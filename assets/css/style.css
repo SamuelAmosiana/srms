@@ -1,0 +1,266 @@
+/* Lusaka South College SRMS Styling */
+/* Orange and Green Theme */
+
+:root {
+    --primary-orange: #FF8C00;
+    --primary-green: #228B22;
+    --light-orange: #FFA500;
+    --light-green: #32CD32;
+    --dark-orange: #FF6600;
+    --dark-green: #006400;
+    --white: #FFFFFF;
+    --light-gray: #F5F5F5;
+    --gray: #CCCCCC;
+    --dark-gray: #333333;
+    --shadow: rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--light-orange) 0%, var(--light-green) 100%);
+    min-height: 100vh;
+    color: var(--dark-gray);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 400px;
+    margin: 50px auto;
+    background: var(--white);
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px var(--shadow);
+    text-align: center;
+}
+
+.container h1, .container h2 {
+    color: var(--primary-green);
+    margin-bottom: 30px;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+.container h1 {
+    font-size: 32px;
+}
+
+/* School branding */
+.school-header {
+    background: var(--primary-green);
+    color: var(--white);
+    padding: 20px;
+    margin: -40px -40px 30px -40px;
+    border-radius: 12px 12px 0 0;
+    text-align: center;
+}
+
+.school-header h1 {
+    color: var(--white);
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.school-header .subtitle {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-top: 5px;
+}
+
+/* Form styling */
+form {
+    margin: 20px 0;
+}
+
+input[type="text"], 
+input[type="password"], 
+input[type="email"] {
+    width: 100%;
+    padding: 15px;
+    margin: 10px 0;
+    border: 2px solid var(--gray);
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+input[type="text"]:focus, 
+input[type="password"]:focus, 
+input[type="email"]:focus {
+    outline: none;
+    border-color: var(--primary-orange);
+    box-shadow: 0 0 8px rgba(255, 140, 0, 0.3);
+}
+
+/* Button styling */
+button, .btn {
+    background: var(--primary-green);
+    color: var(--white);
+    padding: 15px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    margin: 10px 5px;
+    min-width: 120px;
+}
+
+button:hover, .btn:hover {
+    background: var(--dark-green);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(34, 139, 34, 0.3);
+}
+
+.btn-orange {
+    background: var(--primary-orange);
+}
+
+.btn-orange:hover {
+    background: var(--dark-orange);
+    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
+}
+
+/* Login options for index page */
+.login-options {
+    margin: 30px 0;
+}
+
+.login-options a {
+    display: block;
+    background: var(--primary-orange);
+    color: var(--white);
+    padding: 20px;
+    margin: 15px 0;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.login-options a:hover {
+    background: var(--dark-orange);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
+}
+
+.login-options a:nth-child(even) {
+    background: var(--primary-green);
+}
+
+.login-options a:nth-child(even):hover {
+    background: var(--dark-green);
+    box-shadow: 0 4px 12px rgba(34, 139, 34, 0.3);
+}
+
+/* Error and success messages */
+.error {
+    background: #ffebee;
+    color: #c62828;
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 4px solid #c62828;
+    margin: 15px 0;
+    font-weight: 500;
+}
+
+.success {
+    background: #e8f5e8;
+    color: var(--dark-green);
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 4px solid var(--primary-green);
+    margin: 15px 0;
+    font-weight: 500;
+}
+
+/* Links */
+a {
+    color: var(--primary-orange);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: var(--dark-orange);
+    text-decoration: underline;
+}
+
+/* Back link styling */
+.back-link {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--gray);
+}
+
+/* Dashboard basic styling */
+.dashboard {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.dashboard-header {
+    background: var(--primary-green);
+    color: var(--white);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.dashboard-nav {
+    background: var(--light-gray);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.dashboard-nav a {
+    display: inline-block;
+    background: var(--primary-orange);
+    color: var(--white);
+    padding: 10px 20px;
+    margin: 5px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.dashboard-nav a:hover {
+    background: var(--dark-orange);
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+    .container {
+        margin: 20px;
+        padding: 20px;
+    }
+    
+    .school-header {
+        margin: -20px -20px 20px -20px;
+    }
+    
+    .dashboard {
+        margin: 10px;
+        padding: 10px;
+    }
+}
+
+/* Utility classes */
+.text-center { text-align: center; }
+.mt-20 { margin-top: 20px; }
+.mb-20 { margin-bottom: 20px; }
+.p-20 { padding: 20px; }
