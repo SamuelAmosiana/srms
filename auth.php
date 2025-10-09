@@ -5,6 +5,25 @@ function currentUserId() {
     return $_SESSION['user_id'] ?? null;
 }
 
+// Check if user is logged in
+function is_logged_in() {
+    return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+}
+
+// Get user information
+function get_user_info($user_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// Check if user has specific permission
+function has_permission($permission_name) {
+    global $pdo;
+    return currentUserHasPermission($permission_name, $pdo);
+}
+
 function currentUserHasRole($roleName, $pdo) {
     if (!isset($_SESSION['roles'])) {
         if (!currentUserId()) return false;

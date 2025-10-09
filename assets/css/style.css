@@ -23,7 +23,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, var(--light-orange) 0%, var(--light-green) 100%);
+    background: var(--white);
     min-height: 100vh;
     color: var(--dark-gray);
     line-height: 1.6;
