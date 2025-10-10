@@ -104,6 +104,20 @@ CREATE TABLE course (
   FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL
 );
 
+-- Course assignment table for lecturer-course assignments
+CREATE TABLE course_assignment (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  course_id INT NOT NULL,
+  lecturer_id INT NOT NULL,
+  academic_year VARCHAR(20) DEFAULT '2024',
+  semester ENUM('1','2','Summer') DEFAULT '1',
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  is_active TINYINT(1) DEFAULT 1,
+  FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE,
+  FOREIGN KEY (lecturer_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_assignment (course_id, lecturer_id, academic_year, semester)
+);
+
 CREATE TABLE course_enrollment (
   id INT AUTO_INCREMENT PRIMARY KEY,
   student_user_id INT NOT NULL,
