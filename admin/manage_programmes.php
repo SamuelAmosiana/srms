@@ -21,21 +21,21 @@ $stmt->execute([currentUserId()]);
 $user = $stmt->fetch();
 
 // Handle AJAX requests for export
-if (isset($_GET['action']) && $_GET['action'] === 'export_departments') {
+if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
     header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="departments_' . date('Y-m-d') . '.csv"');
+    header('Content-Disposition: attachment; filename="programmes_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['Code', 'Name', 'School', 'Head of Department', 'Students', 'Courses', 'Created']);
+    fputcsv($output, ['Code', 'Name', 'Department', 'Duration', 'Students', 'Courses', 'Created']);
     
     $export_query = "
-        SELECT d.code, d.name, s.name as school_name, d.head_of_department,
-               (SELECT COUNT(*) FROM student_profile sp WHERE sp.department_id = d.id) as student_count,
-               (SELECT COUNT(*) FROM course WHERE department_id = d.id) as programme_count,
-               d.created_at
-        FROM department d 
-        LEFT JOIN school s ON d.school_id = s.id 
-        ORDER BY s.name, d.name
+        SELECT p.code, p.name, d.name as department_name, p.duration,
+               (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
+               (SELECT COUNT(*) FROM course c WHERE c.department_id = d.id) as course_count,
+               p.created_at
+        FROM programme p 
+        LEFT JOIN department d ON p.department_id = d.id 
+        ORDER BY d.name, p.name
     ";
     $export_data = $pdo->query($export_query)->fetchAll();
     
@@ -43,10 +43,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_departments') {
         fputcsv($output, [
             $row['code'],
             $row['name'],
-            $row['school_name'],
-            $row['head_of_department'] ?: 'Not assigned',
+            $row['department_name'] ?: 'Not assigned',
+            $row['duration'],
             $row['student_count'],
-            $row['programme_count'],
+            $row['course_count'],
             date('Y-m-d', strtotime($row['created_at']))
         ]);
     }
@@ -61,36 +61,39 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
-            case 'add_department':
+            case 'add_programme':
                 $name = trim($_POST['name']);
                 $code = strtoupper(trim($_POST['code']));
-                $school_id = $_POST['school_id'];
+                $department_id = $_POST['department_id'];
+                $duration = trim($_POST['duration']);
                 $description = trim($_POST['description']);
-                $head_of_department = trim($_POST['head_of_department']) ?: null;
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($school_id)) {
+                if (empty($name) || empty($code) || empty($department_id) || empty($duration)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
-                    $message = "Department code is too long (max 20 characters)!";
+                    $message = "Programme code is too long (max 20 characters)!";
+                    $messageType = 'error';
+                } elseif (!is_numeric($duration) || $duration <= 0) {
+                    $message = "Duration must be a positive number!";
                     $messageType = 'error';
                 } else {
-                    // Check if department code already exists
-                    $check_stmt = $pdo->prepare("SELECT id FROM department WHERE code = ?");
+                    // Check if programme code already exists
+                    $check_stmt = $pdo->prepare("SELECT id FROM programme WHERE code = ?");
                     $check_stmt->execute([$code]);
                     
                     if ($check_stmt->rowCount() > 0) {
-                        $message = "Department code already exists!";
+                        $message = "Programme code already exists!";
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("INSERT INTO department (name, code, school_id, description, head_of_department, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                            if ($stmt->execute([$name, $code, $school_id, $description, $head_of_department])) {
-                                $message = "Department added successfully!";
+                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, department_id, duration, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                            if ($stmt->execute([$name, $code, $department_id, $duration, $description])) {
+                                $message = "Programme added successfully!";
                                 $messageType = 'success';
                             } else {
-                                $message = "Failed to add department!";
+                                $message = "Failed to add programme!";
                                 $messageType = 'error';
                             }
                         } catch (Exception $e) {
@@ -101,37 +104,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 break;
                 
-            case 'edit_department':
-                $id = $_POST['department_id'];
+            case 'edit_programme':
+                $id = $_POST['programme_id'];
                 $name = trim($_POST['name']);
                 $code = strtoupper(trim($_POST['code']));
-                $school_id = $_POST['school_id'];
+                $department_id = $_POST['department_id'];
+                $duration = trim($_POST['duration']);
                 $description = trim($_POST['description']);
-                $head_of_department = trim($_POST['head_of_department']) ?: null;
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($school_id)) {
+                if (empty($name) || empty($code) || empty($department_id) || empty($duration)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
-                    $message = "Department code is too long (max 20 characters)!";
+                    $message = "Programme code is too long (max 20 characters)!";
+                    $messageType = 'error';
+                } elseif (!is_numeric($duration) || $duration <= 0) {
+                    $message = "Duration must be a positive number!";
                     $messageType = 'error';
                 } else {
-                    // Check if department code already exists (excluding current department)
-                    $check_stmt = $pdo->prepare("SELECT id FROM department WHERE code = ? AND id != ?");
+                    // Check if programme code already exists (excluding current programme)
+                    $check_stmt = $pdo->prepare("SELECT id FROM programme WHERE code = ? AND id != ?");
                     $check_stmt->execute([$code, $id]);
                     
                     if ($check_stmt->rowCount() > 0) {
-                        $message = "Department code already exists!";
+                        $message = "Programme code already exists!";
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("UPDATE department SET name = ?, code = ?, school_id = ?, description = ?, head_of_department = ?, updated_at = NOW() WHERE id = ?");
-                            if ($stmt->execute([$name, $code, $school_id, $description, $head_of_department, $id])) {
-                                $message = "Department updated successfully!";
+                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, code = ?, department_id = ?, duration = ?, description = ?, updated_at = NOW() WHERE id = ?");
+                            if ($stmt->execute([$name, $code, $department_id, $duration, $description, $id])) {
+                                $message = "Programme updated successfully!";
                                 $messageType = 'success';
                             } else {
-                                $message = "Failed to update department!";
+                                $message = "Failed to update programme!";
                                 $messageType = 'error';
                             }
                         } catch (Exception $e) {
@@ -142,33 +148,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 break;
                 
-            case 'delete_department':
-                $id = $_POST['department_id'];
+            case 'delete_programme':
+                $id = $_POST['programme_id'];
                 
-                // Check if department has students
-                $student_check = $pdo->prepare("SELECT COUNT(*) FROM student_profile WHERE department_id = ?");
+                // Check if programme has students
+                $student_check = $pdo->prepare("SELECT COUNT(*) FROM student_profile WHERE programme_id = ?");
                 $student_check->execute([$id]);
                 $student_count = $student_check->fetchColumn();
                 
-                // Check if department has courses
-                $course_check = $pdo->prepare("SELECT COUNT(*) FROM course WHERE department_id = ?");
-                $course_check->execute([$id]);
-                $course_count = $course_check->fetchColumn();
-                
                 if ($student_count > 0) {
-                    $message = "Cannot delete department with {$student_count} enrolled student(s)! Please reassign students first.";
-                    $messageType = 'error';
-                } elseif ($course_count > 0) {
-                    $message = "Cannot delete department with {$course_count} course(s)! Please reassign or delete courses first.";
+                    $message = "Cannot delete programme with {$student_count} enrolled student(s)! Please reassign students first.";
                     $messageType = 'error';
                 } else {
                     try {
-                        $stmt = $pdo->prepare("DELETE FROM department WHERE id = ?");
+                        $stmt = $pdo->prepare("DELETE FROM programme WHERE id = ?");
                         if ($stmt->execute([$id])) {
-                            $message = "Department deleted successfully!";
+                            $message = "Programme deleted successfully!";
                             $messageType = 'success';
                         } else {
-                            $message = "Failed to delete department!";
+                            $message = "Failed to delete programme!";
                             $messageType = 'error';
                         }
                     } catch (Exception $e) {
@@ -181,32 +179,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get departments with school info and counts
-$departments_query = "
-    SELECT d.*, s.name as school_name,
-           (SELECT COUNT(*) FROM student_profile sp WHERE sp.department_id = d.id) as student_count,
-           (SELECT COUNT(*) FROM course WHERE department_id = d.id) as programme_count
-    FROM department d 
-    LEFT JOIN school s ON d.school_id = s.id 
-    ORDER BY s.name, d.name
-";
-$departments = $pdo->query($departments_query)->fetchAll();
-
 // Get filters
 $searchQuery = $_GET['search'] ?? '';
 
 // Build query with filters
-$query = "SELECT d.*, s.name as school_name,
-          (SELECT COUNT(*) FROM student_profile sp WHERE sp.department_id = d.id) as student_count,
-          (SELECT COUNT(*) FROM course WHERE department_id = d.id) as programme_count
-          FROM department d 
-          LEFT JOIN school s ON d.school_id = s.id 
-          WHERE 1=1";
+$query = "
+    SELECT p.*, d.name as department_name,
+           (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
+           (SELECT COUNT(*) FROM course c WHERE c.department_id = p.department_id) as course_count
+    FROM programme p 
+    LEFT JOIN department d ON p.department_id = d.id 
+    WHERE 1=1";
 
 $params = [];
 
 if ($searchQuery) {
-    $query .= " AND (d.name LIKE ? OR d.description LIKE ? OR d.code LIKE ? OR s.name LIKE ?)";
+    $query .= " AND (p.name LIKE ? OR p.code LIKE ? OR p.description LIKE ? OR d.name LIKE ?)";
     $searchParam = "%$searchQuery%";
     $params[] = $searchParam;
     $params[] = $searchParam;
@@ -214,77 +202,74 @@ if ($searchQuery) {
     $params[] = $searchParam;
 }
 
-$query .= " ORDER BY s.name, d.name";
+$query .= " ORDER BY d.name, p.name";
 
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
-$departments = $stmt->fetchAll();
+$programmes = $stmt->fetchAll();
 
-// Get schools for dropdowns
-$schools = $pdo->query("SELECT * FROM school ORDER BY name")->fetchAll();
+// Get departments for dropdowns
+$departments = $pdo->query("SELECT * FROM department ORDER BY name")->fetchAll();
 
-// Get department for editing if specified
-$editDepartment = null;
+// Get programme for editing if specified
+$editProgramme = null;
 if (isset($_GET['edit'])) {
-    $stmt = $pdo->prepare("SELECT d.*, s.name as school_name FROM department d LEFT JOIN school s ON d.school_id = s.id WHERE d.id = ?");
+    $stmt = $pdo->prepare("SELECT p.*, d.name as department_name FROM programme p LEFT JOIN department d ON p.department_id = d.id WHERE p.id = ?");
     $stmt->execute([$_GET['edit']]);
-    $editDepartment = $stmt->fetch();
+    $editProgramme = $stmt->fetch();
 }
 
-// Get department details if viewing
-$viewingDepartment = null;
-$departmentStudents = [];
-$departmentProgrammes = [];
+// Get programme details for viewing if specified
+$viewProgramme = null;
+$programmeStudents = [];
+$programmeCourses = [];
 if (isset($_GET['view'])) {
-    $dept_id = $_GET['view'];
-    $dept_stmt = $pdo->prepare("
-        SELECT d.*, s.name as school_name,
-               (SELECT COUNT(*) FROM student_profile sp WHERE sp.department_id = d.id) as student_count,
-               (SELECT COUNT(*) FROM course WHERE department_id = d.id) as programme_count
-        FROM department d 
-        LEFT JOIN school s ON d.school_id = s.id 
-        WHERE d.id = ?
+    $programme_id = $_GET['view'];
+    $programme_stmt = $pdo->prepare("
+        SELECT p.*, d.name as department_name,
+               (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
+               (SELECT COUNT(*) FROM course c WHERE c.department_id = p.department_id) as course_count
+        FROM programme p 
+        LEFT JOIN department d ON p.department_id = d.id 
+        WHERE p.id = ?
     ");
-    $dept_stmt->execute([$dept_id]);
-    $viewingDepartment = $dept_stmt->fetch();
+    $programme_stmt->execute([$programme_id]);
+    $viewProgramme = $programme_stmt->fetch();
     
-    if ($viewingDepartment) {
-        // Get students in this department
+    if ($viewProgramme) {
+        // Get students in this programme
         $students_stmt = $pdo->prepare("
-            SELECT sp.*, u.username, u.email as user_email, p.name as programme_name
+            SELECT sp.*, u.username, u.email as user_email
             FROM student_profile sp 
             JOIN users u ON sp.user_id = u.id
-            LEFT JOIN programme p ON sp.programme_id = p.id 
-            WHERE sp.department_id = ? 
+            WHERE sp.programme_id = ?
             ORDER BY sp.full_name
         ");
-        $students_stmt->execute([$dept_id]);
-        $departmentStudents = $students_stmt->fetchAll();
+        $students_stmt->execute([$programme_id]);
+        $programmeStudents = $students_stmt->fetchAll();
         
-        // Get courses in this department
-        $programmes_stmt = $pdo->prepare("
+        // Get courses in the same department
+        $courses_stmt = $pdo->prepare("
             SELECT c.*, 
                    (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count
             FROM course c 
-            WHERE c.department_id = ? 
+            WHERE c.department_id = ?
             ORDER BY c.name
         ");
-        $programmes_stmt->execute([$dept_id]);
-        $departmentProgrammes = $programmes_stmt->fetchAll();
+        $courses_stmt->execute([$viewProgramme['department_id']]);
+        $programmeCourses = $courses_stmt->fetchAll();
     }
 }
 
-// Add missing columns to department table if they don't exist
+// Add missing columns to programme table if they don't exist
 try {
-    $pdo->exec("ALTER TABLE department ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE");
-    $pdo->exec("ALTER TABLE department ADD COLUMN IF NOT EXISTS description TEXT");
-    $pdo->exec("ALTER TABLE department ADD COLUMN IF NOT EXISTS head_of_department VARCHAR(255)");
-    $pdo->exec("ALTER TABLE department ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
-    $pdo->exec("ALTER TABLE department ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
-    
-    // Add department_id to programme table for future functionality
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS description TEXT");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration INT");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS department_id INT");
-    $pdo->exec("ALTER TABLE programme ADD CONSTRAINT FK_programme_department FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL");
+    $pdo->exec("ALTER TABLE programme ADD CONSTRAINT IF NOT EXISTS FK_programme_department FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL");
 } catch (Exception $e) {
     // Columns might already exist
 }
@@ -294,7 +279,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Departments - LSC SRMS</title>
+    <title>Manage Programmes - LSC SRMS</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -373,11 +358,11 @@ try {
                     <i class="fas fa-university"></i>
                     <span>Schools</span>
                 </a>
-                <a href="manage_departments.php" class="nav-item active">
+                <a href="manage_departments.php" class="nav-item">
                     <i class="fas fa-building"></i>
                     <span>Departments</span>
                 </a>
-                <a href="manage_programmes.php" class="nav-item">
+                <a href="manage_programmes.php" class="nav-item active">
                     <i class="fas fa-graduation-cap"></i>
                     <span>Programmes</span>
                 </a>
@@ -420,8 +405,8 @@ try {
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-building"></i> Department Management</h1>
-            <p>Create, edit, and manage academic departments within the institution</p>
+            <h1><i class="fas fa-graduation-cap"></i> Programme Management</h1>
+            <p>Create, edit, and manage academic programmes within the institution</p>
         </div>
 
         <?php if ($message): ?>
@@ -435,17 +420,17 @@ try {
         <div class="action-bar">
             <div class="action-left">
                 <?php if (isset($_GET['view'])): ?>
-                    <a href="manage_departments.php" class="btn btn-orange">
-                        <i class="fas fa-arrow-left"></i> Back to Departments
+                    <a href="manage_programmes.php" class="btn btn-orange">
+                        <i class="fas fa-arrow-left"></i> Back to Programmes
                     </a>
                 <?php endif; ?>
             </div>
             <div class="action-right">
                 <?php if (!isset($_GET['view'])): ?>
                     <button onclick="showAddForm()" class="btn btn-green">
-                        <i class="fas fa-plus"></i> Add New Department
+                        <i class="fas fa-plus"></i> Add New Programme
                     </button>
-                    <a href="?action=export_departments" class="btn btn-info">
+                    <a href="?action=export_programmes" class="btn btn-info">
                         <i class="fas fa-download"></i> Export CSV
                     </a>
                 <?php endif; ?>
@@ -458,15 +443,15 @@ try {
                 <form method="GET" class="filters-form">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="search">Search Departments</label>
-                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or school">
+                            <label for="search">Search Programmes</label>
+                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or department">
                         </div>
                         
                         <div class="form-group">
                             <button type="submit" class="btn btn-green">
                                 <i class="fas fa-search"></i> Search
                             </button>
-                            <a href="manage_departments.php" class="btn btn-orange">
+                            <a href="manage_programmes.php" class="btn btn-orange">
                                 <i class="fas fa-refresh"></i> Reset
                             </a>
                         </div>
@@ -475,51 +460,51 @@ try {
             </div>
         </div>
 
-        <!-- Add/Edit Department Form -->
-        <div class="form-section" id="departmentForm" style="<?php echo $editDepartment ? 'display: block;' : 'display: none;'; ?>">
+        <!-- Add/Edit Programme Form -->
+        <div class="form-section" id="programmeForm" style="<?php echo $editProgramme ? 'display: block;' : 'display: none;'; ?>">
             <div class="form-card">
                 <h2>
-                    <i class="fas fa-<?php echo $editDepartment ? 'edit' : 'plus'; ?>"></i>
-                    <?php echo $editDepartment ? 'Edit Department' : 'Add New Department'; ?>
+                    <i class="fas fa-<?php echo $editProgramme ? 'edit' : 'plus'; ?>"></i>
+                    <?php echo $editProgramme ? 'Edit Programme' : 'Add New Programme'; ?>
                 </h2>
                 
                 <form method="POST" class="school-form">
-                    <input type="hidden" name="action" value="<?php echo $editDepartment ? 'edit_department' : 'add_department'; ?>">
-                    <?php if ($editDepartment): ?>
-                        <input type="hidden" name="department_id" value="<?php echo $editDepartment['id']; ?>">
+                    <input type="hidden" name="action" value="<?php echo $editProgramme ? 'edit_programme' : 'add_programme'; ?>">
+                    <?php if ($editProgramme): ?>
+                        <input type="hidden" name="programme_id" value="<?php echo $editProgramme['id']; ?>">
                     <?php endif; ?>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="name">Department Name *</label>
+                            <label for="name">Programme Name *</label>
                             <input type="text" id="name" name="name" required maxlength="150" 
-                                   value="<?php echo htmlspecialchars($editDepartment['name'] ?? ''); ?>">
+                                   value="<?php echo htmlspecialchars($editProgramme['name'] ?? ''); ?>">
                         </div>
                         
                         <div class="form-group">
-                            <label for="code">Department Code *</label>
+                            <label for="code">Programme Code *</label>
                             <input type="text" id="code" name="code" required maxlength="20" style="text-transform: uppercase;"
-                                   value="<?php echo htmlspecialchars($editDepartment['code'] ?? ''); ?>">
+                                   value="<?php echo htmlspecialchars($editProgramme['code'] ?? ''); ?>">
                         </div>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="school_id">School *</label>
-                            <select id="school_id" name="school_id" required>
-                                <option value="">-- Select School --</option>
-                                <?php foreach ($schools as $school): ?>
-                                    <option value="<?php echo $school['id']; ?>" <?php echo isset($editDepartment['school_id']) && $editDepartment['school_id'] == $school['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($school['name']); ?>
+                            <label for="department_id">Department *</label>
+                            <select id="department_id" name="department_id" required>
+                                <option value="">-- Select Department --</option>
+                                <?php foreach ($departments as $department): ?>
+                                    <option value="<?php echo $department['id']; ?>" <?php echo isset($editProgramme['department_id']) && $editProgramme['department_id'] == $department['id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($department['name']); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         
                         <div class="form-group">
-                            <label for="head_of_department">Head of Department</label>
-                            <input type="text" id="head_of_department" name="head_of_department" maxlength="255" 
-                                   value="<?php echo htmlspecialchars($editDepartment['head_of_department'] ?? ''); ?>">
+                            <label for="duration">Duration (Years) *</label>
+                            <input type="number" id="duration" name="duration" required min="1" max="10" 
+                                   value="<?php echo htmlspecialchars($editProgramme['duration'] ?? ''); ?>">
                         </div>
                     </div>
                     
@@ -527,13 +512,13 @@ try {
                         <div class="form-group full-width">
                             <label for="description">Description</label>
                             <textarea id="description" name="description" rows="3" 
-                                      placeholder="Brief description of the department"><?php echo htmlspecialchars($editDepartment['description'] ?? ''); ?></textarea>
+                                      placeholder="Brief description of the programme"><?php echo htmlspecialchars($editProgramme['description'] ?? ''); ?></textarea>
                         </div>
                     </div>
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-green">
-                            <i class="fas fa-save"></i> <?php echo $editDepartment ? 'Update Department' : 'Create Department'; ?>
+                            <i class="fas fa-save"></i> <?php echo $editProgramme ? 'Update Programme' : 'Create Programme'; ?>
                         </button>
                         <button type="button" onclick="hideForm()" class="btn btn-orange">
                             <i class="fas fa-times"></i> Cancel
@@ -543,23 +528,21 @@ try {
             </div>
         </div>
 
-        <?php if ($viewingDepartment): ?>
-            <!-- Department Details View -->
+        <?php if ($viewProgramme): ?>
+            <!-- Programme Details View -->
             <div class="school-header-card">
                 <div class="school-icon">
-                    <i class="fas fa-building"></i>
+                    <i class="fas fa-graduation-cap"></i>
                 </div>
                 <div class="school-info">
-                    <h2><?php echo htmlspecialchars($viewingDepartment['name']); ?></h2>
-                    <p class="department-code">Code: <?php echo htmlspecialchars($viewingDepartment['code']); ?></p>
-                    <p class="school-info">School: <?php echo htmlspecialchars($viewingDepartment['school_name']); ?></p>
-                    <?php if ($viewingDepartment['head_of_department']): ?>
-                        <p class="hod-info">Head of Department: <?php echo htmlspecialchars($viewingDepartment['head_of_department']); ?></p>
-                    <?php endif; ?>
-                    <p class="school-description"><?php echo htmlspecialchars($viewingDepartment['description'] ?? 'No description available'); ?></p>
+                    <h2><?php echo htmlspecialchars($viewProgramme['name']); ?></h2>
+                    <p class="department-code">Code: <?php echo htmlspecialchars($viewProgramme['code']); ?></p>
+                    <p class="school-info">Department: <?php echo htmlspecialchars($viewProgramme['department_name'] ?? 'N/A'); ?></p>
+                    <p class="school-info">Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> Years</p>
+                    <p class="school-description"><?php echo htmlspecialchars($viewProgramme['description'] ?? 'No description available'); ?></p>
                 </div>
                 <div class="school-actions">
-                    <a href="?edit=<?php echo $viewingDepartment['id']; ?>" class="btn btn-orange">
+                    <a href="?edit=<?php echo $viewProgramme['id']; ?>" class="btn btn-orange">
                         <i class="fas fa-edit"></i> Edit
                     </a>
                 </div>
@@ -572,7 +555,7 @@ try {
                         <i class="fas fa-users"></i>
                     </div>
                     <div class="stat-content">
-                        <h3><?php echo $viewingDepartment['student_count']; ?></h3>
+                        <h3><?php echo $viewProgramme['student_count']; ?></h3>
                         <p>Total Students</p>
                     </div>
                 </div>
@@ -582,7 +565,7 @@ try {
                         <i class="fas fa-book"></i>
                     </div>
                     <div class="stat-content">
-                        <h3><?php echo $viewingDepartment['programme_count']; ?></h3>
+                        <h3><?php echo $viewProgramme['course_count']; ?></h3>
                         <p>Courses</p>
                     </div>
                 </div>
@@ -592,21 +575,59 @@ try {
                         <i class="fas fa-calendar"></i>
                     </div>
                     <div class="stat-content">
-                        <h3><?php echo date('M Y', strtotime($viewingDepartment['created_at'])); ?></h3>
-                        <p>Established</p>
+                        <h3><?php echo date('M Y', strtotime($viewProgramme['created_at'])); ?></h3>
+                        <p>Created</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- Students Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="fas fa-users"></i> Students</h3>
+                    <div class="section-actions">
+                        <input type="text" class="search-input" placeholder="Search students..." onkeyup="filterTable(this, 'studentsTable')">
+                    </div>
+                </div>
+                <?php if (empty($programmeStudents)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <h4>No Students</h4>
+                        <p>No students enrolled in this programme</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="users-table" id="studentsTable">
+                            <thead>
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($programmeStudents as $student): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($student['student_id']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['user_email']); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <!-- Courses Section -->
             <div class="section-card">
                 <div class="section-header">
-                    <h3><i class="fas fa-book"></i> Courses</h3>
+                    <h3><i class="fas fa-book"></i> Department Courses</h3>
                     <div class="section-actions">
                         <input type="text" class="search-input" placeholder="Search courses..." onkeyup="filterTable(this, 'coursesTable')">
                     </div>
                 </div>
-                <?php if (empty($departmentProgrammes)): ?>
+                <?php if (empty($programmeCourses)): ?>
                     <div class="empty-state">
                         <i class="fas fa-book"></i>
                         <h4>No Courses</h4>
@@ -624,52 +645,12 @@ try {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($departmentProgrammes as $programme): ?>
+                                <?php foreach ($programmeCourses as $course): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($programme['code']); ?></td>
-                                        <td><?php echo htmlspecialchars($programme['name']); ?></td>
-                                        <td><?php echo $programme['credits']; ?></td>
-                                        <td><?php echo $programme['enrollment_count']; ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Students Section -->
-            <div class="section-card">
-                <div class="section-header">
-                    <h3><i class="fas fa-users"></i> Students</h3>
-                    <div class="section-actions">
-                        <input type="text" class="search-input" placeholder="Search students..." onkeyup="filterTable(this, 'studentsTable')">
-                    </div>
-                </div>
-                <?php if (empty($departmentStudents)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-users"></i>
-                        <h4>No Students</h4>
-                        <p>No students found in this department</p>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="users-table" id="studentsTable">
-                            <thead>
-                                <tr>
-                                    <th>Student ID</th>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Programme</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($departmentStudents as $student): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($student['student_id']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['full_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['user_email']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['programme_name'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($course['code']); ?></td>
+                                        <td><?php echo htmlspecialchars($course['name']); ?></td>
+                                        <td><?php echo $course['credits']; ?></td>
+                                        <td><?php echo $course['enrollment_count']; ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -678,11 +659,11 @@ try {
                 <?php endif; ?>
             </div>
         <?php else: ?>
-            <!-- Departments Table -->
+            <!-- Programmes Table -->
             <div class="table-section">
                 <div class="table-card">
                     <div class="table-header">
-                        <h2><i class="fas fa-list"></i> Departments List (<?php echo count($departments); ?> departments)</h2>
+                        <h2><i class="fas fa-list"></i> Programmes List (<?php echo count($programmes); ?> programmes)</h2>
                     </div>
                     
                     <div class="table-responsive">
@@ -692,34 +673,34 @@ try {
                                     <th>ID</th>
                                     <th>Code</th>
                                     <th>Name</th>
-                                    <th>School</th>
-                                    <th>Head of Dept</th>
+                                    <th>Department</th>
+                                    <th>Duration (Years)</th>
                                     <th>Students</th>
                                     <th>Courses</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($departments as $department): ?>
+                                <?php foreach ($programmes as $programme): ?>
                                     <tr>
-                                        <td><?php echo $department['id']; ?></td>
-                                        <td><?php echo htmlspecialchars($department['code']); ?></td>
-                                        <td><strong><?php echo htmlspecialchars($department['name']); ?></strong></td>
-                                        <td><?php echo htmlspecialchars($department['school_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($department['head_of_department'] ?? 'N/A'); ?></td>
-                                        <td><span class="count-badge green"><?php echo $department['student_count']; ?></span></td>
-                                        <td><span class="count-badge orange"><?php echo $department['programme_count']; ?></span></td>
+                                        <td><?php echo $programme['id']; ?></td>
+                                        <td><?php echo htmlspecialchars($programme['code']); ?></td>
+                                        <td><strong><?php echo htmlspecialchars($programme['name']); ?></strong></td>
+                                        <td><?php echo htmlspecialchars($programme['department_name'] ?? 'N/A'); ?></td>
+                                        <td><?php echo $programme['duration']; ?></td>
+                                        <td><span class="count-badge green"><?php echo $programme['student_count']; ?></span></td>
+                                        <td><span class="count-badge orange"><?php echo $programme['course_count']; ?></span></td>
                                         <td class="actions">
-                                            <a href="?view=<?php echo $department['id']; ?>" class="btn-icon btn-view" title="View Details">
+                                            <a href="?view=<?php echo $programme['id']; ?>" class="btn-icon btn-view" title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            <a href="?edit=<?php echo $department['id']; ?>" class="btn-icon btn-edit" title="Edit">
+                                            <a href="?edit=<?php echo $programme['id']; ?>" class="btn-icon btn-edit" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <?php if ($department['student_count'] == 0 && $department['programme_count'] == 0): ?>
-                                                <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this department?');">
-                                                    <input type="hidden" name="action" value="delete_department">
-                                                    <input type="hidden" name="department_id" value="<?php echo $department['id']; ?>">
+                                            <?php if ($programme['student_count'] == 0): ?>
+                                                <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this programme?');">
+                                                    <input type="hidden" name="action" value="delete_programme">
+                                                    <input type="hidden" name="programme_id" value="<?php echo $programme['id']; ?>">
                                                     <button type="submit" class="btn-icon btn-delete" title="Delete">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
@@ -739,12 +720,12 @@ try {
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
         function showAddForm() {
-            document.getElementById('departmentForm').style.display = 'block';
+            document.getElementById('programmeForm').style.display = 'block';
             document.getElementById('name').focus();
         }
         
         function hideForm() {
-            document.getElementById('departmentForm').style.display = 'none';
+            document.getElementById('programmeForm').style.display = 'none';
         }
 
         function filterTable(input, tableId) {
@@ -765,11 +746,24 @@ try {
         }
         
         // Auto-show form if editing
-        <?php if ($editDepartment): ?>
+        <?php if ($editProgramme): ?>
             document.addEventListener('DOMContentLoaded', function() {
                 showAddForm();
             });
         <?php endif; ?>
+
+        // Auto-hide alerts
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    setTimeout(() => {
+                        alert.remove();
+                    }, 300);
+                }, 5000);
+            });
+        });
     </script>
 </body>
 </html>
