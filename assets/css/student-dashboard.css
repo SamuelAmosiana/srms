@@ -1,0 +1,391 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body.student-layout {
+    font-family: 'Arial', sans-serif;
+    background-color: #f5f6fa;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Top Navigation Bar */
+.top-nav {
+    background-color: #2c3e50;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+    flex-wrap: wrap;
+}
+
+.nav-left, .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logo {
+    height: 40px;
+}
+
+.logo-text {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.sidebar-toggle {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.welcome-text {
+    font-size: 1rem;
+}
+
+.student-id {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.nav-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.theme-toggle, .profile-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.dropdown {
+    position: relative;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background-color: white;
+    color: #333;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    min-width: 150px;
+}
+
+.dropdown-menu a {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: #333;
+    text-decoration: none;
+}
+
+.dropdown-menu a:hover {
+    background-color: #f0f0f0;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background-color: #ddd;
+    margin: 0.5rem 0;
+}
+
+/* Sidebar */
+.sidebar {
+    background-color: #34495e;
+    color: white;
+    width: 250px;
+    position: fixed;
+    top: 60px;
+    bottom: 0;
+    transition: transform 0.3s ease;
+    z-index: 999;
+}
+
+.sidebar-hidden {
+    transform: translateX(-100%);
+}
+
+.sidebar-header {
+    padding: 1rem;
+    background-color: #2c3e50;
+}
+
+.sidebar-nav {
+    padding: 1rem;
+}
+
+.nav-section {
+    margin-bottom: 1rem;
+}
+
+.nav-section h4 {
+    font-size: 1rem;
+    opacity: 0.7;
+    margin-bottom: 0.5rem;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.nav-item:hover, .nav-item.active {
+    background-color: #1abc9c;
+}
+
+/* Main Content */
+.main-content {
+    margin-left: 250px;
+    padding: 80px 2rem 2rem;
+    flex-grow: 1;
+}
+
+.content-header {
+    margin-bottom: 2rem;
+}
+
+.content-header h1 {
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.content-header p {
+    font-size: 1rem;
+    color: #666;
+}
+
+/* Statistics Cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    gap: 1rem;
+}
+
+.stat-icon {
+    font-size: 2rem;
+    padding: 0.5rem;
+    border-radius: 50%;
+}
+
+.stat-icon.orange {
+    background-color: #f39c12;
+    color: white;
+}
+
+.stat-icon.green {
+    background-color: #1abc9c;
+    color: white;
+}
+
+.stat-info h3 {
+    font-size: 1.5rem;
+}
+
+.stat-info p {
+    font-size: 1rem;
+    color: #666;
+}
+
+/* Quick Actions */
+.quick-actions h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.action-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    text-align: center;
+    text-decoration: none;
+    color: #333;
+}
+
+.action-card.orange {
+    background-color: #f39c12;
+    color: white;
+}
+
+.action-card.green {
+    background-color: #1abc9c;
+    color: white;
+}
+
+.action-card i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.action-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.action-card p {
+    font-size: 0.9rem;
+}
+
+/* Recent Activity */
+.recent-activity h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.activity-item {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    gap: 1rem;
+}
+
+.activity-icon {
+    font-size: 1.5rem;
+    padding: 0.5rem;
+    border-radius: 50%;
+}
+
+.activity-icon.orange {
+    background-color: #f39c12;
+    color: white;
+}
+
+.activity-icon.green {
+    background-color: #1abc9c;
+    color: white;
+}
+
+.activity-content h4 {
+    font-size: 1rem;
+}
+
+.activity-content p {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.activity-time {
+    font-size: 0.8rem;
+    color: #999;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 200px;
+    }
+    
+    .main-content {
+        margin-left: 200px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        width: 250px;
+    }
+    
+    .sidebar.active {
+        transform: translateX(0);
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+    
+    .top-nav {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .nav-right {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid, .actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .content-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .quick-actions h2, .recent-activity h2 {
+        font-size: 1.2rem;
+    }
+    
+    .stat-card, .action-card, .activity-item {
+        padding: 0.75rem;
+    }
+}

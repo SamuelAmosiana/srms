@@ -1,0 +1,59 @@
+# Quick Fix Summary - Student Dashboard
+
+## ❌ The Error
+```
+Fatal error: Column 'sp.student_id' doesn't exist
+```
+
+## ✅ The Fix
+
+### Changed This:
+```php
+// WRONG - Column doesn't exist
+SELECT sp.full_name, sp.student_id FROM student_profile
+
+// WRONG - Table doesn't exist  
+SELECT COUNT(*) FROM course_registration WHERE student_id = ?
+
+// WRONG - Table doesn't exist
+SELECT AVG(grade) FROM student_results WHERE student_id = ?
+```
+
+### To This:
+```php
+// CORRECT - Using existing column
+SELECT sp.full_name, sp.student_number, sp.balance FROM student_profile
+
+// CORRECT - Using existing table
+SELECT COUNT(*) FROM course_enrollment WHERE student_user_id = ? AND status = 'enrolled'
+
+// CORRECT - Proper GPA calculation from results table
+SELECT AVG(CASE WHEN grade='A' THEN 4.0 ... END) 
+FROM results r JOIN course_enrollment ce ...
+```
+
+## 🧪 Test Login
+
+**URL:** http://localhost/srms/login.php
+
+**Student Credentials:**
+- Username: `LSC000001`
+- Password: `LSC000001`
+
+**Expected Result:**
+- ✅ Dashboard loads successfully
+- ✅ Shows: "Welcome, Alice Student (LSC000001)"
+- ✅ Shows enrolled courses count
+- ✅ Shows GPA (calculated from results)
+- ✅ Shows fee balance: K500.00
+
+## 📝 Key Points
+
+1. **Column name is `student_number` NOT `student_id`**
+2. **Table name is `course_enrollment` NOT `course_registration`**
+3. **Results are in `results` table, NOT `student_results`**
+4. **Fee balance is in `student_profile.balance` NOT separate table**
+
+## 🎉 Status: FIXED!
+
+The student dashboard now works correctly with the existing database schema.
