@@ -26,15 +26,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_courses') {
     header('Content-Disposition: attachment; filename="courses_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['Code', 'Name', 'Department', 'Credits', 'Enrollments', 'Created']);
+    fputcsv($output, ['Code', 'Name', 'Programme', 'Credits', 'Enrollments', 'Created']);
     
     $export_query = "
-        SELECT c.code, c.name, d.name as department_name, c.credits,
+        SELECT c.code, c.name, p.name as programme_name, c.credits,
                (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count,
                c.created_at
         FROM course c 
-        LEFT JOIN department d ON c.department_id = d.id 
-        ORDER BY d.name, c.name
+        LEFT JOIN programme p ON c.programme_id = p.id 
+        ORDER BY p.name, c.name
     ";
     $export_data = $pdo->query($export_query)->fetchAll();
     
@@ -42,7 +42,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_courses') {
         fputcsv($output, [
             $row['code'],
             $row['name'],
-            $row['department_name'] ?: 'Not assigned',
+            $row['programme_name'] ?: 'Not assigned',
             $row['credits'],
             $row['enrollment_count'],
             date('Y-m-d', strtotime($row['created_at']))
@@ -62,12 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             case 'add_course':
                 $name = trim($_POST['name']);
                 $code = strtoupper(trim($_POST['code']));
-                $department_id = $_POST['department_id'];
+                $programme_id = $_POST['programme_id'];
                 $credits = $_POST['credits'];
                 $description = trim($_POST['description']);
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($department_id) || empty($credits)) {
+                if (empty($name) || empty($code) || empty($programme_id) || empty($credits)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -86,8 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("INSERT INTO course (name, code, department_id, credits, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                            if ($stmt->execute([$name, $code, $department_id, $credits, $description])) {
+                            $stmt = $pdo->prepare("INSERT INTO course (name, code, programme_id, credits, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                            if ($stmt->execute([$name, $code, $programme_id, $credits, $description])) {
                                 $message = "Course added successfully!";
                                 $messageType = 'success';
                             } else {
@@ -106,12 +106,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $id = $_POST['course_id'];
                 $name = trim($_POST['name']);
                 $code = strtoupper(trim($_POST['code']));
-                $department_id = $_POST['department_id'];
+                $programme_id = $_POST['programme_id'];
                 $credits = $_POST['credits'];
                 $description = trim($_POST['description']);
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($department_id) || empty($credits)) {
+                if (empty($name) || empty($code) || empty($programme_id) || empty($credits)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -130,8 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("UPDATE course SET name = ?, code = ?, department_id = ?, credits = ?, description = ?, updated_at = NOW() WHERE id = ?");
-                            if ($stmt->execute([$name, $code, $department_id, $credits, $description, $id])) {
+                            $stmt = $pdo->prepare("UPDATE course SET name = ?, code = ?, programme_id = ?, credits = ?, description = ?, updated_at = NOW() WHERE id = ?");
+                            if ($stmt->execute([$name, $code, $programme_id, $credits, $description, $id])) {
                                 $message = "Course updated successfully!";
                                 $messageType = 'success';
                             } else {
@@ -182,16 +182,16 @@ $searchQuery = $_GET['search'] ?? '';
 
 // Build query with filters
 $query = "
-    SELECT c.*, d.name as department_name,
+    SELECT c.*, p.name as programme_name,
            (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count
     FROM course c 
-    LEFT JOIN department d ON c.department_id = d.id 
+    LEFT JOIN programme p ON c.programme_id = p.id 
     WHERE 1=1";
 
 $params = [];
 
 if ($searchQuery) {
-    $query .= " AND (c.name LIKE ? OR c.code LIKE ? OR c.description LIKE ? OR d.name LIKE ?)";
+    $query .= " AND (c.name LIKE ? OR c.code LIKE ? OR c.description LIKE ? OR p.name LIKE ?)";
     $searchParam = "%$searchQuery%";
     $params[] = $searchParam;
     $params[] = $searchParam;
@@ -199,19 +199,19 @@ if ($searchQuery) {
     $params[] = $searchParam;
 }
 
-$query .= " ORDER BY d.name, c.name";
+$query .= " ORDER BY p.name, c.name";
 
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $courses = $stmt->fetchAll();
 
-// Get departments for dropdowns
-$departments = $pdo->query("SELECT * FROM department ORDER BY name")->fetchAll();
+// Get programmes for dropdowns
+$programmes = $pdo->query("SELECT * FROM programme ORDER BY name")->fetchAll();
 
 // Get course for editing if specified
 $editCourse = null;
 if (isset($_GET['edit'])) {
-    $stmt = $pdo->prepare("SELECT c.*, d.name as department_name FROM course c LEFT JOIN department d ON c.department_id = d.id WHERE c.id = ?");
+    $stmt = $pdo->prepare("SELECT c.*, p.name as programme_name FROM course c LEFT JOIN programme p ON c.programme_id = p.id WHERE c.id = ?");
     $stmt->execute([$_GET['edit']]);
     $editCourse = $stmt->fetch();
 }
@@ -222,10 +222,10 @@ $courseEnrollments = [];
 if (isset($_GET['view'])) {
     $course_id = $_GET['view'];
     $course_stmt = $pdo->prepare("
-        SELECT c.*, d.name as department_name,
+        SELECT c.*, p.name as programme_name,
                (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count
         FROM course c 
-        LEFT JOIN department d ON c.department_id = d.id 
+        LEFT JOIN programme p ON c.programme_id = p.id 
         WHERE c.id = ?
     ");
     $course_stmt->execute([$course_id]);
@@ -248,6 +248,10 @@ if (isset($_GET['view'])) {
 
 // Add missing columns to course table if they don't exist
 try {
+    $pdo->exec("ALTER TABLE course DROP FOREIGN KEY IF EXISTS FK_course_department");
+    $pdo->exec("ALTER TABLE course DROP COLUMN IF EXISTS department_id");
+    $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS programme_id INT");
+    $pdo->exec("ALTER TABLE course ADD CONSTRAINT FK_course_programme FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL");
     $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE");
     $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS description TEXT");
     $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS credits INT");
@@ -427,7 +431,7 @@ try {
                     <div class="form-row">
                         <div class="form-group">
                             <label for="search">Search Courses</label>
-                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or department">
+                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or programme">
                         </div>
                         
                         <div class="form-group">
@@ -473,12 +477,12 @@ try {
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="department_id">Department *</label>
-                            <select id="department_id" name="department_id" required>
-                                <option value="">-- Select Department --</option>
-                                <?php foreach ($departments as $department): ?>
-                                    <option value="<?php echo $department['id']; ?>" <?php echo isset($editCourse['department_id']) && $editCourse['department_id'] == $department['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($department['name']); ?>
+                            <label for="programme_id">Programme *</label>
+                            <select id="programme_id" name="programme_id" required>
+                                <option value="">-- Select Programme --</option>
+                                <?php foreach ($programmes as $programme): ?>
+                                    <option value="<?php echo $programme['id']; ?>" <?php echo isset($editCourse['programme_id']) && $editCourse['programme_id'] == $programme['id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($programme['name']); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -520,7 +524,7 @@ try {
                 <div class="school-info">
                     <h2><?php echo htmlspecialchars($viewCourse['name']); ?></h2>
                     <p class="department-code">Code: <?php echo htmlspecialchars($viewCourse['code']); ?></p>
-                    <p class="school-info">Department: <?php echo htmlspecialchars($viewCourse['department_name'] ?? 'N/A'); ?></p>
+                    <p class="school-info">Programme: <?php echo htmlspecialchars($viewCourse['programme_name'] ?? 'N/A'); ?></p>
                     <p class="school-info">Credits: <?php echo htmlspecialchars($viewCourse['credits']); ?></p>
                     <p class="school-description"><?php echo htmlspecialchars($viewCourse['description'] ?? 'No description available'); ?></p>
                 </div>
@@ -608,7 +612,7 @@ try {
                                     <th>ID</th>
                                     <th>Code</th>
                                     <th>Name</th>
-                                    <th>Department</th>
+                                    <th>Programme</th>
                                     <th>Credits</th>
                                     <th>Enrollments</th>
                                     <th>Actions</th>
@@ -620,7 +624,7 @@ try {
                                         <td><?php echo $course['id']; ?></td>
                                         <td><?php echo htmlspecialchars($course['code']); ?></td>
                                         <td><strong><?php echo htmlspecialchars($course['name']); ?></strong></td>
-                                        <td><?php echo htmlspecialchars($course['department_name'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($course['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo $course['credits']; ?></td>
                                         <td><span class="count-badge green"><?php echo $course['enrollment_count']; ?></span></td>
                                         <td class="actions">

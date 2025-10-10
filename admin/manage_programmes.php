@@ -26,16 +26,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
     header('Content-Disposition: attachment; filename="programmes_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['Code', 'Name', 'Department', 'Duration', 'Students', 'Courses', 'Created']);
+    fputcsv($output, ['Code', 'Name', 'School', 'Duration', 'Students', 'Courses', 'Created']);
     
     $export_query = "
-        SELECT p.code, p.name, d.name as department_name, p.duration,
+        SELECT p.code, p.name, s.name as school_name, p.duration,
                (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
-               (SELECT COUNT(*) FROM course c WHERE c.department_id = d.id) as course_count,
+               (SELECT COUNT(*) FROM course c WHERE c.programme_id = p.id) as course_count,
                p.created_at
         FROM programme p 
-        LEFT JOIN department d ON p.department_id = d.id 
-        ORDER BY d.name, p.name
+        LEFT JOIN school s ON p.school_id = s.id 
+        ORDER BY s.name, p.name
     ";
     $export_data = $pdo->query($export_query)->fetchAll();
     
@@ -43,7 +43,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
         fputcsv($output, [
             $row['code'],
             $row['name'],
-            $row['department_name'] ?: 'Not assigned',
+            $row['school_name'] ?: 'Not assigned',
             $row['duration'],
             $row['student_count'],
             $row['course_count'],
@@ -64,12 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             case 'add_programme':
                 $name = trim($_POST['name']);
                 $code = strtoupper(trim($_POST['code']));
-                $department_id = $_POST['department_id'];
+                $school_id = $_POST['school_id'];
                 $duration = trim($_POST['duration']);
                 $description = trim($_POST['description']);
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($department_id) || empty($duration)) {
+                if (empty($name) || empty($code) || empty($school_id) || empty($duration)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -88,8 +88,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, department_id, duration, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                            if ($stmt->execute([$name, $code, $department_id, $duration, $description])) {
+                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                            if ($stmt->execute([$name, $code, $school_id, $duration, $description])) {
                                 $message = "Programme added successfully!";
                                 $messageType = 'success';
                             } else {
@@ -108,12 +108,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $id = $_POST['programme_id'];
                 $name = trim($_POST['name']);
                 $code = strtoupper(trim($_POST['code']));
-                $department_id = $_POST['department_id'];
+                $school_id = $_POST['school_id'];
                 $duration = trim($_POST['duration']);
                 $description = trim($_POST['description']);
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($department_id) || empty($duration)) {
+                if (empty($name) || empty($code) || empty($school_id) || empty($duration)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -132,8 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, code = ?, department_id = ?, duration = ?, description = ?, updated_at = NOW() WHERE id = ?");
-                            if ($stmt->execute([$name, $code, $department_id, $duration, $description, $id])) {
+                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, code = ?, school_id = ?, duration = ?, description = ?, updated_at = NOW() WHERE id = ?");
+                            if ($stmt->execute([$name, $code, $school_id, $duration, $description, $id])) {
                                 $message = "Programme updated successfully!";
                                 $messageType = 'success';
                             } else {
@@ -184,17 +184,17 @@ $searchQuery = $_GET['search'] ?? '';
 
 // Build query with filters
 $query = "
-    SELECT p.*, d.name as department_name,
+    SELECT p.*, s.name as school_name,
            (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
-           (SELECT COUNT(*) FROM course c WHERE c.department_id = p.department_id) as course_count
+           (SELECT COUNT(*) FROM course c WHERE c.programme_id = p.id) as course_count
     FROM programme p 
-    LEFT JOIN department d ON p.department_id = d.id 
+    LEFT JOIN school s ON p.school_id = s.id 
     WHERE 1=1";
 
 $params = [];
 
 if ($searchQuery) {
-    $query .= " AND (p.name LIKE ? OR p.code LIKE ? OR p.description LIKE ? OR d.name LIKE ?)";
+    $query .= " AND (p.name LIKE ? OR p.code LIKE ? OR p.description LIKE ? OR s.name LIKE ?)";
     $searchParam = "%$searchQuery%";
     $params[] = $searchParam;
     $params[] = $searchParam;
@@ -202,19 +202,19 @@ if ($searchQuery) {
     $params[] = $searchParam;
 }
 
-$query .= " ORDER BY d.name, p.name";
+$query .= " ORDER BY s.name, p.name";
 
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $programmes = $stmt->fetchAll();
 
-// Get departments for dropdowns
-$departments = $pdo->query("SELECT * FROM department ORDER BY name")->fetchAll();
+// Get schools for dropdowns
+$schools = $pdo->query("SELECT * FROM school ORDER BY name")->fetchAll();
 
 // Get programme for editing if specified
 $editProgramme = null;
 if (isset($_GET['edit'])) {
-    $stmt = $pdo->prepare("SELECT p.*, d.name as department_name FROM programme p LEFT JOIN department d ON p.department_id = d.id WHERE p.id = ?");
+    $stmt = $pdo->prepare("SELECT p.*, s.name as school_name FROM programme p LEFT JOIN school s ON p.school_id = s.id WHERE p.id = ?");
     $stmt->execute([$_GET['edit']]);
     $editProgramme = $stmt->fetch();
 }
@@ -223,14 +223,15 @@ if (isset($_GET['edit'])) {
 $viewProgramme = null;
 $programmeStudents = [];
 $programmeCourses = [];
+$programmeLecturers = [];
 if (isset($_GET['view'])) {
     $programme_id = $_GET['view'];
     $programme_stmt = $pdo->prepare("
-        SELECT p.*, d.name as department_name,
+        SELECT p.*, s.name as school_name,
                (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
-               (SELECT COUNT(*) FROM course c WHERE c.department_id = p.department_id) as course_count
+               (SELECT COUNT(*) FROM course c WHERE c.programme_id = p.id) as course_count
         FROM programme p 
-        LEFT JOIN department d ON p.department_id = d.id 
+        LEFT JOIN school s ON p.school_id = s.id 
         WHERE p.id = ?
     ");
     $programme_stmt->execute([$programme_id]);
@@ -248,30 +249,59 @@ if (isset($_GET['view'])) {
         $students_stmt->execute([$programme_id]);
         $programmeStudents = $students_stmt->fetchAll();
         
-        // Get courses in the same department
+        // Get courses under this programme
         $courses_stmt = $pdo->prepare("
             SELECT c.*, 
                    (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count
             FROM course c 
-            WHERE c.department_id = ?
+            WHERE c.programme_id = ?
             ORDER BY c.name
         ");
-        $courses_stmt->execute([$viewProgramme['department_id']]);
+        $courses_stmt->execute([$programme_id]);
         $programmeCourses = $courses_stmt->fetchAll();
+
+        // Get lecturers in this school (assuming lecturer_profile exists with school_id)
+        $lecturers_stmt = $pdo->prepare("
+            SELECT lp.*, u.username, u.email as user_email
+            FROM lecturer_profile lp 
+            JOIN users u ON lp.user_id = u.id
+            WHERE lp.school_id = ?
+            ORDER BY lp.full_name
+        ");
+        $lecturers_stmt->execute([$viewProgramme['school_id']]);
+        $programmeLecturers = $lecturers_stmt->fetchAll();
     }
 }
 
 // Add missing columns to programme table if they don't exist
 try {
+    $pdo->exec("ALTER TABLE programme DROP FOREIGN KEY IF EXISTS FK_programme_department");
+    $pdo->exec("ALTER TABLE programme DROP COLUMN IF EXISTS department_id");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS school_id INT");
+    $pdo->exec("ALTER TABLE programme ADD CONSTRAINT FK_programme_school FOREIGN KEY (school_id) REFERENCES school(id) ON DELETE SET NULL");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS description TEXT");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration INT");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS department_id INT");
-    $pdo->exec("ALTER TABLE programme ADD CONSTRAINT IF NOT EXISTS FK_programme_department FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL");
+    
+    // Add programme_id to course
+    $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS programme_id INT");
+    $pdo->exec("ALTER TABLE course ADD CONSTRAINT FK_course_programme FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL");
+    
+    // Create lecturer_profile if not exists
+    $pdo->exec("CREATE TABLE IF NOT EXISTS lecturer_profile (
+        user_id INT PRIMARY KEY,
+        full_name VARCHAR(255),
+        staff_id VARCHAR(50),
+        school_id INT,
+        department_id INT,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (school_id) REFERENCES school(id),
+        FOREIGN KEY (department_id) REFERENCES department(id)
+    )");
 } catch (Exception $e) {
-    // Columns might already exist
+    // Columns might already exist or other issues
 }
 ?>
 <!DOCTYPE html>
@@ -444,7 +474,7 @@ try {
                     <div class="form-row">
                         <div class="form-group">
                             <label for="search">Search Programmes</label>
-                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or department">
+                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or school">
                         </div>
                         
                         <div class="form-group">
@@ -490,12 +520,12 @@ try {
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="department_id">Department *</label>
-                            <select id="department_id" name="department_id" required>
-                                <option value="">-- Select Department --</option>
-                                <?php foreach ($departments as $department): ?>
-                                    <option value="<?php echo $department['id']; ?>" <?php echo isset($editProgramme['department_id']) && $editProgramme['department_id'] == $department['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($department['name']); ?>
+                            <label for="school_id">School *</label>
+                            <select id="school_id" name="school_id" required>
+                                <option value="">-- Select School --</option>
+                                <?php foreach ($schools as $school): ?>
+                                    <option value="<?php echo $school['id']; ?>" <?php echo isset($editProgramme['school_id']) && $editProgramme['school_id'] == $school['id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($school['name']); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -537,7 +567,7 @@ try {
                 <div class="school-info">
                     <h2><?php echo htmlspecialchars($viewProgramme['name']); ?></h2>
                     <p class="department-code">Code: <?php echo htmlspecialchars($viewProgramme['code']); ?></p>
-                    <p class="school-info">Department: <?php echo htmlspecialchars($viewProgramme['department_name'] ?? 'N/A'); ?></p>
+                    <p class="school-info">School: <?php echo htmlspecialchars($viewProgramme['school_name'] ?? 'N/A'); ?></p>
                     <p class="school-info">Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> Years</p>
                     <p class="school-description"><?php echo htmlspecialchars($viewProgramme['description'] ?? 'No description available'); ?></p>
                 </div>
@@ -622,7 +652,7 @@ try {
             <!-- Courses Section -->
             <div class="section-card">
                 <div class="section-header">
-                    <h3><i class="fas fa-book"></i> Department Courses</h3>
+                    <h3><i class="fas fa-book"></i> Courses</h3>
                     <div class="section-actions">
                         <input type="text" class="search-input" placeholder="Search courses..." onkeyup="filterTable(this, 'coursesTable')">
                     </div>
@@ -631,7 +661,7 @@ try {
                     <div class="empty-state">
                         <i class="fas fa-book"></i>
                         <h4>No Courses</h4>
-                        <p>No courses found in this department</p>
+                        <p>No courses registered under this programme</p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
@@ -658,6 +688,44 @@ try {
                     </div>
                 <?php endif; ?>
             </div>
+
+            <!-- Lecturers Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="fas fa-chalkboard-teacher"></i> Lecturers</h3>
+                    <div class="section-actions">
+                        <input type="text" class="search-input" placeholder="Search lecturers..." onkeyup="filterTable(this, 'lecturersTable')">
+                    </div>
+                </div>
+                <?php if (empty($programmeLecturers)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                        <h4>No Lecturers</h4>
+                        <p>No lecturers found in this school</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="users-table" id="lecturersTable">
+                            <thead>
+                                <tr>
+                                    <th>Staff ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($programmeLecturers as $lecturer): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($lecturer['staff_id']); ?></td>
+                                        <td><?php echo htmlspecialchars($lecturer['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($lecturer['user_email']); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
         <?php else: ?>
             <!-- Programmes Table -->
             <div class="table-section">
@@ -673,7 +741,7 @@ try {
                                     <th>ID</th>
                                     <th>Code</th>
                                     <th>Name</th>
-                                    <th>Department</th>
+                                    <th>School</th>
                                     <th>Duration (Years)</th>
                                     <th>Students</th>
                                     <th>Courses</th>
@@ -686,7 +754,7 @@ try {
                                         <td><?php echo $programme['id']; ?></td>
                                         <td><?php echo htmlspecialchars($programme['code']); ?></td>
                                         <td><strong><?php echo htmlspecialchars($programme['name']); ?></strong></td>
-                                        <td><?php echo htmlspecialchars($programme['department_name'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($programme['school_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo $programme['duration']; ?></td>
                                         <td><span class="count-badge green"><?php echo $programme['student_count']; ?></span></td>
                                         <td><span class="count-badge orange"><?php echo $programme['course_count']; ?></span></td>
