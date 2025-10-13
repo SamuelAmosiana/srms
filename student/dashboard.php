@@ -18,12 +18,12 @@ $student = $stmt->fetch();
 // Get dashboard statistics
 $stats = [];
 
-// Count enrolled courses using the correct table (course_enrollment)
-$stmt = $pdo->prepare("SELECT COUNT(*) as count FROM course_enrollment WHERE student_user_id = ? AND status = 'enrolled'");
+// Count enrolled courses
+$stmt = $pdo->prepare("SELECT COUNT(*) as count FROM course_enrollment WHERE student_user_id = ?");
 $stmt->execute([currentUserId()]);
 $stats['enrolled_courses'] = $stmt->fetch()['count'];
 
-// Get current GPA - calculate from results table
+// Get current GPA (calculate from results table with proper grade conversion)
 $stmt = $pdo->prepare("
     SELECT AVG(
         CASE 
@@ -32,22 +32,22 @@ $stmt = $pdo->prepare("
             WHEN r.grade = 'B' THEN 3.0
             WHEN r.grade = 'C+' THEN 2.5
             WHEN r.grade = 'C' THEN 2.0
+            WHEN r.grade = 'D+' THEN 1.5
             WHEN r.grade = 'D' THEN 1.0
             ELSE 0
         END
     ) as gpa 
     FROM results r
-    JOIN course_enrollment ce ON r.enrollment_id = ce.id
-    WHERE ce.student_user_id = ? AND r.grade IS NOT NULL
+    INNER JOIN course_enrollment ce ON r.enrollment_id = ce.id
+    WHERE ce.student_user_id = ?
 ");
 $stmt->execute([currentUserId()]);
-$gpaResult = $stmt->fetch();
-$stats['gpa'] = $gpaResult['gpa'] ? number_format($gpaResult['gpa'], 2) : '0.00';
+$stats['gpa'] = number_format($stmt->fetch()['gpa'] ?? 0, 2);
 
-// Get fee balance from student_profile table
+// Get fee balance from student profile
 $stats['fee_balance'] = $student['balance'] ?? 0;
 
-// Get accommodation status (placeholder - set to default for now)
+// Get accommodation status (no table exists yet, placeholder)
 $stats['accommodation_status'] = 'Not Applied';
 ?>
 <!DOCTYPE html>
