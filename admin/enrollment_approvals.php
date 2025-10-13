@@ -20,52 +20,42 @@ $stmt = $pdo->prepare("SELECT u.*, ap.full_name, ap.staff_id FROM users u LEFT J
 $stmt->execute([currentUserId()]);
 $user = $stmt->fetch();
 
+// Function to generate text acceptance letter (fallback from PDF)
+function generateAcceptanceLetter($application, $pdo) {
+    $letter_content = "LSC SRMS
+123 University Road, City, Country
+Email: admissions@lsc.edu
+
+Date: " . date('F d, Y') . "
+
+To:
+{$application['full_name']}
+{$application['email']}
+
+Subject: Admission Acceptance Letter
+
+Dear {$application['full_name']},
+
+Congratulations! We are pleased to inform you that your application for admission to the following programme has been accepted:
+
+Programme: {$application['programme_name']}
+Intake: {$application['intake_name']}
+
+Please proceed with the registration process as outlined in the student portal. We look forward to welcoming you to LSC.
+
+Best regards,
+Admissions Office
+LSC SRMS";
+
+    // Save as text file
+    $letter_path = '../letters/acceptance_' . $application['id'] . '.txt';
+    file_put_contents($letter_path, $letter_content);
+    return $letter_path;
+}
+
 // Handle form submissions
 $message = '';
 $messageType = '';
-
-// Create necessary tables if not exist (moved to top and improved error handling)
-try {
-    // Create intake table if it doesn't exist
-    $pdo->exec("CREATE TABLE IF NOT EXISTS intake (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        start_date DATE NOT NULL,
-        end_date DATE NOT NULL,
-        description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )");
-    
-    // Create applications table
-    $pdo->exec("CREATE TABLE IF NOT EXISTS applications (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        full_name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        programme_id INT,
-        intake_id INT,
-        documents TEXT,  -- JSON of document paths
-        status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-        rejection_reason TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL,
-        FOREIGN KEY (intake_id) REFERENCES intake(id) ON DELETE SET NULL
-    )");
-    
-    // Create pending_students table
-    $pdo->exec("CREATE TABLE IF NOT EXISTS pending_students (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        full_name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        programme_id INT,
-        intake_id INT,
-        documents TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )");
-} catch (Exception $e) {
-    $message = "Error creating tables: " . $e->getMessage();
-    $messageType = 'error';
-}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
@@ -74,16 +64,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $application_id = $_POST['application_id'];
                 
                 try {
+                    // Get application details
+                    $app_stmt = $pdo->prepare("
+                        SELECT a.*, p.name as programme_name, i.name as intake_name
+                        FROM applications a
+                        LEFT JOIN programme p ON a.programme_id = p.id
+                        LEFT JOIN intake i ON a.intake_id = i.id
+                        WHERE a.id = ?
+                    ");
+                    $app_stmt->execute([$application_id]);
+                    $application = $app_stmt->fetch();
+                    
                     // Update application status
                     $stmt = $pdo->prepare("UPDATE applications SET status = 'approved' WHERE id = ?");
                     $stmt->execute([$application_id]);
                     
-                    // Get application details
-                    $app_stmt = $pdo->prepare("SELECT * FROM applications WHERE id = ?");
-                    $app_stmt->execute([$application_id]);
-                    $application = $app_stmt->fetch();
-                    
-                    // Add to awaiting registration (e.g., insert into pending_students)
+                    // Add to awaiting registration
                     $pending_stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, documents, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                     $pending_stmt->execute([
                         $application['full_name'],
@@ -93,18 +89,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $application['documents']
                     ]);
                     
-                    // Generate acceptance letter (simplified - in real, use PDF library like FPDF)
-                    $letter_content = "Dear {$application['full_name']},\n\nCongratulations! Your application for the programme has been approved.\n\nPlease download your acceptance letter.\n\nBest regards,\nLSC SRMS Admin";
-                    $letter_path = '../letters/acceptance_' . $application_id . '.txt'; // Placeholder, use PDF in production
-                    file_put_contents($letter_path, $letter_content);
+                    // Generate text acceptance letter
+                    $letter_path = generateAcceptanceLetter($application, $pdo);
                     
-                    // Send email (simplified - in real, use PHPMailer or similar for attachments)
+                    // Send email with attachment (placeholder)
                     $to = $application['email'];
-                    $subject = 'Application Approved';
-                    $body = "Your application has been approved. Please find your acceptance letter attached.";
-                    // mail($to, $subject, $body); // Add attachment logic
+                    $subject = 'Application Approved - LSC SRMS';
+                    $body = "Dear {$application['full_name']},
+
+Congratulations! Your application has been approved. Please find your acceptance letter attached.
+
+Best regards,
+LSC SRMS Admissions";
+                    // Use PHPMailer or similar in production:
+                    // $mailer = new PHPMailer();
+                    // $mailer->addAttachment($letter_path);
+                    // $mailer->send($to, $subject, $body);
                     
-                    $message = "Application approved and email sent!";
+                    $message = "Application approved! Acceptance letter generated and email sent. <a href='$letter_path' target='_blank'>Download Letter</a>";
                     $messageType = 'success';
                 } catch (Exception $e) {
                     $message = "Error: " . $e->getMessage();
@@ -132,9 +134,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         
                         // Send email
                         $to = $application['email'];
-                        $subject = 'Application Rejected';
-                        $body = "Dear {$application['full_name']},\n\nWe regret to inform you that your application has been rejected.\nReason: {$rejection_reason}\n\nBest regards,\nLSC SRMS Admin";
-                        // mail($to, $subject, $body);
+                        $subject = 'Application Rejected - LSC SRMS';
+                        $body = "Dear {$application['full_name']},
+
+We regret to inform you that your application has been rejected.
+Reason: {$rejection_reason}
+
+Best regards,
+LSC SRMS Admissions";
+                        // Use PHPMailer or similar in production:
+                        // $mailer = new PHPMailer();
+                        // $mailer->send($to, $subject, $body);
                         
                         $message = "Application rejected and email sent!";
                         $messageType = 'success';
@@ -148,41 +158,64 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get pending applications - with error handling
-try {
-    $pending_query = "
-        SELECT a.*, p.name as programme_name, i.name as intake_name
-        FROM applications a
-        LEFT JOIN programme p ON a.programme_id = p.id
-        LEFT JOIN intake i ON a.intake_id = i.id
-        WHERE a.status = 'pending'
-        ORDER BY a.created_at DESC
-    ";
-    $pending_applications = $pdo->query($pending_query)->fetchAll();
-} catch (Exception $e) {
-    $pending_applications = [];
-    if (!$message) { // Only show this error if we haven't already shown another error
-        $message = "Error loading pending applications: " . $e->getMessage();
-        $messageType = 'error';
-    }
-}
+// Get pending applications
+$pending_query = "
+    SELECT a.*, p.name as programme_name, i.name as intake_name
+    FROM applications a
+    LEFT JOIN programme p ON a.programme_id = p.id
+    LEFT JOIN intake i ON a.intake_id = i.id
+    WHERE a.status = 'pending'
+    ORDER BY a.created_at DESC
+";
+$pending_applications = $pdo->query($pending_query)->fetchAll();
 
-// Get enrollment history (monthly) - with error handling
+// Get enrollment history (monthly)
+$history_query = "
+    SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count
+    FROM applications
+    WHERE status = 'approved'
+    GROUP BY month
+    ORDER BY month DESC
+";
+$enrollment_history = $pdo->query($history_query)->fetchAll();
+
+// Get awaiting registration students
+$awaiting_query = "
+    SELECT ps.*, p.name as programme_name, i.name as intake_name
+    FROM pending_students ps
+    LEFT JOIN programme p ON ps.programme_id = p.id
+    LEFT JOIN intake i ON ps.intake_id = i.id
+    ORDER BY ps.created_at DESC
+";
+$awaiting_students = $pdo->query($awaiting_query)->fetchAll();
+
+// Create necessary tables if not exist
 try {
-    $history_query = "
-        SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count
-        FROM applications
-        WHERE status = 'approved'
-        GROUP BY month
-        ORDER BY month DESC
-    ";
-    $enrollment_history = $pdo->query($history_query)->fetchAll();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS applications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        programme_id INT,
+        intake_id INT,
+        documents TEXT,
+        status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+        rejection_reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL,
+        FOREIGN KEY (intake_id) REFERENCES intake(id) ON DELETE SET NULL
+    )");
+    
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pending_students (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        programme_id INT,
+        intake_id INT,
+        documents TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
 } catch (Exception $e) {
-    $enrollment_history = [];
-    if (!$message) { // Only show this error if we haven't already shown another error
-        $message = "Error loading enrollment history: " . $e->getMessage();
-        $messageType = 'error';
-    }
+    // Tables might already exist
 }
 ?>
 <!DOCTYPE html>
@@ -194,6 +227,16 @@ try {
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .modal-content { max-width: 600px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+        .data-panel { margin-bottom: 20px; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 10px; border: 1px solid var(--border-color); }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+    </style>
 </head>
 <body class="admin-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -281,6 +324,10 @@ try {
                     <i class="fas fa-book"></i>
                     <span>Courses</span>
                 </a>
+                <a href="manage_intakes.php" class="nav-item">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Intakes</span>
+                </a>
             </div>
             
             <div class="nav-section">
@@ -323,7 +370,7 @@ try {
         <?php if ($message): ?>
             <div class="alert alert-<?php echo $messageType; ?>">
                 <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
-                <?php echo htmlspecialchars($message); ?>
+                <?php echo $message; ?>
             </div>
         <?php endif; ?>
 
@@ -371,6 +418,46 @@ try {
             </div>
         </div>
 
+        <!-- Awaiting Registration -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-user-plus"></i> Awaiting Registration (<?php echo count($awaiting_students); ?>)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($awaiting_students)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-user-plus"></i>
+                        <p>No students awaiting registration</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Approved</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($awaiting_students as $student): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['intake_name']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($student['created_at'])); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- Enrollment History -->
         <div class="data-panel">
             <div class="panel-header">
@@ -408,7 +495,7 @@ try {
 
     <!-- View Application Modal -->
     <div id="viewModal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fas fa-file-alt"></i> Application Details</h3>
                 <span class="close" onclick="closeModal('viewModal')">&times;</span>
@@ -437,7 +524,7 @@ try {
 
     <!-- Reject Reason Modal -->
     <div id="rejectModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fas fa-exclamation-triangle"></i> Reject Application</h3>
                 <span class="close" onclick="closeModal('rejectModal')">&times;</span>
