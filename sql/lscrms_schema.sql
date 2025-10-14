@@ -49,6 +49,7 @@ CREATE TABLE admin_profile (
   user_id INT PRIMARY KEY,
   full_name VARCHAR(150),
   staff_id VARCHAR(50) UNIQUE,
+  bio TEXT,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -202,8 +203,8 @@ INSERT INTO user_roles (user_id, role_id) VALUES
 -- PROFILES
 -- ===================================
 -- Super Admin
-INSERT INTO admin_profile (user_id, full_name, staff_id) VALUES
-((SELECT id FROM users WHERE username='admin@lsc.ac.zm'), 'John Admin', 'ADM001');
+INSERT INTO admin_profile (user_id, full_name, staff_id, bio) VALUES
+((SELECT id FROM users WHERE username='admin@lsc.ac.zm'), 'John Admin', 'ADM001', NULL);
 
 -- Lecturer
 INSERT INTO staff_profile (user_id, full_name, staff_id, NRC, gender, qualification) VALUES
