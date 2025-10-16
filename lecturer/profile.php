@@ -20,10 +20,10 @@ try {
 // Get lecturer profile
 try {
     $stmt = $pdo->prepare("
-        SELECT sp.full_name, sp.staff_id, sp.email, sp.phone, sp.department_id, sp.address, sp.date_of_birth, sp.bio,
-               d.department_name
+        SELECT sp.full_name, sp.staff_id, sp.NRC, sp.gender, sp.qualification, sp.bio,
+               u.email, u.contact as phone
         FROM staff_profile sp
-        LEFT JOIN departments d ON sp.department_id = d.id
+        JOIN users u ON sp.user_id = u.id
         WHERE sp.user_id = ?
     ");
     $stmt->execute([currentUserId()]);
@@ -31,10 +31,10 @@ try {
 } catch (Exception $e) {
     // If bio column doesn't exist, select without it
     $stmt = $pdo->prepare("
-        SELECT sp.full_name, sp.staff_id, sp.email, sp.phone, sp.department_id, sp.address, sp.date_of_birth,
-               d.department_name
+        SELECT sp.full_name, sp.staff_id, sp.NRC, sp.gender, sp.qualification,
+               u.email, u.contact as phone
         FROM staff_profile sp
-        LEFT JOIN departments d ON sp.department_id = d.id
+        JOIN users u ON sp.user_id = u.id
         WHERE sp.user_id = ?
     ");
     $stmt->execute([currentUserId()]);
@@ -71,20 +71,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Refresh profile data
         try {
             $stmt = $pdo->prepare("
-                SELECT sp.full_name, sp.staff_id, sp.email, sp.phone, sp.department_id, sp.address, sp.date_of_birth, sp.bio,
-                       d.department_name
+                SELECT sp.full_name, sp.staff_id, sp.NRC, sp.gender, sp.qualification, sp.bio,
+                       u.email, u.contact as phone
                 FROM staff_profile sp
-                LEFT JOIN departments d ON sp.department_id = d.id
+                JOIN users u ON sp.user_id = u.id
                 WHERE sp.user_id = ?
             ");
             $stmt->execute([currentUserId()]);
             $lecturer = $stmt->fetch();
         } catch (Exception $e) {
             $stmt = $pdo->prepare("
-                SELECT sp.full_name, sp.staff_id, sp.email, sp.phone, sp.department_id, sp.address, sp.date_of_birth,
-                       d.department_name
+                SELECT sp.full_name, sp.staff_id, sp.NRC, sp.gender, sp.qualification,
+                       u.email, u.contact as phone
                 FROM staff_profile sp
-                LEFT JOIN departments d ON sp.department_id = d.id
+                JOIN users u ON sp.user_id = u.id
                 WHERE sp.user_id = ?
             ");
             $stmt->execute([currentUserId()]);
@@ -104,14 +104,11 @@ try {
             user_id INT PRIMARY KEY,
             full_name VARCHAR(255),
             staff_id VARCHAR(50),
-            email VARCHAR(255),
-            phone VARCHAR(20),
-            department_id INT,
-            address TEXT,
-            date_of_birth DATE,
+            NRC VARCHAR(50),
+            gender ENUM('Male','Female','Other'),
+            qualification VARCHAR(255),
             bio TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (department_id) REFERENCES departments(id)
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ");
 } catch (Exception $e) {
