@@ -150,7 +150,7 @@ foreach ($results_by_year as $year => $courses) {
         </div>
         
         <nav class="sidebar-nav">
-            <a href="student_dashboard.php" class="nav-item">
+            <a href="dashboard.php" class="nav-item">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>

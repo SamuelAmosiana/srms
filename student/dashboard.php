@@ -107,7 +107,7 @@ $stats['accommodation_status'] = 'Not Applied';
         </div>
         
         <nav class="sidebar-nav">
-            <a href="student_dashboard.php" class="nav-item active">
+            <a href="dashboard.php" class="nav-item active">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
