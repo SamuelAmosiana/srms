@@ -15,30 +15,39 @@ $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WH
 $stmt->execute([currentUserId()]);
 $admin = $stmt->fetch();
 
-// Handle results access update
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_access'])) {
-    $student_id = $_POST['student_id'];
-    $results_access = $_POST['results_access'] === '1' ? 1 : 0;
-    
-    try {
-        // First, let's add the results_access column if it doesn't exist
-        $pdo->exec("ALTER TABLE student_profile ADD COLUMN IF NOT EXISTS results_access TINYINT(1) DEFAULT 1");
-        
-        // Update results access
-        $stmt = $pdo->prepare("UPDATE student_profile SET results_access = ? WHERE student_number = ?");
-        $stmt->execute([$results_access, $student_id]);
-        
-        $success_message = "Results access updated successfully!";
-    } catch (Exception $e) {
-        $error_message = "Error updating results access: " . $e->getMessage();
-    }
-}
-
 // Try to add the results_access column if it doesn't exist
 try {
     $pdo->exec("ALTER TABLE student_profile ADD COLUMN IF NOT EXISTS results_access TINYINT(1) DEFAULT 1");
 } catch (Exception $e) {
     // Column might already exist or there's an issue, ignore error
+}
+
+// Handle single student results access update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_access'])) {
+    $student_id = $_POST['student_id'];
+    $results_access = $_POST['results_access'] === '1' ? 1 : 0;
+    
+    // Update results access
+    $stmt = $pdo->prepare("UPDATE student_profile SET results_access = ? WHERE student_number = ?");
+    $stmt->execute([$results_access, $student_id]);
+    
+    $success_message = "Results access updated successfully!";
+}
+
+// Handle bulk results access update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_update_access'])) {
+    $student_ids = $_POST['selected_students'] ?? [];
+    $bulk_action = $_POST['bulk_action'] === 'grant' ? 1 : 0;
+    
+    if (!empty($student_ids)) {
+        $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
+        $stmt = $pdo->prepare("UPDATE student_profile SET results_access = ? WHERE student_number IN ($placeholders)");
+        $stmt->execute(array_merge([$bulk_action], $student_ids));
+        
+        $success_message = "Bulk results access updated successfully!";
+    } else {
+        $error_message = "No students selected for bulk update.";
+    }
 }
 
 // Fetch student data with fee balances and results access status
@@ -163,47 +172,75 @@ $students = $stmt->fetchAll();
             </div>
         <?php endif; ?>
         
+        <!-- Bulk Access Form -->
+        <div class="form-container">
+            <h2>Bulk Results Access</h2>
+            <form method="POST" action="results_access.php">
+                <div class="form-group">
+                    <label for="bulk_action">Action</label>
+                    <select name="bulk_action" id="bulk_action" required>
+                        <option value="grant">Grant Access</option>
+                        <option value="restrict">Restrict Access</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" name="bulk_update_access" class="btn green">Apply to Selected</button>
+                </div>
+            </form>
+        </div>
+        
         <!-- Student Results Access Table -->
         <div class="table-container">
             <h2>Student Results Access</h2>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Student ID</th>
-                        <th>Full Name</th>
-                        <th>Fee Balance (K)</th>
-                        <th>Results Access</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($students as $student): ?>
+            <form method="POST" action="results_access.php">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars($student['student_id']); ?></td>
-                            <td><?php echo htmlspecialchars($student['full_name']); ?></td>
-                            <td><?php echo number_format($student['balance'] ?? 0, 2); ?></td>
-                            <td>
-                                <span class="status <?php echo $student['results_access'] ? 'green' : 'orange'; ?>">
-                                    <?php echo $student['results_access'] ? 'Granted' : 'Restricted'; ?>
-                                </span>
-                            </td>
-                            <td>
-                                <form method="POST" action="results_access.php">
-                                    <input type="hidden" name="student_id" value="<?php echo $student['student_id']; ?>">
-                                    <select name="results_access" onchange="this.form.submit()">
-                                        <option value="1" <?php echo $student['results_access'] ? 'selected' : ''; ?>>Grant Access</option>
-                                        <option value="0" <?php echo !$student['results_access'] ? 'selected' : ''; ?>>Restrict Access</option>
-                                    </select>
-                                    <input type="hidden" name="update_access" value="1">
-                                </form>
-                            </td>
+                            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                            <th>Student ID</th>
+                            <th>Full Name</th>
+                            <th>Fee Balance (K)</th>
+                            <th>Results Access</th>
+                            <th>Individual Action</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($students as $student): ?>
+                            <tr>
+                                <td><input type="checkbox" name="selected_students[]" value="<?php echo $student['student_id']; ?>"></td>
+                                <td><?php echo htmlspecialchars($student['student_id']); ?></td>
+                                <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                                <td><?php echo number_format($student['balance'] ?? 0, 2); ?></td>
+                                <td>
+                                    <span class="status <?php echo $student['results_access'] ? 'green' : 'orange'; ?>">
+                                        <?php echo $student['results_access'] ? 'Granted' : 'Restricted'; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <form method="POST" action="results_access.php">
+                                        <input type="hidden" name="student_id" value="<?php echo $student['student_id']; ?>">
+                                        <select name="results_access" onchange="this.form.submit()">
+                                            <option value="1" <?php echo $student['results_access'] ? 'selected' : ''; ?>>Grant Access</option>
+                                            <option value="0" <?php echo !$student['results_access'] ? 'selected' : ''; ?>>Restrict Access</option>
+                                        </select>
+                                        <input type="hidden" name="update_access" value="1">
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </form>
         </div>
     </main>
 
+    <script>
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('input[name="selected_students[]"]');
+            const selectAll = document.getElementById('selectAll');
+            checkboxes.forEach(checkbox => checkbox.checked = selectAll.checked);
+        }
+    </script>
     <script src="../assets/js/admin-dashboard.js"></script>
 </body>
 </html>
