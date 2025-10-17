@@ -47,14 +47,33 @@ if ($_POST) {
                     $roleName = $roleStmt->fetchColumn();
                     
                     if ($roleName == 'Super Admin') {
+                        $staff_id = $_POST['staff_id'] ?: 'ADM-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
                         $stmt = $pdo->prepare("INSERT INTO admin_profile (user_id, full_name, staff_id) VALUES (?, ?, ?)");
-                        $stmt->execute([$userId, $_POST['full_name'], $_POST['staff_id']]);
+                        $stmt->execute([$userId, $_POST['full_name'], $staff_id]);
                     } elseif ($roleName == 'Student') {
-                        $stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, NRC, gender) VALUES (?, ?, ?, ?, ?)");
-                        $stmt->execute([$userId, $_POST['full_name'], $_POST['student_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null]);
+                        $student_number = $_POST['student_id'] ?: 'STU-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
+                        $stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, NRC, gender, programme_id, intake_id, school_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$userId, $_POST['full_name'], $student_number, $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['programme_id'] ?? null, $_POST['intake_id'] ?? null, $_POST['school_id'] ?? null]);
+                        
+                        // Assign courses if selected
+                        if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
+                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_id, course_id, status) VALUES (?, ?, 'approved')");
+                            foreach ($_POST['course_ids'] as $course_id) {
+                                $course_stmt->execute([$userId, $course_id]);
+                            }
+                        }
                     } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)') {
-                        $stmt = $pdo->prepare("INSERT INTO staff_profile (user_id, full_name, staff_id, NRC, gender, qualification) VALUES (?, ?, ?, ?, ?, ?)");
-                        $stmt->execute([$userId, $_POST['full_name'], $_POST['staff_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null]);
+                        $staff_id = $_POST['staff_id'] ?: 'STF-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
+                        $stmt = $pdo->prepare("INSERT INTO staff_profile (user_id, full_name, staff_id, NRC, gender, qualification, department_id, school_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$userId, $_POST['full_name'], $staff_id, $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null, $_POST['department_id'] ?? null, $_POST['school_id'] ?? null]);
+                        
+                        // Assign courses if selected (for lecturers)
+                        if ($roleName == 'Lecturer' && isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
+                            $course_stmt = $pdo->prepare("INSERT INTO lecturer_courses (lecturer_id, course_id) VALUES (?, ?)");
+                            foreach ($_POST['course_ids'] as $course_id) {
+                                $course_stmt->execute([$userId, $course_id]);
+                            }
+                        }
                     }
                     
                     $pdo->commit();
@@ -100,11 +119,33 @@ if ($_POST) {
                         $stmt = $pdo->prepare("UPDATE admin_profile SET full_name = ?, staff_id = ? WHERE user_id = ?");
                         $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['user_id']]);
                     } elseif ($roleName == 'Student') {
-                        $stmt = $pdo->prepare("UPDATE student_profile SET full_name = ?, student_number = ?, NRC = ?, gender = ? WHERE user_id = ?");
-                        $stmt->execute([$_POST['full_name'], $_POST['student_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['user_id']]);
+                        $stmt = $pdo->prepare("UPDATE student_profile SET full_name = ?, student_number = ?, NRC = ?, gender = ?, programme_id = ?, intake_id = ?, school_id = ? WHERE user_id = ?");
+                        $stmt->execute([$_POST['full_name'], $_POST['student_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['programme_id'] ?? null, $_POST['intake_id'] ?? null, $_POST['school_id'] ?? null, $_POST['user_id']]);
+                        
+                        // Update courses
+                        $delete_stmt = $pdo->prepare("DELETE FROM course_enrollment WHERE student_id = ?");
+                        $delete_stmt->execute([$_POST['user_id']]);
+                        if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
+                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_id, course_id, status) VALUES (?, ?, 'approved')");
+                            foreach ($_POST['course_ids'] as $course_id) {
+                                $course_stmt->execute([$_POST['user_id'], $course_id]);
+                            }
+                        }
                     } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)') {
-                        $stmt = $pdo->prepare("UPDATE staff_profile SET full_name = ?, staff_id = ?, NRC = ?, gender = ?, qualification = ? WHERE user_id = ?");
-                        $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null, $_POST['user_id']]);
+                        $stmt = $pdo->prepare("UPDATE staff_profile SET full_name = ?, staff_id = ?, NRC = ?, gender = ?, qualification = ?, department_id = ?, school_id = ? WHERE user_id = ?");
+                        $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null, $_POST['department_id'] ?? null, $_POST['school_id'] ?? null, $_POST['user_id']]);
+                        
+                        // Update courses for lecturers
+                        if ($roleName == 'Lecturer') {
+                            $delete_stmt = $pdo->prepare("DELETE FROM lecturer_courses WHERE lecturer_id = ?");
+                            $delete_stmt->execute([$_POST['user_id']]);
+                            if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
+                                $course_stmt = $pdo->prepare("INSERT INTO lecturer_courses (lecturer_id, course_id) VALUES (?, ?)");
+                                foreach ($_POST['course_ids'] as $course_id) {
+                                    $course_stmt->execute([$_POST['user_id'], $course_id]);
+                                }
+                            }
+                        }
                     }
                     
                     $pdo->commit();
@@ -201,14 +242,21 @@ $users = $stmt->fetchAll();
 $stmt = $pdo->query("SELECT id as role_id, name as role_name FROM roles ORDER BY name");
 $roles = $stmt->fetchAll();
 
+// Get programmes, intakes, schools, departments, courses for assignments
+$programmes = $pdo->query("SELECT id, name FROM programme ORDER BY name")->fetchAll();
+$intakes = $pdo->query("SELECT id, name FROM intake ORDER BY name")->fetchAll();
+$schools = $pdo->query("SELECT id, name FROM school ORDER BY name")->fetchAll();
+$departments = $pdo->query("SELECT id, name FROM department ORDER BY name")->fetchAll();
+$courses = $pdo->query("SELECT id, name FROM course ORDER BY name")->fetchAll();
+
 // Get user for editing if specified
 $editUser = null;
 if (isset($_GET['edit'])) {
     $stmt = $pdo->prepare("SELECT u.*, r.id as role_id, r.name as role_name,
                           COALESCE(ap.full_name, sp.full_name, stp.full_name) as full_name,
                           COALESCE(ap.staff_id, sp.student_number, stp.staff_id) as identifier,
-                          sp.NRC as student_nrc, sp.gender as student_gender,
-                          stp.NRC as staff_nrc, stp.gender as staff_gender, stp.qualification
+                          sp.NRC as student_nrc, sp.gender as student_gender, sp.programme_id, sp.intake_id, sp.school_id,
+                          stp.NRC as staff_nrc, stp.gender as staff_gender, stp.qualification, stp.department_id, stp.school_id
                           FROM users u 
                           JOIN user_roles ur ON u.id = ur.user_id
                           JOIN roles r ON ur.role_id = r.id
@@ -218,6 +266,32 @@ if (isset($_GET['edit'])) {
                           WHERE u.id = ?");
     $stmt->execute([$_GET['edit']]);
     $editUser = $stmt->fetch();
+    
+    // Get assigned courses if editing student or lecturer
+    if ($editUser) {
+        if ($editUser['role_name'] == 'Student') {
+            $course_stmt = $pdo->prepare("SELECT course_id FROM course_enrollment WHERE student_id = ?");
+            $course_stmt->execute([$_GET['edit']]);
+            $editUser['course_ids'] = array_column($course_stmt->fetchAll(), 'course_id');
+        } elseif ($editUser['role_name'] == 'Lecturer') {
+            $course_stmt = $pdo->prepare("SELECT course_id FROM lecturer_courses WHERE lecturer_id = ?");
+            $course_stmt->execute([$_GET['edit']]);
+            $editUser['course_ids'] = array_column($course_stmt->fetchAll(), 'course_id');
+        }
+    }
+}
+
+// Create necessary tables if not exist
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS lecturer_courses (
+        lecturer_id INT,
+        course_id INT,
+        PRIMARY KEY (lecturer_id, course_id),
+        FOREIGN KEY (lecturer_id) REFERENCES users(id),
+        FOREIGN KEY (course_id) REFERENCES course(id)
+    )");
+} catch (Exception $e) {
+    // Table might already exist
 }
 ?>
 <!DOCTYPE html>
@@ -316,10 +390,6 @@ if (isset($_GET['edit'])) {
                     <i class="fas fa-book"></i>
                     <span>Courses</span>
                 </a>
-                <a href="manage_intakes.php" class="nav-item">
-                    <i class="fas fa-calendar-alt"></i>
-                    <span>Intakes</span>
-                </a>
             </div>
             
             <div class="nav-section">
@@ -355,8 +425,8 @@ if (isset($_GET['edit'])) {
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-users"></i> User Management</h1>
-            <p>Create, edit, and manage user accounts across the system</p>
+            <h1><i class="fas fa-users"></i> Manage Users</h1>
+            <p>Create, edit, and manage system users</p>
         </div>
 
         <?php if ($message): ?>
@@ -366,23 +436,17 @@ if (isset($_GET['edit'])) {
             </div>
         <?php endif; ?>
 
-        <!-- Filters and Search -->
+        <!-- Filters Section -->
         <div class="filters-section">
             <div class="filters-card">
                 <form method="GET" class="filters-form">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="search">Search Users</label>
-                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, username, or email">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="role">Filter by Role</label>
+                            <label for="role">Role</label>
                             <select id="role" name="role">
                                 <option value="">All Roles</option>
                                 <?php foreach ($roles as $role): ?>
-                                    <option value="<?php echo htmlspecialchars($role['role_name']); ?>" 
-                                            <?php echo $roleFilter === $role['role_name'] ? 'selected' : ''; ?>>
+                                    <option value="<?php echo htmlspecialchars($role['role_name']); ?>" <?php echo $roleFilter === $role['role_name'] ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($role['role_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -390,7 +454,7 @@ if (isset($_GET['edit'])) {
                         </div>
                         
                         <div class="form-group">
-                            <label for="status">Filter by Status</label>
+                            <label for="status">Status</label>
                             <select id="status" name="status">
                                 <option value="">All Status</option>
                                 <option value="1" <?php echo $statusFilter === '1' ? 'selected' : ''; ?>>Active</option>
@@ -399,8 +463,13 @@ if (isset($_GET['edit'])) {
                         </div>
                         
                         <div class="form-group">
+                            <label for="search">Search</label>
+                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, username or email">
+                        </div>
+                        
+                        <div class="form-group">
                             <button type="submit" class="btn btn-green">
-                                <i class="fas fa-search"></i> Search
+                                <i class="fas fa-search"></i> Filter
                             </button>
                             <a href="manage_users.php" class="btn btn-orange">
                                 <i class="fas fa-refresh"></i> Reset
@@ -477,13 +546,13 @@ if (isset($_GET['edit'])) {
                     
                     <div class="form-row">
                         <div class="form-group" id="staff_id_group">
-                            <label for="staff_id">Staff ID</label>
+                            <label for="staff_id">Staff ID (auto-generated if blank)</label>
                             <input type="text" id="staff_id" name="staff_id" 
                                    value="<?php echo htmlspecialchars($editUser['identifier'] ?? ''); ?>">
                         </div>
                         
                         <div class="form-group" id="student_id_group" style="display: none;">
-                            <label for="student_id">Student Number</label>
+                            <label for="student_id">Student Number (auto-generated if blank)</label>
                             <input type="text" id="student_id" name="student_id" 
                                    value="<?php echo htmlspecialchars($editUser['identifier'] ?? ''); ?>">
                         </div>
@@ -516,6 +585,71 @@ if (isset($_GET['edit'])) {
                             <label for="qualification">Qualification (Optional)</label>
                             <input type="text" id="qualification" name="qualification" 
                                    value="<?php echo htmlspecialchars($editUser['qualification'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row" id="assignment_fields" style="display: none;">
+                        <div class="form-group" id="school_id_group">
+                            <label for="school_id">School</label>
+                            <select id="school_id" name="school_id">
+                                <option value="">Select School</option>
+                                <?php foreach ($schools as $school): ?>
+                                    <option value="<?php echo $school['id']; ?>" <?php echo ($editUser && $editUser['school_id'] == $school['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($school['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group" id="department_id_group">
+                            <label for="department_id">Department</label>
+                            <select id="department_id" name="department_id">
+                                <option value="">Select Department</option>
+                                <?php foreach ($departments as $department): ?>
+                                    <option value="<?php echo $department['id']; ?>" <?php echo ($editUser && $editUser['department_id'] == $department['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($department['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group" id="programme_id_group">
+                            <label for="programme_id">Programme</label>
+                            <select id="programme_id" name="programme_id">
+                                <option value="">Select Programme</option>
+                                <?php foreach ($programmes as $programme): ?>
+                                    <option value="<?php echo $programme['id']; ?>" <?php echo ($editUser && $editUser['programme_id'] == $programme['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($programme['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group" id="intake_id_group">
+                            <label for="intake_id">Intake</label>
+                            <select id="intake_id" name="intake_id">
+                                <option value="">Select Intake</option>
+                                <?php foreach ($intakes as $intake): ?>
+                                    <option value="<?php echo $intake['id']; ?>" <?php echo ($editUser && $editUser['intake_id'] == $intake['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($intake['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row" id="courses_group" style="display: none;">
+                        <div class="form-group full-width">
+                            <label>Courses</label>
+                            <div class="checkbox-list">
+                                <?php foreach ($courses as $course): ?>
+                                    <label>
+                                        <input type="checkbox" name="course_ids[]" value="<?php echo $course['id']; ?>"
+                                               <?php echo ($editUser && in_array($course['id'], $editUser['course_ids'] ?? [])) ? 'checked' : ''; ?>>
+                                        <?php echo htmlspecialchars($course['name']); ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </div>
                     
@@ -603,25 +737,43 @@ if (isset($_GET['edit'])) {
             const studentIdGroup = document.getElementById('student_id_group');
             const phoneGroup = document.getElementById('phone_group');
             const qualificationGroup = document.getElementById('qualification_group');
+            const assignmentFields = document.getElementById('assignment_fields');
+            const coursesGroup = document.getElementById('courses_group');
             
-            // Hide all fields first
+            // Hide all conditional fields
             staffIdGroup.style.display = 'none';
             studentIdGroup.style.display = 'none';
             qualificationGroup.style.display = 'none';
+            assignmentFields.style.display = 'none';
+            coursesGroup.style.display = 'none';
             
-            // Show phone field for all roles
+            // Show phone for all
             phoneGroup.style.display = 'block';
             
-            // Show appropriate fields based on role
             const selectedRole = roleSelect.options[roleSelect.selectedIndex].text;
             
-            if (selectedRole === 'Student') {
+            if (selectedRole === 'Super Admin') {
+                staffIdGroup.style.display = 'block';
+                assignmentFields.style.display = 'none';
+            } else if (selectedRole === 'Student') {
                 studentIdGroup.style.display = 'block';
-            } else if (selectedRole === 'Lecturer' || selectedRole === 'Sub Admin (Finance)') {
+                assignmentFields.style.display = 'block';
+                document.getElementById('department_id_group').style.display = 'none';
+                coursesGroup.style.display = 'block';
+            } else if (selectedRole === 'Lecturer') {
                 staffIdGroup.style.display = 'block';
                 qualificationGroup.style.display = 'block';
-            } else if (selectedRole === 'Super Admin') {
+                assignmentFields.style.display = 'block';
+                document.getElementById('programme_id_group').style.display = 'none';
+                document.getElementById('intake_id_group').style.display = 'none';
+                coursesGroup.style.display = 'block';
+            } else if (selectedRole === 'Sub Admin (Finance)') {
                 staffIdGroup.style.display = 'block';
+                qualificationGroup.style.display = 'block';
+                assignmentFields.style.display = 'block';
+                document.getElementById('programme_id_group').style.display = 'none';
+                document.getElementById('intake_id_group').style.display = 'none';
+                coursesGroup.style.display = 'none';
             }
         }
         
