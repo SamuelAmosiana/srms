@@ -1,0 +1,323 @@
+<?php
+require 'config.php';
+
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Collect form data
+    $firstname = trim($_POST['firstname']);
+    $lastname = trim($_POST['lastname']);
+    $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
+    $nrc = trim($_POST['nrc']);
+    $dob = $_POST['dateofbirth'];
+    $address = trim($_POST['address']);
+    $program = $_POST['program'];
+    $intake = $_POST['intake'];
+    $guardian_name = trim($_POST['guardianname']);
+    $guardian_phone = trim($_POST['guardianphone']);
+    $relationship = $_POST['relationship'];
+    
+    // Handle file uploads
+    $documents = [];
+    if (isset($_FILES['grade12results']) && $_FILES['grade12results']['error'] == 0) {
+        $documents[] = [
+            'name' => $_FILES['grade12results']['name'],
+            'path' => 'uploads/' . time() . '_grade12results_' . $_FILES['grade12results']['name']
+        ];
+        move_uploaded_file($_FILES['grade12results']['tmp_name'], $documents[count($documents)-1]['path']);
+    }
+    
+    if (isset($_FILES['previousschool']) && $_FILES['previousschool']['error'] == 0) {
+        $documents[] = [
+            'name' => $_FILES['previousschool']['name'],
+            'path' => 'uploads/' . time() . '_previousschool_' . $_FILES['previousschool']['name']
+        ];
+        move_uploaded_file($_FILES['previousschool']['tmp_name'], $documents[count($documents)-1]['path']);
+    }
+    
+    try {
+        // Get programme ID
+        $stmt = $pdo->prepare("SELECT id FROM programme WHERE name LIKE ? LIMIT 1");
+        $stmt->execute(["%$program%"]);
+        $programme = $stmt->fetch();
+        $programme_id = $programme ? $programme['id'] : null;
+        
+        // Get intake ID
+        $stmt = $pdo->prepare("SELECT id FROM intake WHERE name LIKE ? LIMIT 1");
+        $stmt->execute(["%$intake%"]);
+        $intake_data = $stmt->fetch();
+        $intake_id = $intake_data ? $intake_data['id'] : null;
+        
+        // Insert application into database
+        $stmt = $pdo->prepare("INSERT INTO applications (full_name, email, programme_id, intake_id, documents) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $firstname . ' ' . $lastname,
+            $email,
+            $programme_id,
+            $intake_id,
+            json_encode($documents)
+        ]);
+        
+        $success = "Your application has been submitted successfully! Our enrollment team will review your application and contact you soon.";
+    } catch (Exception $e) {
+        $error = "There was an error submitting your application. Please try again.";
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Undergraduate Application - LSC SRMS</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        .application-form {
+            text-align: left;
+            background: #f9f9f9;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .form-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .form-section h3 {
+            color: var(--primary-green);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-orange);
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .form-group {
+            flex: 1;
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-orange);
+            box-shadow: 0 0 5px rgba(255, 140, 0, 0.3);
+        }
+        
+        .submit-btn {
+            background: var(--primary-green);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            transition: background 0.3s ease;
+        }
+        
+        .submit-btn:hover {
+            background: var(--dark-green);
+        }
+        
+        .form-info {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .form-info h4 {
+            color: var(--primary-green);
+            margin-bottom: 15px;
+        }
+        
+        .form-info ul {
+            padding-left: 20px;
+        }
+        
+        .form-info ul li {
+            margin-bottom: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="school-header">
+            <h1>Lusaka South College</h1>
+            <div class="subtitle">Undergraduate Application</div>
+        </div>
+        
+        <h2>Undergraduate Application</h2>
+        <p>Apply for undergraduate programs at Lusaka South College</p>
+        
+        <div class="back-link">
+            <a href="enroll.php">← Back to Enrollment Options</a> | 
+            <a href="index.php">← Home</a>
+        </div>
+        
+        <?php if (isset($success)): ?>
+            <div class="success"><?php echo $success; ?></div>
+        <?php endif; ?>
+        
+        <?php if (isset($error)): ?>
+            <div class="error"><?php echo $error; ?></div>
+        <?php endif; ?>
+        
+        <div class="form-info">
+            <h4>Application Requirements</h4>
+            <ul>
+                <li>Completed Grade 12 Certificate or equivalent</li>
+                <li>Official transcripts from previous institutions</li>
+                <li>Copy of National Registration Card/Passport</li>
+                <li>Two passport-size photographs</li>
+                <li>Application fee payment confirmation</li>
+            </ul>
+        </div>
+        
+        <form class="application-form" method="POST" enctype="multipart/form-data">
+            <div class="form-section">
+                <h3>Personal Information</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-firstname">First Name *</label>
+                        <input type="text" id="ug-firstname" name="firstname" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-lastname">Last Name *</label>
+                        <input type="text" id="ug-lastname" name="lastname" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-email">Email Address *</label>
+                        <input type="email" id="ug-email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-phone">Phone Number *</label>
+                        <input type="tel" id="ug-phone" name="phone" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-nrc">National Registration Card/Passport *</label>
+                        <input type="text" id="ug-nrc" name="nrc" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-dob">Date of Birth *</label>
+                        <input type="date" id="ug-dob" name="dateofbirth" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ug-address">Physical Address *</label>
+                    <textarea id="ug-address" name="address" rows="3" required></textarea>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h3>Academic Information</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-program">Preferred Program *</label>
+                        <select id="ug-program" name="program" required>
+                            <option value="">Select Program</option>
+                            <option value="business-admin">Diploma Business in Business Administration</option>
+                            <option value="computer-science">Diploma in Computer Studies</option>
+                            <option value="engineering">Certificate in Electrical Engineering</option>
+                            <option value="education">Diploma in Primary Teaching</option>
+                            <option value="health-sciences">Certificate in Nursing and Health Care Assistant</option>
+                            <option value="agriculture">Diploma in General Agriculture</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-intake">Preferred Intake *</label>
+                        <select id="ug-intake" name="intake" required>
+                            <option value="">Select Intake</option>
+                            <option value="january-2026">January</option>
+                            <option value="may-2026">April</option>
+                            <option value="september-2026">July</option>
+                            <option value="september-2026">October</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-grade">Copy of Results *</label>
+                        <input type="file" id="ug-grade" name="grade12results" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-school">Supporting Documents(Proof of Payment) *</label>
+                        <input type="file" id="ug-school" name="previousschool" required>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h3>Emergency Contact</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-guardian-name">Guardian/Parent Name *</label>
+                        <input type="text" id="ug-guardian-name" name="guardianname" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-guardian-phone">Guardian/Parent Phone *</label>
+                        <input type="tel" id="ug-guardian-phone" name="guardianphone" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ug-guardian-relationship">Relationship *</label>
+                    <select id="ug-guardian-relationship" name="relationship" required>
+                        <option value="">Select Relationship</option>
+                        <option value="parent">Parent</option>
+                        <option value="guardian">Guardian</option>
+                        <option value="spouse">Spouse</option>
+                        <option value="sibling">Sibling</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button type="submit" class="submit-btn">Submit Application</button>
+        </form>
+    </div>
+</body>
+</html>
