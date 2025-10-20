@@ -8,20 +8,27 @@
     <title>Enroll - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
+        .container {
+            max-width: 1200px;
+        }
+        
         .enrollment-options {
             display: flex;
-            flex-direction: column;
-            gap: 20px;
+            flex-direction: row;
+            gap: 30px;
             margin: 30px 0;
+            justify-content: space-between;
         }
         
         .enrollment-card {
             background: #f9f9f9;
             border-radius: 10px;
-            padding: 25px;
+            padding: 30px;
             text-align: center;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             border: 2px solid #e0e0e0;
+            flex: 1;
+            min-width: 300px;
         }
         
         .enrollment-card:hover {
@@ -33,24 +40,25 @@
         .enrollment-card h3 {
             color: var(--primary-green);
             margin-bottom: 15px;
-            font-size: 22px;
+            font-size: 24px;
         }
         
         .enrollment-card p {
             color: #666;
-            margin-bottom: 20px;
-            min-height: 60px;
+            margin-bottom: 25px;
+            min-height: 80px;
         }
         
         .enrollment-card .btn {
             background: var(--primary-green);
             color: white;
-            padding: 12px 25px;
+            padding: 15px 30px;
             border-radius: 6px;
             text-decoration: none;
             font-weight: 600;
             display: inline-block;
             transition: background 0.3s ease;
+            font-size: 18px;
         }
         
         .enrollment-card .btn:hover {
@@ -59,9 +67,19 @@
         }
         
         .icon {
-            font-size: 48px;
-            margin-bottom: 15px;
+            font-size: 60px;
+            margin-bottom: 20px;
             color: var(--primary-orange);
+        }
+        
+        @media (max-width: 992px) {
+            .enrollment-options {
+                flex-direction: column;
+            }
+            
+            .enrollment-card {
+                min-width: 100%;
+            }
         }
     </style>
 </head>

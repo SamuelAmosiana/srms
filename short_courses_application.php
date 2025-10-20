@@ -56,10 +56,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Short Courses Application - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
+        .container {
+            max-width: 1000px;
+        }
+        
         .application-form {
             text-align: left;
             background: #f9f9f9;
-            padding: 25px;
+            padding: 30px;
             border-radius: 10px;
             margin: 20px 0;
         }
@@ -134,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         .form-info {
             background: #e8f5e8;
-            padding: 20px;
+            padding: 25px;
             border-radius: 10px;
             margin-bottom: 30px;
         }
@@ -156,6 +160,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .form-row {
                 flex-direction: column;
                 gap: 0;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 20px;
             }
         }
     </style>
@@ -268,8 +277,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <div class="form-group">
-                    <label for="sc-goals">Learning Goals</label>
-                    <textarea id="sc-goals" name="goals" rows="3" placeholder="What do you hope to achieve from this course?"></textarea>
+                    <label for="sc-goals">Recommended By?</label>
+                    <input type="text" id="sc-goals" name="goals" placeholder="Who recommended you to take this course?">
                 </div>
             </div>
             

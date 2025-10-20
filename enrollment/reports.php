@@ -33,13 +33,13 @@ $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM applications WHERE status =
 $stmt->execute();
 $rejectedApplications = $stmt->fetch()['total'];
 
-// Applications by category
+// Applications by category - updated logic to match actual programme names
 $stmt = $pdo->prepare("
     SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN p.name LIKE '%undergrad%' OR p.name LIKE '%Undergrad%' THEN 1 ELSE 0 END) as undergrad,
-        SUM(CASE WHEN p.name LIKE '%short%' OR p.name LIKE '%Short%' THEN 1 ELSE 0 END) as short_courses,
-        SUM(CASE WHEN p.name LIKE '%corporate%' OR p.name LIKE '%Corporate%' THEN 1 ELSE 0 END) as corporate
+        SUM(CASE WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 1 ELSE 0 END) as undergrad,
+        SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 1 ELSE 0 END) as short_courses,
+        SUM(CASE WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' OR a.documents LIKE '%corporate_training%' THEN 1 ELSE 0 END) as corporate
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
 ");
@@ -64,9 +64,9 @@ $monthlyTrend = $stmt->fetchAll();
 $stmt = $pdo->prepare("
     SELECT a.*, p.name as programme_name, i.name as intake_name,
            CASE 
-               WHEN p.name LIKE '%undergrad%' OR p.name LIKE '%Undergrad%' THEN 'Undergraduate'
-               WHEN p.name LIKE '%short%' OR p.name LIKE '%Short%' THEN 'Short Course'
-               WHEN p.name LIKE '%corporate%' OR p.name LIKE '%Corporate%' THEN 'Corporate Training'
+               WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'Undergraduate'
+               WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'Short Course'
+               WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' OR a.documents LIKE '%corporate_training%' THEN 'Corporate Training'
                ELSE 'Other'
            END as category
     FROM applications a

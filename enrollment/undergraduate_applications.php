@@ -50,14 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get undergraduate applications
+// Get undergraduate applications - updated logic to match actual programme names
 $stmt = $pdo->prepare("
     SELECT a.*, p.name as programme_name, i.name as intake_name
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'pending' 
-    AND (p.name LIKE '%undergrad%' OR p.name LIKE '%Undergrad%')
+    AND (p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%')
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
@@ -298,15 +298,72 @@ $undergraduateApplications = $stmt->fetchAll();
             
             const docsList = document.getElementById('documents_list');
             docsList.innerHTML = '';
-            const documents = JSON.parse(app.documents || '[]');
-            if (documents.length > 0) {
-                documents.forEach(doc => {
+            
+            try {
+                // Parse documents JSON
+                const documents = JSON.parse(app.documents || '{}');
+                
+                // Handle file documents
+                if (Array.isArray(documents)) {
+                    if (documents.length > 0) {
+                        documents.forEach(doc => {
+                            const li = document.createElement('li');
+                            if (typeof doc === 'string') {
+                                // Handle legacy format
+                                li.textContent = doc;
+                            } else if (doc.path && doc.name) {
+                                // Handle new format with path and name
+                                li.innerHTML = `<a href="../${doc.path}" target="_blank">${doc.name}</a>`;
+                            } else {
+                                // Handle other formats
+                                li.textContent = JSON.stringify(doc);
+                            }
+                            docsList.appendChild(li);
+                        });
+                    } else {
+                        docsList.innerHTML = '<li>No documents attached</li>';
+                    }
+                } else {
+                    // Handle object format (new applications with recommended_by)
+                    const fileDocs = [];
+                    let recommendedBy = '';
+                    
+                    // Extract file documents and recommended_by
+                    for (const key in documents) {
+                        if (key === 'recommended_by') {
+                            recommendedBy = documents[key];
+                        } else if (typeof documents[key] === 'object' && documents[key].path) {
+                            fileDocs.push(documents[key]);
+                        }
+                    }
+                    
+                    // Display file documents
+                    if (fileDocs.length > 0) {
+                        fileDocs.forEach(doc => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<a href="../${doc.path}" target="_blank">${doc.name}</a>`;
+                            docsList.appendChild(li);
+                        });
+                    } else {
+                        docsList.innerHTML = '<li>No documents attached</li>';
+                    }
+                    
+                    // Display recommended by if present
+                    if (recommendedBy) {
+                        const recLi = document.createElement('li');
+                        recLi.innerHTML = `<strong>Recommended by:</strong> ${recommendedBy}`;
+                        docsList.appendChild(recLi);
+                    }
+                }
+            } catch (e) {
+                // Handle case where documents is not valid JSON
+                if (app.documents) {
                     const li = document.createElement('li');
-                    li.innerHTML = `<a href="${doc.path}" target="_blank">${doc.name}</a>`;
+                    li.textContent = app.documents;
                     docsList.appendChild(li);
-                });
-            } else {
-                docsList.innerHTML = '<li>No documents attached</li>';
+                } else {
+                    docsList.innerHTML = '<li>No documents attached</li>';
+                }
             }
             
             document.getElementById('viewModal').style.display = 'block';

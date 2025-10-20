@@ -58,10 +58,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Corporate Training Application - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
+        .container {
+            max-width: 1000px;
+        }
+        
         .application-form {
             text-align: left;
             background: #f9f9f9;
-            padding: 25px;
+            padding: 30px;
             border-radius: 10px;
             margin: 20px 0;
         }
@@ -136,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         .form-info {
             background: #e8f5e8;
-            padding: 20px;
+            padding: 25px;
             border-radius: 10px;
             margin-bottom: 30px;
         }
@@ -158,6 +162,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .form-row {
                 flex-direction: column;
                 gap: 0;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 20px;
             }
         }
     </style>
@@ -258,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="email" id="ct-email" name="email" required>
                     </div>
                     <div class="form-group">
-                        <label for="ct-phone">Phone Number *</label>
+                        <label for="ct-phone">Phone Number(Preferably WhatsApp) *</label>
                         <input type="tel" id="ct-phone" name="phone" required>
                     </div>
                 </div>
@@ -287,12 +296,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="form-group">
                         <label for="ct-duration">Preferred Duration *</label>
                         <select id="ct-duration" name="duration" required>
-                            <option value="">Select Duration</option>
-                            <option value="half-day">Half Day (4 hours)</option>
-                            <option value="full-day">Full Day (8 hours)</option>
-                            <option value="2-days">2 Days</option>
-                            <option value="1-week">1 Week</option>
-                            <option value="custom">Custom Duration</option>
+                            <option value="">Mode of Training</option>
+                            <option value="half-day">Physical</option>
+                            <option value="full-day">Online</option>
+                           
                         </select>
                     </div>
                 </div>

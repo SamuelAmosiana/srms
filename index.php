@@ -17,14 +17,14 @@
         <h2>Welcome to LSC SRMS</h2>
         <p>Please select your login type to access the system:</p>
         <div class="login-options">
-            <a href="login.php">👨‍💼 Admin / Staff / Lecturer Login</a>
+            <a href="login.php">👨‍💼 Staff Login</a>
             <a href="student_login.php">🎓 Student Login</a>
             <a href="enroll.php" class="btn-orange">📝 Enroll Now</a>
         </div>
         
-        <div class="mt-20">
-            <p><small>Having login issues? <a href="database_setup_guide.php">📋 Database Setup Guide</a></small></p>
+        <!-- <div class="mt-20">
+          <p><small>Having login issues? <a href="database_setup_guide.php">📋 Database Setup Guide</a></small></p>
         </div>
-    </div>
+    </div>-->
 </body>
 </html>

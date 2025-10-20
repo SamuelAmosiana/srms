@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $guardian_name = trim($_POST['guardianname']);
     $guardian_phone = trim($_POST['guardianphone']);
     $relationship = $_POST['relationship'];
+    $recommended_by = trim($_POST['recommendedby']); // New field
     
     // Handle file uploads
     $documents = [];
@@ -36,11 +37,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     try {
-        // Get programme ID
-        $stmt = $pdo->prepare("SELECT id FROM programme WHERE name LIKE ? LIMIT 1");
-        $stmt->execute(["%$program%"]);
-        $programme = $stmt->fetch();
-        $programme_id = $programme ? $programme['id'] : null;
+        // Get programme ID - map form values to actual programme names
+        $programme_id = null;
+        $programme_mappings = [
+            'business-admin' => 'Business Adminstration',
+            'computer-science' => 'Computer Studies',
+            'engineering' => 'Office Administration',
+            'education' => 'Information Technology',
+            'health-sciences' => 'Nursing',
+            'agriculture' => 'Agriculture'
+        ];
+        
+        if (isset($programme_mappings[$program])) {
+            $stmt = $pdo->prepare("SELECT id FROM programme WHERE name LIKE ? LIMIT 1");
+            $stmt->execute(["%{$programme_mappings[$program]}%"]);
+            $programme = $stmt->fetch();
+            $programme_id = $programme ? $programme['id'] : null;
+        }
         
         // Get intake ID
         $stmt = $pdo->prepare("SELECT id FROM intake WHERE name LIKE ? LIMIT 1");
@@ -55,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $email,
             $programme_id,
             $intake_id,
-            json_encode($documents)
+            json_encode(array_merge($documents, ['recommended_by' => $recommended_by])) // Include recommended by in documents
         ]);
         
         $success = "Your application has been submitted successfully! Our enrollment team will review your application and contact you soon.";
@@ -71,10 +84,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Undergraduate Application - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
+        .container {
+            max-width: 1000px;
+        }
+        
         .application-form {
             text-align: left;
             background: #f9f9f9;
-            padding: 25px;
+            padding: 30px;
             border-radius: 10px;
             margin: 20px 0;
         }
@@ -149,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         .form-info {
             background: #e8f5e8;
-            padding: 20px;
+            padding: 25px;
             border-radius: 10px;
             margin-bottom: 30px;
         }
@@ -171,6 +188,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .form-row {
                 flex-direction: column;
                 gap: 0;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 20px;
             }
         }
     </style>
@@ -303,16 +325,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="ug-guardian-relationship">Relationship *</label>
-                    <select id="ug-guardian-relationship" name="relationship" required>
-                        <option value="">Select Relationship</option>
-                        <option value="parent">Parent</option>
-                        <option value="guardian">Guardian</option>
-                        <option value="spouse">Spouse</option>
-                        <option value="sibling">Sibling</option>
-                        <option value="other">Other</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-guardian-relationship">Relationship *</label>
+                        <select id="ug-guardian-relationship" name="relationship" required>
+                            <option value="">Select Relationship</option>
+                            <option value="parent">Parent</option>
+                            <option value="guardian">Guardian</option>
+                            <option value="spouse">Spouse</option>
+                            <option value="sibling">Sibling</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-recommended-by">Recommended by (if any)</label>
+                        <input type="text" id="ug-recommended-by" name="recommendedby" placeholder="Name of Enrollment Officer">
+                    </div>
                 </div>
             </div>
             
