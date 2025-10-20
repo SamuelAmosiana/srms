@@ -51,13 +51,13 @@ if ($_POST) {
                         $stmt = $pdo->prepare("INSERT INTO admin_profile (user_id, full_name, staff_id) VALUES (?, ?, ?)");
                         $stmt->execute([$userId, $_POST['full_name'], $staff_id]);
                     } elseif ($roleName == 'Student') {
-                        $student_number = $_POST['student_id'] ?: 'STU-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
+                        $student_number = $_POST['student_number'] ?: 'STU-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
                         $stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, NRC, gender, programme_id, intake_id, school_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                         $stmt->execute([$userId, $_POST['full_name'], $student_number, $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['programme_id'] ?? null, $_POST['intake_id'] ?? null, $_POST['school_id'] ?? null]);
                         
                         // Assign courses if selected
                         if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_id, course_id, status) VALUES (?, ?, 'approved')");
+                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
                             foreach ($_POST['course_ids'] as $course_id) {
                                 $course_stmt->execute([$userId, $course_id]);
                             }
@@ -69,9 +69,9 @@ if ($_POST) {
                         
                         // Assign courses if selected (for lecturers)
                         if ($roleName == 'Lecturer' && isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                            $course_stmt = $pdo->prepare("INSERT INTO lecturer_courses (lecturer_id, course_id) VALUES (?, ?)");
+                            $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
                             foreach ($_POST['course_ids'] as $course_id) {
-                                $course_stmt->execute([$userId, $course_id]);
+                                $course_stmt->execute([$course_id, $userId]);
                             }
                         }
                     }
@@ -120,13 +120,13 @@ if ($_POST) {
                         $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['user_id']]);
                     } elseif ($roleName == 'Student') {
                         $stmt = $pdo->prepare("UPDATE student_profile SET full_name = ?, student_number = ?, NRC = ?, gender = ?, programme_id = ?, intake_id = ?, school_id = ? WHERE user_id = ?");
-                        $stmt->execute([$_POST['full_name'], $_POST['student_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['programme_id'] ?? null, $_POST['intake_id'] ?? null, $_POST['school_id'] ?? null, $_POST['user_id']]);
+                        $stmt->execute([$_POST['full_name'], $_POST['student_number'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['programme_id'] ?? null, $_POST['intake_id'] ?? null, $_POST['school_id'] ?? null, $_POST['user_id']]);
                         
                         // Update courses
-                        $delete_stmt = $pdo->prepare("DELETE FROM course_enrollment WHERE student_id = ?");
+                        $delete_stmt = $pdo->prepare("DELETE FROM course_enrollment WHERE student_user_id = ?");
                         $delete_stmt->execute([$_POST['user_id']]);
                         if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_id, course_id, status) VALUES (?, ?, 'approved')");
+                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
                             foreach ($_POST['course_ids'] as $course_id) {
                                 $course_stmt->execute([$_POST['user_id'], $course_id]);
                             }
@@ -137,12 +137,12 @@ if ($_POST) {
                         
                         // Update courses for lecturers
                         if ($roleName == 'Lecturer') {
-                            $delete_stmt = $pdo->prepare("DELETE FROM lecturer_courses WHERE lecturer_id = ?");
+                            $delete_stmt = $pdo->prepare("DELETE FROM course_assignment WHERE lecturer_id = ?");
                             $delete_stmt->execute([$_POST['user_id']]);
                             if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                                $course_stmt = $pdo->prepare("INSERT INTO lecturer_courses (lecturer_id, course_id) VALUES (?, ?)");
+                                $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
                                 foreach ($_POST['course_ids'] as $course_id) {
-                                    $course_stmt->execute([$_POST['user_id'], $course_id]);
+                                    $course_stmt->execute([$course_id, $_POST['user_id']]);
                                 }
                             }
                         }
@@ -270,7 +270,7 @@ if (isset($_GET['edit'])) {
     // Get assigned courses if editing student or lecturer
     if ($editUser) {
         if ($editUser['role_name'] == 'Student') {
-            $course_stmt = $pdo->prepare("SELECT course_id FROM course_enrollment WHERE student_id = ?");
+            $course_stmt = $pdo->prepare("SELECT course_id FROM course_enrollment WHERE student_user_id = ?");
             $course_stmt->execute([$_GET['edit']]);
             $editUser['course_ids'] = array_column($course_stmt->fetchAll(), 'course_id');
         } elseif ($editUser['role_name'] == 'Lecturer') {
@@ -552,8 +552,8 @@ try {
                         </div>
                         
                         <div class="form-group" id="student_id_group" style="display: none;">
-                            <label for="student_id">Student Number (auto-generated if blank)</label>
-                            <input type="text" id="student_id" name="student_id" 
+                            <label for="student_number">Student Number (auto-generated if blank)</label>
+                            <input type="text" id="student_number" name="student_number" 
                                    value="<?php echo htmlspecialchars($editUser['identifier'] ?? ''); ?>">
                         </div>
                         

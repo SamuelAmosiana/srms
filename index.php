@@ -19,6 +19,7 @@
         <div class="login-options">
             <a href="login.php">👨‍💼 Admin / Staff / Lecturer Login</a>
             <a href="student_login.php">🎓 Student Login</a>
+            <a href="enroll.php" class="btn-orange">📝 Enroll Now</a>
         </div>
         
         <div class="mt-20">

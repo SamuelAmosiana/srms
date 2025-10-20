@@ -1,0 +1,353 @@
+<?php
+require '../config.php';
+require '../auth.php';
+
+// Check if user is logged in and has enrollment officer role
+if (!currentUserId()) {
+    header('Location: ../login.php');
+    exit;
+}
+
+requireRole('Enrollment Officer', $pdo);
+
+// Get enrollment officer profile
+$stmt = $pdo->prepare("SELECT sp.full_name, sp.staff_id FROM staff_profile sp WHERE sp.user_id = ?");
+$stmt->execute([currentUserId()]);
+$enrollmentOfficer = $stmt->fetch();
+
+// Handle application actions (approve/reject)
+$message = '';
+$messageType = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action']) && isset($_POST['application_id'])) {
+        $application_id = $_POST['application_id'];
+        
+        try {
+            switch ($_POST['action']) {
+                case 'approve':
+                    $stmt = $pdo->prepare("UPDATE applications SET status = 'approved' WHERE id = ?");
+                    $stmt->execute([$application_id]);
+                    $message = "Application approved successfully!";
+                    $messageType = "success";
+                    break;
+                    
+                case 'reject':
+                    $rejection_reason = trim($_POST['rejection_reason']);
+                    if (empty($rejection_reason)) {
+                        throw new Exception("Rejection reason is required!");
+                    }
+                    $stmt = $pdo->prepare("UPDATE applications SET status = 'rejected', rejection_reason = ? WHERE id = ?");
+                    $stmt->execute([$rejection_reason, $application_id]);
+                    $message = "Application rejected successfully!";
+                    $messageType = "success";
+                    break;
+            }
+        } catch (Exception $e) {
+            $message = "Error: " . $e->getMessage();
+            $messageType = "error";
+        }
+    }
+}
+
+// Get corporate training applications
+$stmt = $pdo->prepare("
+    SELECT a.*, p.name as programme_name, i.name as intake_name
+    FROM applications a
+    LEFT JOIN programme p ON a.programme_id = p.id
+    LEFT JOIN intake i ON a.intake_id = i.id
+    WHERE a.status = 'pending' 
+    AND (p.name LIKE '%corporate%' OR p.name LIKE '%Corporate%')
+    ORDER BY a.created_at DESC
+");
+$stmt->execute();
+$corporateTrainingApplications = $stmt->fetchAll();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate Training Applications - LSC SRMS</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="admin-layout" data-theme="light">
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+        <div class="nav-left">
+            <div class="logo-container">
+                <img src="../assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
+                <span class="logo-text">LSC SRMS</span>
+            </div>
+            <button class="sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        
+        <div class="nav-right">
+            <div class="user-info">
+                <span class="welcome-text">Welcome, <?php echo htmlspecialchars($enrollmentOfficer['full_name'] ?? 'Enrollment Officer'); ?></span>
+                <span class="staff-id">(<?php echo htmlspecialchars($enrollmentOfficer['staff_id'] ?? 'N/A'); ?>)</span>
+            </div>
+            
+            <div class="nav-actions">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
+                    <i class="fas fa-moon" id="theme-icon"></i>
+                </button>
+                
+                <div class="dropdown">
+                    <button class="profile-btn" onclick="toggleDropdown()">
+                        <i class="fas fa-user-circle"></i>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu" id="profileDropdown">
+                        <a href="profile.php"><i class="fas fa-user"></i> View Profile</a>
+                        <div class="dropdown-divider"></div>
+                        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-tachometer-alt"></i> Enrollment Panel</h3>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="dashboard.php" class="nav-item">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <div class="nav-section">
+                <h4>Applications</h4>
+                <a href="undergraduate_applications.php" class="nav-item">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Undergraduate</span>
+                </a>
+                <a href="short_courses_applications.php" class="nav-item">
+                    <i class="fas fa-book"></i>
+                    <span>Short Courses</span>
+                </a>
+                <a href="corporate_training_applications.php" class="nav-item active">
+                    <i class="fas fa-building"></i>
+                    <span>Corporate Training</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
+                <h4>Reports</h4>
+                <a href="reports.php" class="nav-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Enrollment Reports</span>
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-header">
+            <h1><i class="fas fa-building"></i> Corporate Training Applications</h1>
+            <p>Manage corporate training applications</p>
+        </div>
+
+        <?php if ($message): ?>
+            <div class="alert alert-<?php echo $messageType; ?>">
+                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
+                <?php echo htmlspecialchars($message); ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Corporate Training Applications -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-building"></i> Pending Corporate Training Applications (<?php echo count($corporateTrainingApplications); ?>)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($corporateTrainingApplications)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-building"></i>
+                        <p>No pending corporate training applications</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Submitted</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($corporateTrainingApplications as $app): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($app['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-info" onclick="viewApplication(<?php echo htmlspecialchars(json_encode($app)); ?>)">
+                                                <i class="fas fa-eye"></i> View
+                                            </button>
+                                            <button class="btn btn-sm btn-success" onclick="approveApplication(<?php echo $app['id']; ?>)">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" onclick="rejectApplication(<?php echo $app['id']; ?>)">
+                                                <i class="fas fa-times"></i> Reject
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </main>
+
+    <!-- View Application Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-alt"></i> Application Details</h3>
+                <span class="close" onclick="closeModal('viewModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p><strong>Name:</strong> <span id="view_name"></span></p>
+                <p><strong>Email:</strong> <span id="view_email"></span></p>
+                <p><strong>Programme:</strong> <span id="view_programme"></span></p>
+                <p><strong>Intake:</strong> <span id="view_intake"></span></p>
+                <p><strong>Submitted:</strong> <span id="view_submitted"></span></p>
+                <div id="documents_section">
+                    <strong>Documents:</strong>
+                    <ul id="documents_list"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" onclick="approveFromModal()"><i class="fas fa-check"></i> Approve</button>
+                <button class="btn btn-danger" onclick="rejectFromModal()"><i class="fas fa-times"></i> Reject</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Reason Modal -->
+    <div id="rejectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Reject Application</h3>
+                <span class="close" onclick="closeModal('rejectModal')">&times;</span>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="reject">
+                <input type="hidden" id="reject_application_id" name="application_id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="rejection_reason">Rejection Reason *</label>
+                        <textarea id="rejection_reason" name="rejection_reason" rows="4" required placeholder="Explain why the application is being rejected..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger"><i class="fas fa-times"></i> Reject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Approval Confirmation Modal -->
+    <div id="approveModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-circle"></i> Approve Application</h3>
+                <span class="close" onclick="closeModal('approveModal')">&times;</span>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="approve">
+                <input type="hidden" id="approve_application_id" name="application_id">
+                <div class="modal-body">
+                    <p>Are you sure you want to approve this application?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Approve</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../assets/js/admin-dashboard.js"></script>
+    <script>
+        let currentApplicationId = null;
+        
+        function viewApplication(app) {
+            document.getElementById('view_name').textContent = app.full_name;
+            document.getElementById('view_email').textContent = app.email;
+            document.getElementById('view_programme').textContent = app.programme_name;
+            document.getElementById('view_intake').textContent = app.intake_name;
+            document.getElementById('view_submitted').textContent = new Date(app.created_at).toLocaleDateString();
+            
+            const docsList = document.getElementById('documents_list');
+            docsList.innerHTML = '';
+            const documents = JSON.parse(app.documents || '[]');
+            if (documents.length > 0) {
+                documents.forEach(doc => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="${doc.path}" target="_blank">${doc.name}</a>`;
+                    docsList.appendChild(li);
+                });
+            } else {
+                docsList.innerHTML = '<li>No documents attached</li>';
+            }
+            
+            document.getElementById('viewModal').style.display = 'block';
+        }
+        
+        function approveApplication(applicationId) {
+            currentApplicationId = applicationId;
+            document.getElementById('approve_application_id').value = applicationId;
+            document.getElementById('approveModal').style.display = 'block';
+        }
+        
+        function approveFromModal() {
+            document.getElementById('approve_application_id').value = currentApplicationId;
+            // Submit the form
+            document.querySelector('#approveModal form').submit();
+        }
+        
+        function rejectApplication(applicationId) {
+            currentApplicationId = applicationId;
+            document.getElementById('reject_application_id').value = applicationId;
+            document.getElementById('rejectModal').style.display = 'block';
+        }
+        
+        function rejectFromModal() {
+            document.getElementById('reject_application_id').value = currentApplicationId;
+            // Submit the form
+            document.querySelector('#rejectModal form').submit();
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        
+        window.onclick = function(event) {
+            const modals = document.getElementsByClassName('modal');
+            for (let i = 0; i < modals.length; i++) {
+                if (event.target == modals[i]) {
+                    modals[i].style.display = 'none';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
