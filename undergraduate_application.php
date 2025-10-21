@@ -209,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         <div class="back-link">
             <a href="enroll.php">← Back to Enrollment Options</a> | 
-            <a href="index.php">← Home</a>
+            <a href="https://lsuczm.com/#home">← Home</a>
         </div>
         
         <?php if (isset($success)): ?>

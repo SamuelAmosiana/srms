@@ -242,20 +242,185 @@ a:hover {
     background: var(--dark-orange);
 }
 
-/* Responsive design */
-@media (max-width: 480px) {
+/* Enhanced Responsive Design */
+@media (max-width: 1200px) {
     .container {
-        margin: 20px;
-        padding: 20px;
+        max-width: 95%;
+        padding: 30px;
+    }
+}
+
+@media (max-width: 992px) {
+    .container {
+        max-width: 90%;
+        padding: 25px;
+    }
+    
+    .school-header {
+        margin: -25px -25px 25px -25px;
+    }
+    
+    .container h1 {
+        font-size: 28px;
+    }
+    
+    .container h2 {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        margin: 30px 20px;
+        padding: 25px 20px;
     }
     
     .school-header {
         margin: -20px -20px 20px -20px;
+        padding: 15px;
+    }
+    
+    .school-header h1 {
+        font-size: 22px;
+    }
+    
+    .school-header .subtitle {
+        font-size: 13px;
+    }
+    
+    .container h1 {
+        font-size: 26px;
+    }
+    
+    .container h2 {
+        font-size: 22px;
+    }
+    
+    input[type="text"], 
+    input[type="password"], 
+    input[type="email"] {
+        padding: 12px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    button, .btn {
+        padding: 12px 20px;
+        font-size: 15px;
+        min-width: 100px;
+    }
+    
+    .login-options a {
+        padding: 15px;
+        font-size: 16px;
     }
     
     .dashboard {
-        margin: 10px;
+        margin: 15px;
+        padding: 15px;
+    }
+    
+    .dashboard-header {
+        padding: 15px;
+    }
+}
+
+@media (max-width: 576px) {
+    .container {
+        margin: 20px 15px;
+        padding: 20px 15px;
+    }
+    
+    .school-header {
+        margin: -15px -15px 15px -15px;
+        padding: 12px;
+    }
+    
+    .school-header h1 {
+        font-size: 20px;
+    }
+    
+    .container h1 {
+        font-size: 24px;
+    }
+    
+    .container h2 {
+        font-size: 20px;
+    }
+    
+    input[type="text"], 
+    input[type="password"], 
+    input[type="email"] {
         padding: 10px;
+        font-size: 16px;
+        margin: 8px 0;
+    }
+    
+    button, .btn {
+        padding: 10px 15px;
+        font-size: 14px;
+        min-width: 90px;
+        margin: 8px 3px;
+    }
+    
+    .login-options {
+        margin: 20px 0;
+    }
+    
+    .login-options a {
+        padding: 12px;
+        font-size: 15px;
+        margin: 10px 0;
+    }
+    
+    .back-link {
+        margin-top: 15px;
+        padding-top: 15px;
+    }
+}
+
+@media (max-width: 400px) {
+    .container {
+        margin: 15px 10px;
+        padding: 15px 10px;
+    }
+    
+    .school-header {
+        margin: -10px -10px 10px -10px;
+        padding: 10px;
+    }
+    
+    .school-header h1 {
+        font-size: 18px;
+    }
+    
+    .school-header .subtitle {
+        font-size: 12px;
+    }
+    
+    .container h1 {
+        font-size: 22px;
+    }
+    
+    .container h2 {
+        font-size: 18px;
+    }
+    
+    input[type="text"], 
+    input[type="password"], 
+    input[type="email"] {
+        padding: 8px;
+        font-size: 16px;
+    }
+    
+    button, .btn {
+        padding: 8px 12px;
+        font-size: 13px;
+        min-width: 80px;
+    }
+    
+    .login-options a {
+        padding: 10px;
+        font-size: 14px;
     }
 }
 
@@ -264,3 +429,19 @@ a:hover {
 .mt-20 { margin-top: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .p-20 { padding: 20px; }
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    button, .btn, .login-options a {
+        min-height: 44px; /* Minimum touch target size */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    input[type="text"], 
+    input[type="password"], 
+    input[type="email"] {
+        min-height: 44px;
+    }
+}
