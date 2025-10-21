@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="container">
     <div class="school-header">
         <h1>Lusaka South College</h1>
-        <div class="subtitle">Admin / Staff / Lecturer Portal</div>
+        <div class="subtitle">Staff Portal</div>
     </div>
     <h2>Login to Your Account</h2>
     <?php if (!empty($error)) echo "<p class='error'>$error</p>"; ?>
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit">🚀 Login</button>
     </form>
     <div class="back-link">
-        <a href="index.php">← Back to Home</a>
+        <a href="https://lsuczm.com/#home">← Back to Home</a>
     </div>
 </div>
 </body>

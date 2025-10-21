@@ -294,7 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="number" id="ct-participants" name="participants" min="1" required>
                     </div>
                     <div class="form-group">
-                        <label for="ct-duration">Preferred Duration *</label>
+                        <label for="ct-duration">Mode of Training *</label>
                         <select id="ct-duration" name="duration" required>
                             <option value="">Mode of Training</option>
                             <option value="half-day">Physical</option>

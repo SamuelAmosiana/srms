@@ -116,7 +116,7 @@
         </div>
         
         <div class="back-link">
-            <a href="index.php">← Back to Home</a>
+            <a href="https://lsuczm.com/#home">← Back to Home</a>
         </div>
     </div>
 </body>

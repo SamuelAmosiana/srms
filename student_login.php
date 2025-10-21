@@ -44,12 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <p>Enter your student number to access your account</p>
     <?php if (!empty($error)) echo "<p class='error'>$error</p>"; ?>
     <form method="POST">
-        <input type="text" name="student_number" placeholder="🎓 Student Number (e.g., LSC000001 or STU-2025-0016)" required>
-        <input type="password" name="password" placeholder="🔒 Password (if any)">
+        <input type="text" name="student_number" placeholder="🎓 Student ID / Username" required>
+        <input type="password" name="password" placeholder="🔒 Password ">
         <button type="submit">🚀 Login</button>
     </form>
     <div class="back-link">
-        <a href="index.php">← Back to Home</a>
+        <a href="https://lsuczm.com/#home">← Back to Home</a>
     </div>
 </div>
 </body>

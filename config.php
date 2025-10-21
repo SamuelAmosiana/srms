@@ -2,8 +2,8 @@
 // Database configuration
 $DB_HOST = '127.0.0.1';
 $DB_NAME = 'lscrms';
-$DB_USER = 'root'; // replace with your DB user
-$DB_PASS = '';     // replace with your DB password
+$DB_USER = 'root';
+$DB_PASS = '';
 
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -19,3 +19,4 @@ try {
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+?>
