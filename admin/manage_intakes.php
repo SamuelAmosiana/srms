@@ -705,7 +705,7 @@ try {
                             <tbody>
                                 <?php foreach ($intakeStudents as $student): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($student['student_id']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['student_number']); ?></td>
                                         <td><?php echo htmlspecialchars($student['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($student['user_email']); ?></td>
                                         <td><?php echo htmlspecialchars($student['programme_name'] ?? 'N/A'); ?></td>

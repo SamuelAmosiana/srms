@@ -51,7 +51,7 @@ if ($_POST) {
                         $stmt = $pdo->prepare("INSERT INTO admin_profile (user_id, full_name, staff_id) VALUES (?, ?, ?)");
                         $stmt->execute([$userId, $_POST['full_name'], $staff_id]);
                     } elseif ($roleName == 'Student') {
-                        $student_number = $_POST['student_number'] ?: 'STU-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
+                        $student_number = $_POST['student_number'] ?: 'LSC' . str_pad($userId, 6, '0', STR_PAD_LEFT);
                         $stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, NRC, gender, programme_id, intake_id, school_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                         $stmt->execute([$userId, $_POST['full_name'], $student_number, $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['programme_id'] ?? null, $_POST['intake_id'] ?? null, $_POST['school_id'] ?? null]);
                         

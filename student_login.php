@@ -5,9 +5,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $studnum = strtoupper(trim($_POST['student_number']));
     $password = $_POST['password'] ?? '';
 
-    // Updated regex to accept both LSC format and STU-YYYY-NNNN format
-    if (!preg_match('/^(LSC\d{6}|STU-\d{4}-\d{4})$/', $studnum)) {
-        $error = "Invalid student number format. Use LSC000001 or STU-2025-0016";
+    // Updated regex to accept LSC format only
+    if (!preg_match('/^LSC\d{6}$/', $studnum)) {
+        $error = "Invalid student number format. Use LSC000001";
     } else {
         $stmt = $pdo->prepare("SELECT u.id, u.password_hash FROM users u 
                                JOIN student_profile s ON u.id = s.user_id 
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit">🚀 Login</button>
     </form>
     <div class="back-link">
-        <a href="https://lsuczm.com/#home">← Back to Home</a>
+        <a href="index.php">← Back to Home</a>
     </div>
 </div>
 </body>
