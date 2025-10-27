@@ -1,5 +1,3 @@
--- Add missing course_assignment table for lecturer-course assignments
-USE lscrms;
 
 CREATE TABLE course_assignment (
     id INT AUTO_INCREMENT PRIMARY KEY,
