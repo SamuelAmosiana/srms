@@ -154,6 +154,14 @@ foreach ($pendingApplications as $application) {
             </div>
             
             <div class="nav-section">
+                <h4>My Approvals</h4>
+                <a href="my_approvals.php" class="nav-item">
+                    <i class="fas fa-thumbs-up"></i>
+                    <span>My Approvals</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
                 <h4>Reports</h4>
                 <a href="reports.php" class="nav-item">
                     <i class="fas fa-chart-bar"></i>

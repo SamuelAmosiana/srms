@@ -22,12 +22,13 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && isset($_POST['application_id'])) {
         $application_id = $_POST['application_id'];
+        $current_user_id = currentUserId(); // Get current enrollment officer ID
         
         try {
             switch ($_POST['action']) {
                 case 'approve':
-                    $stmt = $pdo->prepare("UPDATE applications SET status = 'approved' WHERE id = ?");
-                    $stmt->execute([$application_id]);
+                    $stmt = $pdo->prepare("UPDATE applications SET status = 'approved', processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$current_user_id, $application_id]);
                     $message = "Application approved successfully!";
                     $messageType = "success";
                     break;
@@ -37,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (empty($rejection_reason)) {
                         throw new Exception("Rejection reason is required!");
                     }
-                    $stmt = $pdo->prepare("UPDATE applications SET status = 'rejected', rejection_reason = ? WHERE id = ?");
-                    $stmt->execute([$rejection_reason, $application_id]);
+                    $stmt = $pdo->prepare("UPDATE applications SET status = 'rejected', rejection_reason = ?, processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$rejection_reason, $current_user_id, $application_id]);
                     $message = "Application rejected successfully!";
                     $messageType = "success";
                     break;
@@ -163,6 +164,14 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                 <a href="corporate_training_applications.php" class="nav-item">
                     <i class="fas fa-building"></i>
                     <span>Corporate Training</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
+                <h4>My Approvals</h4>
+                <a href="my_approvals.php" class="nav-item">
+                    <i class="fas fa-thumbs-up"></i>
+                    <span>My Approvals</span>
                 </a>
             </div>
             
