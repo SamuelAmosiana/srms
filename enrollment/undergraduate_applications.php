@@ -62,6 +62,32 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute();
 $undergraduateApplications = $stmt->fetchAll();
+
+// Get approved undergraduate applications
+$stmt = $pdo->prepare("
+    SELECT a.*, p.name as programme_name, i.name as intake_name
+    FROM applications a
+    LEFT JOIN programme p ON a.programme_id = p.id
+    LEFT JOIN intake i ON a.intake_id = i.id
+    WHERE a.status = 'approved' 
+    AND (p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%')
+    ORDER BY a.created_at DESC
+");
+$stmt->execute();
+$approvedUndergraduateApplications = $stmt->fetchAll();
+
+// Get rejected undergraduate applications
+$stmt = $pdo->prepare("
+    SELECT a.*, p.name as programme_name, i.name as intake_name
+    FROM applications a
+    LEFT JOIN programme p ON a.programme_id = p.id
+    LEFT JOIN intake i ON a.intake_id = i.id
+    WHERE a.status = 'rejected' 
+    AND (p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%')
+    ORDER BY a.created_at DESC
+");
+$stmt->execute();
+$rejectedUndergraduateApplications = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -207,6 +233,92 @@ $undergraduateApplications = $stmt->fetchAll();
                                                 <i class="fas fa-times"></i> Reject
                                             </button>
                                         </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Approved Undergraduate Applications -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-check-circle"></i> Approved Undergraduate Applications (<?php echo count($approvedUndergraduateApplications); ?>)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($approvedUndergraduateApplications)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle"></i>
+                        <p>No approved undergraduate applications</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Submitted</th>
+                                    <th>Approved Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($approvedUndergraduateApplications as $app): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($app['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Rejected Undergraduate Applications -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-times-circle"></i> Rejected Undergraduate Applications (<?php echo count($rejectedUndergraduateApplications); ?>)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($rejectedUndergraduateApplications)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-times-circle"></i>
+                        <p>No rejected undergraduate applications</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Submitted</th>
+                                    <th>Rejected Date</th>
+                                    <th>Rejection Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($rejectedUndergraduateApplications as $app): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($app['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>
+                                        <td><?php echo htmlspecialchars($app['rejection_reason'] ?? 'No reason provided'); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>

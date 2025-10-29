@@ -62,6 +62,32 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute();
 $corporateTrainingApplications = $stmt->fetchAll();
+
+// Get approved corporate training applications
+$stmt = $pdo->prepare("
+    SELECT a.*, p.name as programme_name, i.name as intake_name
+    FROM applications a
+    LEFT JOIN programme p ON a.programme_id = p.id
+    LEFT JOIN intake i ON a.intake_id = i.id
+    WHERE a.status = 'approved' 
+    AND (p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' OR a.documents LIKE '%corporate_training%')
+    ORDER BY a.created_at DESC
+");
+$stmt->execute();
+$approvedCorporateTrainingApplications = $stmt->fetchAll();
+
+// Get rejected corporate training applications
+$stmt = $pdo->prepare("
+    SELECT a.*, p.name as programme_name, i.name as intake_name
+    FROM applications a
+    LEFT JOIN programme p ON a.programme_id = p.id
+    LEFT JOIN intake i ON a.intake_id = i.id
+    WHERE a.status = 'rejected' 
+    AND (p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' OR a.documents LIKE '%corporate_training%')
+    ORDER BY a.created_at DESC
+");
+$stmt->execute();
+$rejectedCorporateTrainingApplications = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -215,6 +241,92 @@ $corporateTrainingApplications = $stmt->fetchAll();
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Approved Corporate Training Applications -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-check-circle"></i> Approved Corporate Training Applications (<?php echo count($approvedCorporateTrainingApplications); ?>)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($approvedCorporateTrainingApplications)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle"></i>
+                        <p>No approved corporate training applications</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Submitted</th>
+                                    <th>Approved Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($approvedCorporateTrainingApplications as $app): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($app['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Rejected Corporate Training Applications -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-times-circle"></i> Rejected Corporate Training Applications (<?php echo count($rejectedCorporateTrainingApplications); ?>)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($rejectedCorporateTrainingApplications)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-times-circle"></i>
+                        <p>No rejected corporate training applications</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Submitted</th>
+                                    <th>Rejected Date</th>
+                                    <th>Rejection Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($rejectedCorporateTrainingApplications as $app): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($app['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>
+                                        <td><?php echo htmlspecialchars($app['rejection_reason'] ?? 'No reason provided'); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
     </main>
 
     <!-- View Application Modal -->
@@ -269,7 +381,7 @@ $corporateTrainingApplications = $stmt->fetchAll();
     <div id="approveModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fas fa-check-circle"></i> Approve Application</h3>
+                <h3><i class="fas fa-check-circle"></i> Approve Application</h1>
                 <span class="close" onclick="closeModal('approveModal')">&times;</span>
             </div>
             <form method="POST">
