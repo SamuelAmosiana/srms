@@ -37,6 +37,11 @@ if ($_POST) {
                     
                     $userId = $pdo->lastInsertId();
                     
+                    // Debug: Check if userId is valid
+                    if (!$userId) {
+                        throw new Exception("Failed to get user ID after inserting user");
+                    }
+                    
                     // Insert role assignment
                     $stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
                     $stmt->execute([$userId, $_POST['role_id']]);
@@ -57,21 +62,35 @@ if ($_POST) {
                         
                         // Assign courses if selected
                         if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
+                            // First, verify that the courses exist
+                            $courseCheckStmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
                             foreach ($_POST['course_ids'] as $course_id) {
-                                $course_stmt->execute([$userId, $course_id]);
+                                $courseCheckStmt->execute([$course_id]);
+                                if ($courseCheckStmt->fetch()) {
+                                    // Course exists, so we can enroll the student
+                                    $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
+                                    if (!$course_stmt->execute([$userId, $course_id])) {
+                                        throw new Exception("Failed to enroll student in course ID: " . $course_id);
+                                    }
+                                }
                             }
                         }
                     } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)') {
                         $staff_id = $_POST['staff_id'] ?: 'STF-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
-                        $stmt = $pdo->prepare("INSERT INTO staff_profile (user_id, full_name, staff_id, NRC, gender, qualification, department_id, school_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                        $stmt->execute([$userId, $_POST['full_name'], $staff_id, $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null, $_POST['department_id'] ?? null, $_POST['school_id'] ?? null]);
+                        $stmt = $pdo->prepare("INSERT INTO staff_profile (user_id, full_name, staff_id, NRC, gender, qualification) VALUES (?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$userId, $_POST['full_name'], $staff_id, $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null]);
                         
                         // Assign courses if selected (for lecturers)
                         if ($roleName == 'Lecturer' && isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                            $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
+                            // First, verify that the courses exist
+                            $courseCheckStmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
                             foreach ($_POST['course_ids'] as $course_id) {
-                                $course_stmt->execute([$course_id, $userId]);
+                                $courseCheckStmt->execute([$course_id]);
+                                if ($courseCheckStmt->fetch()) {
+                                    // Course exists, so we can assign it to the lecturer
+                                    $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
+                                    $course_stmt->execute([$course_id, $userId]);
+                                }
                             }
                         }
                     }
@@ -83,6 +102,20 @@ if ($_POST) {
                     
                 case 'update_user':
                     $pdo->beginTransaction();
+                    
+                    // Debug: Check if user_id is set and valid
+                    if (!isset($_POST['user_id']) || empty($_POST['user_id'])) {
+                        throw new Exception("User ID is missing or invalid");
+                    }
+                    
+                    // Debug: Check if user exists in database
+                    $userCheckStmt = $pdo->prepare("SELECT id FROM users WHERE id = ?");
+                    $userCheckStmt->execute([$_POST['user_id']]);
+                    if (!$userCheckStmt->fetch()) {
+                        // Fixed: Properly handle the case where user_id might not exist
+                        $userId = isset($_POST['user_id']) ? $_POST['user_id'] : 'undefined';
+                        throw new Exception("User with ID " . htmlspecialchars($userId) . " does not exist in the database");
+                    }
                     
                     // Update users table
                     if (!empty($_POST['password'])) {
@@ -126,23 +159,38 @@ if ($_POST) {
                         $delete_stmt = $pdo->prepare("DELETE FROM course_enrollment WHERE student_user_id = ?");
                         $delete_stmt->execute([$_POST['user_id']]);
                         if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                            $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
+                            // First, verify that the courses exist
+                            $courseCheckStmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
                             foreach ($_POST['course_ids'] as $course_id) {
-                                $course_stmt->execute([$_POST['user_id'], $course_id]);
+                                $courseCheckStmt->execute([$course_id]);
+                                if ($courseCheckStmt->fetch()) {
+                                    // Course exists, so we can enroll the student
+                                    $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
+                                    if (!$course_stmt->execute([$_POST['user_id'], $course_id])) {
+                                        throw new Exception("Failed to enroll student in course ID: " . $course_id);
+                                    }
+                                }
                             }
                         }
                     } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)') {
-                        $stmt = $pdo->prepare("UPDATE staff_profile SET full_name = ?, staff_id = ?, NRC = ?, gender = ?, qualification = ?, department_id = ?, school_id = ? WHERE user_id = ?");
-                        $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null, $_POST['department_id'] ?? null, $_POST['school_id'] ?? null, $_POST['user_id']]);
+                        // Fixed: Removed department_id and school_id from the UPDATE query as they don't exist in staff_profile table
+                        $stmt = $pdo->prepare("UPDATE staff_profile SET full_name = ?, staff_id = ?, NRC = ?, gender = ?, qualification = ? WHERE user_id = ?");
+                        $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null, $_POST['user_id']]);
                         
                         // Update courses for lecturers
                         if ($roleName == 'Lecturer') {
                             $delete_stmt = $pdo->prepare("DELETE FROM course_assignment WHERE lecturer_id = ?");
                             $delete_stmt->execute([$_POST['user_id']]);
                             if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                                $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
+                                // First, verify that the courses exist
+                                $courseCheckStmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
                                 foreach ($_POST['course_ids'] as $course_id) {
-                                    $course_stmt->execute([$course_id, $_POST['user_id']]);
+                                    $courseCheckStmt->execute([$course_id]);
+                                    if ($courseCheckStmt->fetch()) {
+                                        // Course exists, so we can assign it to the lecturer
+                                        $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
+                                        $course_stmt->execute([$course_id, $_POST['user_id']]);
+                                    }
                                 }
                             }
                         }
@@ -154,6 +202,11 @@ if ($_POST) {
                     break;
                     
                 case 'delete_user':
+                    // Fixed: Check if user_id is set before using it
+                    if (!isset($_POST['user_id']) || empty($_POST['user_id'])) {
+                        throw new Exception("User ID is missing or invalid for delete operation");
+                    }
+                    
                     $pdo->beginTransaction();
                     
                     // Get user role first to determine which profile table to delete from
@@ -256,7 +309,7 @@ if (isset($_GET['edit'])) {
                           COALESCE(ap.full_name, sp.full_name, stp.full_name) as full_name,
                           COALESCE(ap.staff_id, sp.student_number, stp.staff_id) as identifier,
                           sp.NRC as student_nrc, sp.gender as student_gender, sp.programme_id, sp.intake_id, sp.school_id,
-                          stp.NRC as staff_nrc, stp.gender as staff_gender, stp.qualification, stp.department_id, stp.school_id
+                          stp.NRC as staff_nrc, stp.gender as staff_gender, stp.qualification
                           FROM users u 
                           JOIN user_roles ur ON u.id = ur.user_id
                           JOIN roles r ON ur.role_id = r.id
@@ -274,7 +327,8 @@ if (isset($_GET['edit'])) {
             $course_stmt->execute([$_GET['edit']]);
             $editUser['course_ids'] = array_column($course_stmt->fetchAll(), 'course_id');
         } elseif ($editUser['role_name'] == 'Lecturer') {
-            $course_stmt = $pdo->prepare("SELECT course_id FROM lecturer_courses WHERE lecturer_id = ?");
+            // Fixed: Changed from lecturer_courses to course_assignment table
+            $course_stmt = $pdo->prepare("SELECT course_id FROM course_assignment WHERE lecturer_id = ?");
             $course_stmt->execute([$_GET['edit']]);
             $editUser['course_ids'] = array_column($course_stmt->fetchAll(), 'course_id');
         }
@@ -606,7 +660,7 @@ try {
                             <select id="department_id" name="department_id">
                                 <option value="">Select Department</option>
                                 <?php foreach ($departments as $department): ?>
-                                    <option value="<?php echo $department['id']; ?>" <?php echo ($editUser && $editUser['department_id'] == $department['id']) ? 'selected' : ''; ?>>
+                                    <option value="<?php echo $department['id']; ?>" <?php echo ($editUser && isset($editUser['school_id']) && $editUser['school_id'] && isset($editUser['department_id']) && $editUser['department_id'] == $department['id']) ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($department['name']); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -739,6 +793,9 @@ try {
             const qualificationGroup = document.getElementById('qualification_group');
             const assignmentFields = document.getElementById('assignment_fields');
             const coursesGroup = document.getElementById('courses_group');
+            const departmentIdGroup = document.getElementById('department_id_group');
+            const programmeIdGroup = document.getElementById('programme_id_group');
+            const intakeIdGroup = document.getElementById('intake_id_group');
             
             // Hide all conditional fields
             staffIdGroup.style.display = 'none';
@@ -746,6 +803,9 @@ try {
             qualificationGroup.style.display = 'none';
             assignmentFields.style.display = 'none';
             coursesGroup.style.display = 'none';
+            departmentIdGroup.style.display = 'none';
+            programmeIdGroup.style.display = 'none';
+            intakeIdGroup.style.display = 'none';
             
             // Show phone for all
             phoneGroup.style.display = 'block';
@@ -754,25 +814,28 @@ try {
             
             if (selectedRole === 'Super Admin') {
                 staffIdGroup.style.display = 'block';
-                assignmentFields.style.display = 'none';
             } else if (selectedRole === 'Student') {
                 studentIdGroup.style.display = 'block';
                 assignmentFields.style.display = 'block';
-                document.getElementById('department_id_group').style.display = 'none';
+                departmentIdGroup.style.display = 'none'; // Hide department for students
+                programmeIdGroup.style.display = 'block';
+                intakeIdGroup.style.display = 'block';
                 coursesGroup.style.display = 'block';
             } else if (selectedRole === 'Lecturer') {
                 staffIdGroup.style.display = 'block';
                 qualificationGroup.style.display = 'block';
                 assignmentFields.style.display = 'block';
-                document.getElementById('programme_id_group').style.display = 'none';
-                document.getElementById('intake_id_group').style.display = 'none';
+                departmentIdGroup.style.display = 'none'; // Hide department for lecturers (no department_id in staff_profile)
+                programmeIdGroup.style.display = 'none';
+                intakeIdGroup.style.display = 'none';
                 coursesGroup.style.display = 'block';
             } else if (selectedRole === 'Sub Admin (Finance)') {
                 staffIdGroup.style.display = 'block';
                 qualificationGroup.style.display = 'block';
                 assignmentFields.style.display = 'block';
-                document.getElementById('programme_id_group').style.display = 'none';
-                document.getElementById('intake_id_group').style.display = 'none';
+                departmentIdGroup.style.display = 'none'; // Hide department for finance staff (no department_id in staff_profile)
+                programmeIdGroup.style.display = 'none';
+                intakeIdGroup.style.display = 'none';
                 coursesGroup.style.display = 'none';
             }
         }

@@ -34,11 +34,13 @@ $stats['pending_applications'] = $stmt->fetch();
 
 // Count approved applications
 $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM applications WHERE status = 'approved'");
-$stats['approved_applications'] = $stmt->fetch()['count'];
+$stmt->execute(); // Fixed: Added execute() before fetch()
+$stats['approved_applications'] = $stmt->fetchColumn(); // Fixed: Using fetchColumn() for single value
 
 // Count rejected applications
 $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM applications WHERE status = 'rejected'");
-$stats['rejected_applications'] = $stmt->fetch()['count'];
+$stmt->execute(); // Fixed: Added execute() before fetch()
+$stats['rejected_applications'] = $stmt->fetchColumn(); // Fixed: Using fetchColumn() for single value
 
 // Get pending applications by category
 $stmt = $pdo->prepare("
