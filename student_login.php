@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit">🚀 Login</button>
     </form>
     <div class="back-link">
-        <a href="https://lsuczm.com/#home">← Back to Home</a>
+        <a href="index.php">← Back to Home</a>
     </div>
 </div>
 </body>
