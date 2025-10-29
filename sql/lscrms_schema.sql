@@ -1,3 +1,5 @@
+CREATE DATABASE IF NOT EXISTS lscrms;
+USE lscrms;
 -- Roles & permissions (flexible RBAC)
 CREATE TABLE roles (
   id INT AUTO_INCREMENT PRIMARY KEY,
