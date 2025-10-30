@@ -189,6 +189,47 @@ $awaiting_query = "
 ";
 $awaiting_students = $pdo->query($awaiting_query)->fetchAll();
 
+// Get enrollment officer statistics for commission tracking
+$officer_stats_query = "
+    SELECT 
+        u.id as officer_id,
+        COALESCE(sp.full_name, u.username) as officer_name,
+        sp.staff_id,
+        COUNT(CASE WHEN a.status = 'approved' THEN 1 END) as approved_count,
+        COUNT(CASE WHEN a.status = 'rejected' THEN 1 END) as rejected_count,
+        COUNT(a.id) as total_processed,
+        DATE_FORMAT(MAX(a.updated_at), '%Y-%m-%d') as last_activity
+    FROM users u
+    JOIN user_roles ur ON u.id = ur.user_id
+    JOIN roles r ON ur.role_id = r.id
+    LEFT JOIN staff_profile sp ON u.id = sp.user_id
+    LEFT JOIN applications a ON u.id = a.processed_by
+    WHERE r.name = 'Enrollment Officer'
+    GROUP BY u.id, sp.full_name, u.username, sp.staff_id
+    ORDER BY total_processed DESC
+";
+$officer_statistics = $pdo->query($officer_stats_query)->fetchAll();
+
+// Get monthly statistics by officer
+$monthly_officer_stats_query = "
+    SELECT 
+        u.id as officer_id,
+        COALESCE(sp.full_name, u.username) as officer_name,
+        DATE_FORMAT(a.updated_at, '%Y-%m') as month,
+        COUNT(CASE WHEN a.status = 'approved' THEN 1 END) as approved_count,
+        COUNT(CASE WHEN a.status = 'rejected' THEN 1 END) as rejected_count,
+        COUNT(a.id) as total_processed
+    FROM users u
+    JOIN user_roles ur ON u.id = ur.user_id
+    JOIN roles r ON ur.role_id = r.id
+    LEFT JOIN staff_profile sp ON u.id = sp.user_id
+    LEFT JOIN applications a ON u.id = a.processed_by
+    WHERE r.name = 'Enrollment Officer' AND a.updated_at IS NOT NULL
+    GROUP BY u.id, sp.full_name, u.username, DATE_FORMAT(a.updated_at, '%Y-%m')
+    ORDER BY month DESC, total_processed DESC
+";
+$monthly_officer_statistics = $pdo->query($monthly_officer_stats_query)->fetchAll();
+
 // Create necessary tables if not exist
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS applications (
@@ -491,6 +532,105 @@ try {
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Enrollment Officer Performance for Commission Tracking -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-chart-line"></i> Enrollment Officer Performance (Commission Tracking)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($officer_statistics)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <p>No enrollment officers found</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Officer Name</th>
+                                    <th>Staff ID</th>
+                                    <th>Approved</th>
+                                    <th>Rejected</th>
+                                    <th>Total Processed</th>
+                                    <th>Approval Rate</th>
+                                    <th>Last Activity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($officer_statistics as $stats): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($stats['officer_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($stats['staff_id'] ?? 'N/A'); ?></td>
+                                        <td><?php echo number_format($stats['approved_count']); ?></td>
+                                        <td><?php echo number_format($stats['rejected_count']); ?></td>
+                                        <td><?php echo number_format($stats['total_processed']); ?></td>
+                                        <td>
+                                            <?php 
+                                            $approval_rate = $stats['total_processed'] > 0 ? 
+                                                round(($stats['approved_count'] / $stats['total_processed']) * 100, 2) : 0;
+                                            echo $approval_rate . '%';
+                                            ?>
+                                        </td>
+                                        <td><?php echo $stats['last_activity'] ?? 'Never'; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Monthly Performance by Officer -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-calendar-alt"></i> Monthly Performance by Officer</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($monthly_officer_statistics)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-alt"></i>
+                        <p>No monthly performance data</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Officer Name</th>
+                                    <th>Approved</th>
+                                    <th>Rejected</th>
+                                    <th>Total Processed</th>
+                                    <th>Approval Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($monthly_officer_statistics as $stats): ?>
+                                    <tr>
+                                        <td><?php echo $stats['month']; ?></td>
+                                        <td><?php echo htmlspecialchars($stats['officer_name']); ?></td>
+                                        <td><?php echo number_format($stats['approved_count']); ?></td>
+                                        <td><?php echo number_format($stats['rejected_count']); ?></td>
+                                        <td><?php echo number_format($stats['total_processed']); ?></td>
+                                        <td>
+                                            <?php 
+                                            $approval_rate = $stats['total_processed'] > 0 ? 
+                                                round(($stats['approved_count'] / $stats['total_processed']) * 100, 2) : 0;
+                                            echo $approval_rate . '%';
+                                            ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
     </main>
 
     <!-- View Application Modal -->

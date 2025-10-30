@@ -20,34 +20,48 @@ $stmt = $pdo->prepare("SELECT u.* FROM users u WHERE u.id = ?");
 $stmt->execute([currentUserId()]);
 $user = $stmt->fetch();
 
+$message = '';
+$messageType = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name = trim($_POST['full_name']);
-    $staff_id = trim($_POST['staff_id']);
-    $email = trim($_POST['email']);
-    
-    try {
-        // Update staff profile
-        $stmt = $pdo->prepare("UPDATE staff_profile SET full_name = ?, staff_id = ? WHERE user_id = ?");
-        $stmt->execute([$full_name, $staff_id, currentUserId()]);
+    // Handle password change
+    if (isset($_POST['change_password'])) {
+        $current_password = $_POST['current_password'];
+        $new_password = $_POST['new_password'];
+        $confirm_password = $_POST['confirm_password'];
         
-        // Update user email
-        $stmt = $pdo->prepare("UPDATE users SET email = ? WHERE id = ?");
-        $stmt->execute([$email, currentUserId()]);
-        
-        $message = "Profile updated successfully!";
-        $messageType = "success";
-        
-        // Refresh profile data
-        $stmt = $pdo->prepare("SELECT sp.* FROM staff_profile sp WHERE sp.user_id = ?");
-        $stmt->execute([currentUserId()]);
-        $profile = $stmt->fetch();
-        
-        $stmt = $pdo->prepare("SELECT u.* FROM users u WHERE u.id = ?");
-        $stmt->execute([currentUserId()]);
-        $user = $stmt->fetch();
-    } catch (Exception $e) {
-        $message = "Error updating profile: " . $e->getMessage();
-        $messageType = "error";
+        // Verify current password
+        if (password_verify($current_password, $user['password_hash'])) {
+            // Check if new passwords match
+            if ($new_password === $confirm_password) {
+                // Check password strength (at least 8 characters)
+                if (strlen($new_password) >= 8) {
+                    // Hash new password
+                    $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                    
+                    // Update password in database
+                    try {
+                        $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+                        $stmt->execute([$hashed_password, currentUserId()]);
+                        
+                        $message = "Password changed successfully!";
+                        $messageType = "success";
+                    } catch (Exception $e) {
+                        $message = "Error updating password: " . $e->getMessage();
+                        $messageType = "error";
+                    }
+                } else {
+                    $message = "New password must be at least 8 characters long.";
+                    $messageType = "error";
+                }
+            } else {
+                $message = "New passwords do not match.";
+                $messageType = "error";
+            }
+        } else {
+            $message = "Current password is incorrect.";
+            $messageType = "error";
+        }
     }
 }
 ?>
@@ -150,10 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <main class="main-content">
         <div class="content-header">
             <h1><i class="fas fa-user"></i> My Profile</h1>
-            <p>Manage your profile information</p>
+            <p>View your profile information</p>
         </div>
 
-        <?php if (isset($message)): ?>
+        <?php if ($message): ?>
             <div class="alert alert-<?php echo $messageType; ?>">
                 <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
                 <?php echo htmlspecialchars($message); ?>
@@ -173,35 +187,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             
             <div class="profile-details">
+                <div class="profile-info-grid">
+                    <div class="info-item">
+                        <label>Full Name</label>
+                        <p><?php echo htmlspecialchars($profile['full_name'] ?? 'N/A'); ?></p>
+                    </div>
+                    
+                    <div class="info-item">
+                        <label>Staff ID</label>
+                        <p><?php echo htmlspecialchars($profile['staff_id'] ?? 'N/A'); ?></p>
+                    </div>
+                    
+                    <div class="info-item">
+                        <label>Email</label>
+                        <p><?php echo htmlspecialchars($user['email'] ?? 'N/A'); ?></p>
+                    </div>
+                    
+                    <div class="info-item">
+                        <label>NRC Number</label>
+                        <p><?php echo htmlspecialchars($profile['NRC'] ?? 'N/A'); ?></p>
+                    </div>
+                    
+                    <div class="info-item">
+                        <label>Gender</label>
+                        <p><?php echo htmlspecialchars($profile['gender'] ?? 'N/A'); ?></p>
+                    </div>
+                    
+                    <div class="info-item">
+                        <label>Qualification</label>
+                        <p><?php echo htmlspecialchars($profile['qualification'] ?? 'N/A'); ?></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Password Change Section -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-lock"></i> Change Password</h3>
+            </div>
+            <div class="panel-content">
                 <form method="POST">
+                    <input type="hidden" name="change_password" value="1">
                     <div class="form-group">
-                        <label for="full_name">Full Name</label>
-                        <input type="text" id="full_name" name="full_name" value="<?php echo htmlspecialchars($profile['full_name'] ?? ''); ?>" required>
+                        <label for="current_password">Current Password</label>
+                        <input type="password" id="current_password" name="current_password" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="staff_id">Staff ID</label>
-                        <input type="text" id="staff_id" name="staff_id" value="<?php echo htmlspecialchars($profile['staff_id'] ?? ''); ?>" required>
+                        <label for="new_password">New Password</label>
+                        <input type="password" id="new_password" name="new_password" required minlength="8">
+                        <small class="form-text">Password must be at least 8 characters long</small>
                     </div>
                     
                     <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="nrc">NRC Number</label>
-                        <input type="text" id="nrc" name="nrc" value="<?php echo htmlspecialchars($profile['NRC'] ?? ''); ?>" readonly>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="gender">Gender</label>
-                        <input type="text" id="gender" name="gender" value="<?php echo htmlspecialchars($profile['gender'] ?? ''); ?>" readonly>
+                        <label for="confirm_password">Confirm New Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" required minlength="8">
                     </div>
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Update Profile
+                            <i class="fas fa-key"></i> Change Password
                         </button>
                     </div>
                 </form>

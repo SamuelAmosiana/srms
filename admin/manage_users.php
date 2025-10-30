@@ -242,7 +242,9 @@ if ($_POST) {
         if ($pdo->inTransaction()) {
             $pdo->rollback();
         }
-        $message = 'Error: ' . $e->getMessage();
+        // Clean the error message to avoid HTML issues
+        $errorMessage = htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+        $message = 'Error: ' . $errorMessage;
         $messageType = 'error';
     }
 }
