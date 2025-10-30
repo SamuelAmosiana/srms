@@ -1,6 +1,14 @@
 <?php
 require 'config.php';
 
+// Fetch all programmes from the database
+try {
+    $stmt = $pdo->query("SELECT id, name, code FROM programme ORDER BY name");
+    $programmes = $stmt->fetchAll();
+} catch (Exception $e) {
+    $programmes = [];
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Collect form data
@@ -37,23 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     try {
-        // Get programme ID - map form values to actual programme names
-        $programme_id = null;
-        $programme_mappings = [
-            'business-admin' => 'Business Adminstration',
-            'computer-science' => 'Computer Studies',
-            'engineering' => 'Office Administration',
-            'education' => 'Information Technology',
-            'health-sciences' => 'Nursing',
-            'agriculture' => 'Agriculture'
-        ];
-        
-        if (isset($programme_mappings[$program])) {
-            $stmt = $pdo->prepare("SELECT id FROM programme WHERE name LIKE ? LIMIT 1");
-            $stmt->execute(["%{$programme_mappings[$program]}%"]);
-            $programme = $stmt->fetch();
-            $programme_id = $programme ? $programme['id'] : null;
-        }
+        // Get programme ID from the selected programme
+        $programme_id = $program; // Now directly using the programme ID from the dropdown
         
         // Get intake ID
         $stmt = $pdo->prepare("SELECT id FROM intake WHERE name LIKE ? LIMIT 1");
@@ -280,22 +273,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="ug-program">Preferred Program *</label>
                         <select id="ug-program" name="program" required>
                             <option value="">Select Program</option>
-                            <option value="business-admin">Diploma Business in Business Administration</option>
-                            <option value="computer-science">Diploma in Computer Studies</option>
-                            <option value="engineering">Certificate in Electrical Engineering</option>
-                            <option value="education">Diploma in Primary Teaching</option>
-                            <option value="health-sciences">Certificate in Nursing and Health Care Assistant</option>
-                            <option value="agriculture">Diploma in General Agriculture</option>
+                            <?php foreach ($programmes as $prog): ?>
+                                <option value="<?php echo $prog['id']; ?>">
+                                    <?php echo htmlspecialchars($prog['name'] . ' (' . $prog['code'] . ')'); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="ug-intake">Preferred Intake *</label>
                         <select id="ug-intake" name="intake" required>
                             <option value="">Select Intake</option>
-                            <option value="january-2026">January</option>
-                            <option value="may-2026">April</option>
-                            <option value="september-2026">July</option>
-                            <option value="september-2026">October</option>
+                            <option value="January">January</option>
+                            <option value="April">April</option>
+                            <option value="July">July</option>
+                            <option value="October">October</option>
                         </select>
                     </div>
                 </div>
