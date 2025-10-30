@@ -57,10 +57,125 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
 // Handle form submissions
 $message = '';
 $messageType = '';
+$importReport = []; // For storing import results
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
+            case 'import_programmes':
+                if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] == 0) {
+                    $file = $_FILES['csv_file'];
+                    $fileType = mime_content_type($file['tmp_name']);
+                    
+                    // Check if file is CSV
+                    if ($fileType == 'text/csv' || $fileType == 'text/plain' || strpos($fileType, 'csv') !== false) {
+                        $handle = fopen($file['tmp_name'], 'r');
+                        if ($handle) {
+                            $importedCount = 0;
+                            $updatedCount = 0;
+                            $errorCount = 0;
+                            $lineNumber = 0;
+                            
+                            // Get all schools for mapping
+                            $schools = $pdo->query("SELECT id, name FROM school")->fetchAll(PDO::FETCH_KEY_PAIR);
+                            $schoolNames = array_flip($schools); // Flip to get name => id mapping
+                            
+                            // Read the header row
+                            $header = fgetcsv($handle);
+                            $lineNumber++;
+                            
+                            // Validate header
+                            if ($header[0] !== 'Code' || $header[1] !== 'Name' || $header[2] !== 'School') {
+                                $message = "Invalid CSV format. Please use the correct template.";
+                                $messageType = 'error';
+                            } else {
+                                // Process each row
+                                while (($row = fgetcsv($handle)) !== false) {
+                                    $lineNumber++;
+                                    try {
+                                        $code = trim($row[0]);
+                                        $name = trim($row[1]);
+                                        $schoolName = trim($row[2]);
+                                        $duration = isset($row[3]) ? (int)$row[3] : 0;
+                                        
+                                        // Validate required fields
+                                        if (empty($code) || empty($name) || empty($schoolName)) {
+                                            $importReport[] = "Line $lineNumber: Missing required fields";
+                                            $errorCount++;
+                                            continue;
+                                        }
+                                        
+                                        // Find school ID
+                                        $school_id = null;
+                                        if (isset($schoolNames[$schoolName])) {
+                                            $school_id = $schoolNames[$schoolName];
+                                        } else {
+                                            // Try to find school with case-insensitive match
+                                            foreach ($schools as $id => $name) {
+                                                if (strtolower($name) === strtolower($schoolName)) {
+                                                    $school_id = $id;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (!$school_id) {
+                                            $importReport[] = "Line $lineNumber: School '$schoolName' not found";
+                                            $errorCount++;
+                                            continue;
+                                        }
+                                        
+                                        // Check if programme already exists
+                                        $check_stmt = $pdo->prepare("SELECT id FROM programme WHERE code = ?");
+                                        $check_stmt->execute([$code]);
+                                        $existing = $check_stmt->fetch();
+                                        
+                                        if ($existing) {
+                                            // Update existing programme
+                                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, school_id = ?, duration = ?, updated_at = NOW() WHERE id = ?");
+                                            if ($stmt->execute([$name, $school_id, $duration, $existing['id']])) {
+                                                $importReport[] = "Line $lineNumber: Updated programme '$code'";
+                                                $updatedCount++;
+                                            } else {
+                                                $importReport[] = "Line $lineNumber: Failed to update programme '$code'";
+                                                $errorCount++;
+                                            }
+                                        } else {
+                                            // Insert new programme
+                                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, created_at) VALUES (?, ?, ?, ?, NOW())");
+                                            if ($stmt->execute([$name, $code, $school_id, $duration])) {
+                                                $importReport[] = "Line $lineNumber: Imported programme '$code'";
+                                                $importedCount++;
+                                            } else {
+                                                $importReport[] = "Line $lineNumber: Failed to import programme '$code'";
+                                                $errorCount++;
+                                            }
+                                        }
+                                    } catch (Exception $e) {
+                                        $importReport[] = "Line $lineNumber: Error - " . $e->getMessage();
+                                        $errorCount++;
+                                    }
+                                }
+                                
+                                $message = "Import completed: $importedCount imported, $updatedCount updated, $errorCount errors";
+                                $messageType = $errorCount > 0 ? 'warning' : 'success';
+                            }
+                            
+                            fclose($handle);
+                        } else {
+                            $message = "Failed to open uploaded file!";
+                            $messageType = 'error';
+                        }
+                    } else {
+                        $message = "Please upload a valid CSV file!";
+                        $messageType = 'error';
+                    }
+                } else {
+                    $message = "Please select a CSV file to import!";
+                    $messageType = 'error';
+                }
+                break;
+                
             case 'add_programme':
                 $name = trim($_POST['name']);
                 $code = strtoupper(trim($_POST['code']));
@@ -447,6 +562,16 @@ try {
             <div class="alert alert-<?php echo $messageType; ?>">
                 <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
                 <?php echo htmlspecialchars($message); ?>
+                <?php if (!empty($importReport)): ?>
+                    <details style="margin-top: 10px;">
+                        <summary>Import Details</summary>
+                        <ul style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
+                            <?php foreach ($importReport as $report): ?>
+                                <li><?php echo htmlspecialchars($report); ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </details>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
@@ -464,10 +589,39 @@ try {
                     <button onclick="showAddForm()" class="btn btn-green">
                         <i class="fas fa-plus"></i> Add New Programme
                     </button>
+                    <button onclick="showImportForm()" class="btn btn-blue">
+                        <i class="fas fa-file-import"></i> Import CSV
+                    </button>
                     <a href="?action=export_programmes" class="btn btn-info">
                         <i class="fas fa-download"></i> Export CSV
                     </a>
                 <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Import CSV Form -->
+        <div class="form-section" id="importForm" style="display: none;">
+            <div class="form-card">
+                <h2><i class="fas fa-file-import"></i> Import Programmes from CSV</h2>
+                <p>Upload a CSV file with programme data. The file should have columns: Code, Name, School, Duration</p>
+                <form method="POST" enctype="multipart/form-data" class="import-form">
+                    <input type="hidden" name="action" value="import_programmes">
+                    <div class="form-row">
+                        <div class="form-group full-width">
+                            <label for="csv_file">CSV File *</label>
+                            <input type="file" id="csv_file" name="csv_file" accept=".csv,text/csv" required>
+                            <small class="form-text">Download the template <a href="#" onclick="downloadTemplate()">here</a></small>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-blue">
+                            <i class="fas fa-upload"></i> Import Programmes
+                        </button>
+                        <button type="button" onclick="hideImportForm()" class="btn btn-orange">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -793,11 +947,39 @@ try {
     <script>
         function showAddForm() {
             document.getElementById('programmeForm').style.display = 'block';
+            document.getElementById('importForm').style.display = 'none';
             document.getElementById('name').focus();
         }
         
         function hideForm() {
             document.getElementById('programmeForm').style.display = 'none';
+        }
+        
+        function showImportForm() {
+            document.getElementById('importForm').style.display = 'block';
+            document.getElementById('programmeForm').style.display = 'none';
+        }
+        
+        function hideImportForm() {
+            document.getElementById('importForm').style.display = 'none';
+        }
+        
+        function downloadTemplate() {
+            // Create CSV content
+            let csvContent = "Code,Name,School,Duration\n";
+            csvContent += "BSC-CS,Bachelor of Science in Computer Science,School of Computing,4\n";
+            csvContent += "BBA,Bachelor of Business Administration,School of Business,4\n";
+            
+            // Create blob and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "programmes_template.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function filterTable(input, tableId) {
