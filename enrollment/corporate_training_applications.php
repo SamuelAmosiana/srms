@@ -232,13 +232,13 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td>
-                                            <button class="btn btn-sm btn-info" onclick="viewApplication(<?php echo htmlspecialchars(json_encode($app)); ?>)">
+                                            <button class="btn btn-sm btn-info" onclick='viewApplication(<?php echo json_encode($app, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
                                                 <i class="fas fa-eye"></i> View
                                             </button>
-                                            <button class="btn btn-sm btn-success" onclick="approveApplication(<?php echo $app['id']; ?>)">
+                                            <button class="btn btn-sm btn-success" onclick="approveApplication(<?php echo (int)$app['id']; ?>)">
                                                 <i class="fas fa-check"></i> Approve
                                             </button>
-                                            <button class="btn btn-sm btn-danger" onclick="rejectApplication(<?php echo $app['id']; ?>)">
+                                            <button class="btn btn-sm btn-danger" onclick="rejectApplication(<?php echo (int)$app['id']; ?>)">
                                                 <i class="fas fa-times"></i> Reject
                                             </button>
                                         </td>
@@ -411,18 +411,18 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
         let currentApplicationId = null;
         
         function viewApplication(app) {
-            document.getElementById('view_name').textContent = app.full_name;
-            document.getElementById('view_email').textContent = app.email;
-            document.getElementById('view_programme').textContent = app.programme_name;
-            document.getElementById('view_intake').textContent = app.intake_name;
-            document.getElementById('view_submitted').textContent = new Date(app.created_at).toLocaleDateString();
+            document.getElementById('view_name').textContent = app.full_name || 'N/A';
+            document.getElementById('view_email').textContent = app.email || 'N/A';
+            document.getElementById('view_programme').textContent = app.programme_name || 'N/A';
+            document.getElementById('view_intake').textContent = app.intake_name || 'N/A';
+            document.getElementById('view_submitted').textContent = app.created_at ? new Date(app.created_at).toLocaleDateString() : 'N/A';
             
             const docsList = document.getElementById('documents_list');
             docsList.innerHTML = '';
             
             try {
                 // Parse documents JSON
-                const documents = JSON.parse(app.documents || '{}');
+                const documents = app.documents ? JSON.parse(app.documents) : {};
                 
                 // Handle different document formats
                 if (Array.isArray(documents)) {
@@ -444,15 +444,27 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
                     } else {
                         docsList.innerHTML = '<li>No documents attached</li>';
                     }
-                } else if (typeof documents === 'object') {
+                } else if (typeof documents === 'object' && documents !== null) {
                     // Handle object format (corporate training applications with detailed info)
+                    const fileDocs = [];
                     const additionalInfo = [];
                     
-                    // Extract additional information
+                    // Extract file documents and additional info
                     for (const key in documents) {
-                        if (key !== 'path' && key !== 'name') {
+                        if (typeof documents[key] === 'object' && documents[key].path) {
+                            fileDocs.push(documents[key]);
+                        } else if (key !== 'path' && key !== 'name' && documents[key]) {
                             additionalInfo.push({label: key, value: documents[key]});
                         }
+                    }
+                    
+                    // Display file documents
+                    if (fileDocs.length > 0) {
+                        fileDocs.forEach(doc => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<a href="../${doc.path}" target="_blank">${doc.name}</a>`;
+                            docsList.appendChild(li);
+                        });
                     }
                     
                     // Display additional information
@@ -464,8 +476,11 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
                                 docsList.appendChild(li);
                             }
                         });
-                    } else {
-                        docsList.innerHTML = '<li>No additional information provided</li>';
+                    }
+                    
+                    // If no documents or info, show default message
+                    if (fileDocs.length === 0 && additionalInfo.length === 0) {
+                        docsList.innerHTML = '<li>No documents attached</li>';
                     }
                 } else {
                     // Handle case where documents is a simple string
@@ -474,7 +489,7 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
                         li.textContent = app.documents;
                         docsList.appendChild(li);
                     } else {
-                        docsList.innerHTML = '<li>No additional information provided</li>';
+                        docsList.innerHTML = '<li>No documents attached</li>';
                     }
                 }
             } catch (e) {
@@ -484,7 +499,7 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
                     li.textContent = app.documents;
                     docsList.appendChild(li);
                 } else {
-                    docsList.innerHTML = '<li>No additional information provided</li>';
+                    docsList.innerHTML = '<li>No documents attached</li>';
                 }
             }
             
@@ -498,9 +513,10 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
         }
         
         function approveFromModal() {
-            document.getElementById('approve_application_id').value = currentApplicationId;
-            // Submit the form
-            document.querySelector('#approveModal form').submit();
+            if (currentApplicationId) {
+                document.getElementById('approve_application_id').value = currentApplicationId;
+                document.querySelector('#approveModal form').submit();
+            }
         }
         
         function rejectApplication(applicationId) {
@@ -510,9 +526,10 @@ $rejectedCorporateTrainingApplications = $stmt->fetchAll();
         }
         
         function rejectFromModal() {
-            document.getElementById('reject_application_id').value = currentApplicationId;
-            // Submit the form
-            document.querySelector('#rejectModal form').submit();
+            if (currentApplicationId) {
+                document.getElementById('reject_application_id').value = currentApplicationId;
+                document.querySelector('#rejectModal form').submit();
+            }
         }
         
         function closeModal(modalId) {

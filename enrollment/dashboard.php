@@ -15,6 +15,39 @@ $stmt = $pdo->prepare("SELECT sp.full_name, sp.staff_id FROM staff_profile sp WH
 $stmt->execute([currentUserId()]);
 $enrollmentOfficer = $stmt->fetch();
 
+// Handle application actions (approve/reject) - for dashboard quick actions
+$message = '';
+$messageType = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action']) && isset($_POST['application_id'])) {
+        $application_id = $_POST['application_id'];
+        $current_user_id = currentUserId();
+        
+        try {
+            switch ($_POST['action']) {
+                case 'approve':
+                    $stmt = $pdo->prepare("UPDATE applications SET status = 'approved', processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$current_user_id, $application_id]);
+                    $message = "Application approved successfully!";
+                    $messageType = "success";
+                    break;
+                    
+                case 'reject':
+                    $rejection_reason = trim($_POST['rejection_reason'] ?? '');
+                    $stmt = $pdo->prepare("UPDATE applications SET status = 'rejected', rejection_reason = ?, processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$rejection_reason, $current_user_id, $application_id]);
+                    $message = "Application rejected successfully!";
+                    $messageType = "success";
+                    break;
+            }
+        } catch (Exception $e) {
+            $message = "Error: " . $e->getMessage();
+            $messageType = "error";
+        }
+    }
+}
+
 // Get dashboard statistics
 $stats = [];
 
@@ -22,8 +55,8 @@ $stats = [];
 $stmt = $pdo->prepare("
     SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' THEN 1 ELSE 0 END) as undergrad,
-        SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' THEN 1 ELSE 0 END) as short_courses,
+        SUM(CASE WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 1 ELSE 0 END) as undergrad,
+        SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 1 ELSE 0 END) as short_courses,
         SUM(CASE WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' THEN 1 ELSE 0 END) as corporate
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
@@ -34,13 +67,13 @@ $stats['pending_applications'] = $stmt->fetch();
 
 // Count approved applications
 $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM applications WHERE status = 'approved'");
-$stmt->execute(); // Fixed: Added execute() before fetch()
-$stats['approved_applications'] = $stmt->fetchColumn(); // Fixed: Using fetchColumn() for single value
+$stmt->execute();
+$stats['approved_applications'] = $stmt->fetchColumn();
 
 // Count rejected applications
 $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM applications WHERE status = 'rejected'");
-$stmt->execute(); // Fixed: Added execute() before fetch()
-$stats['rejected_applications'] = $stmt->fetchColumn(); // Fixed: Using fetchColumn() for single value
+$stmt->execute();
+$stats['rejected_applications'] = $stmt->fetchColumn();
 
 // Get pending applications by category
 $stmt = $pdo->prepare("
@@ -56,6 +89,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'pending'
     ORDER BY a.created_at DESC
+    LIMIT 10
 ");
 $stmt->execute();
 $pendingApplications = $stmt->fetchAll();
@@ -85,6 +119,71 @@ foreach ($pendingApplications as $application) {
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 5px;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        
+        .modal-body p {
+            margin: 10px 0;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        #documents_list {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        #documents_list li {
+            margin: 5px 0;
+        }
+    </style>
 </head>
 <body class="admin-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -178,6 +277,13 @@ foreach ($pendingApplications as $application) {
             <p>Manage student enrollment applications</p>
         </div>
         
+        <?php if ($message): ?>
+            <div class="alert alert-<?php echo $messageType; ?>">
+                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
+                <?php echo htmlspecialchars($message); ?>
+            </div>
+        <?php endif; ?>
+        
         <!-- Statistics Cards -->
         <div class="stats-grid">
             <div class="stat-card">
@@ -258,8 +364,14 @@ foreach ($pendingApplications as $application) {
                                             <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                             <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                             <td>
-                                                <button class="btn btn-sm btn-info" onclick="viewApplication(<?php echo htmlspecialchars(json_encode($app)); ?>)">
+                                                <button class="btn btn-sm btn-info" onclick='viewApplication(<?php echo json_encode($app, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
                                                     <i class="fas fa-eye"></i> View
+                                                </button>
+                                                <button class="btn btn-sm btn-success" onclick="approveApplication(<?php echo (int)$app['id']; ?>)">
+                                                    <i class="fas fa-check"></i> Approve
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="rejectApplication(<?php echo (int)$app['id']; ?>)">
+                                                    <i class="fas fa-times"></i> Reject
                                                 </button>
                                             </td>
                                         </tr>
@@ -304,8 +416,14 @@ foreach ($pendingApplications as $application) {
                                             <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                             <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                             <td>
-                                                <button class="btn btn-sm btn-info" onclick="viewApplication(<?php echo htmlspecialchars(json_encode($app)); ?>)">
+                                                <button class="btn btn-sm btn-info" onclick='viewApplication(<?php echo json_encode($app, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
                                                     <i class="fas fa-eye"></i> View
+                                                </button>
+                                                <button class="btn btn-sm btn-success" onclick="approveApplication(<?php echo (int)$app['id']; ?>)">
+                                                    <i class="fas fa-check"></i> Approve
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="rejectApplication(<?php echo (int)$app['id']; ?>)">
+                                                    <i class="fas fa-times"></i> Reject
                                                 </button>
                                             </td>
                                         </tr>
@@ -350,8 +468,14 @@ foreach ($pendingApplications as $application) {
                                             <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                             <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                             <td>
-                                                <button class="btn btn-sm btn-info" onclick="viewApplication(<?php echo htmlspecialchars(json_encode($app)); ?>)">
+                                                <button class="btn btn-sm btn-info" onclick='viewApplication(<?php echo json_encode($app, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
                                                     <i class="fas fa-eye"></i> View
+                                                </button>
+                                                <button class="btn btn-sm btn-success" onclick="approveApplication(<?php echo (int)$app['id']; ?>)">
+                                                    <i class="fas fa-check"></i> Approve
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="rejectApplication(<?php echo (int)$app['id']; ?>)">
+                                                    <i class="fas fa-times"></i> Reject
                                                 </button>
                                             </td>
                                         </tr>
@@ -365,12 +489,189 @@ foreach ($pendingApplications as $application) {
         </div>
     </main>
 
+    <!-- View Application Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-alt"></i> Application Details</h3>
+                <span class="close" onclick="closeModal('viewModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p><strong>Name:</strong> <span id="view_name"></span></p>
+                <p><strong>Email:</strong> <span id="view_email"></span></p>
+                <p><strong>Programme:</strong> <span id="view_programme"></span></p>
+                <p><strong>Intake:</strong> <span id="view_intake"></span></p>
+                <p><strong>Submitted:</strong> <span id="view_submitted"></span></p>
+                <div id="documents_section">
+                    <strong>Documents:</strong>
+                    <ul id="documents_list"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" onclick="approveFromModal()"><i class="fas fa-check"></i> Approve</button>
+                <button class="btn btn-danger" onclick="rejectFromModal()"><i class="fas fa-times"></i> Reject</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Reason Modal -->
+    <div id="rejectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Reject Application</h3>
+                <span class="close" onclick="closeModal('rejectModal')">&times;</span>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="reject">
+                <input type="hidden" id="reject_application_id" name="application_id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="rejection_reason">Rejection Reason</label>
+                        <textarea id="rejection_reason" name="rejection_reason" rows="4" placeholder="Explain why the application is being rejected..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger"><i class="fas fa-times"></i> Reject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Approval Confirmation Modal -->
+    <div id="approveModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-circle"></i> Approve Application</h3>
+                <span class="close" onclick="closeModal('approveModal')">&times;</span>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="approve">
+                <input type="hidden" id="approve_application_id" name="application_id">
+                <div class="modal-body">
+                    <p>Are you sure you want to approve this application?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Approve</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
+        let currentApplicationId = null;
+        
         function viewApplication(app) {
-            // In a real implementation, this would open a modal with application details
-            // and options to approve or reject
-            alert('Viewing application for: ' + app.full_name + '\nThis would open a detailed view in a real implementation.');
+            // Set application details in the modal
+            document.getElementById('view_name').textContent = app.full_name || 'N/A';
+            document.getElementById('view_email').textContent = app.email || 'N/A';
+            document.getElementById('view_programme').textContent = app.programme_name || 'N/A';
+            document.getElementById('view_intake').textContent = app.intake_name || 'N/A';
+            document.getElementById('view_submitted').textContent = app.created_at ? new Date(app.created_at).toLocaleDateString() : 'N/A';
+            
+            // Handle documents
+            const docsList = document.getElementById('documents_list');
+            docsList.innerHTML = '';
+            
+            try {
+                // Parse documents JSON
+                const documents = app.documents ? JSON.parse(app.documents) : {};
+                
+                if (Array.isArray(documents)) {
+                    if (documents.length > 0) {
+                        documents.forEach(doc => {
+                            const li = document.createElement('li');
+                            if (typeof doc === 'string') {
+                                li.textContent = doc;
+                            } else if (doc.path && doc.name) {
+                                li.innerHTML = `<a href="../${doc.path}" target="_blank">${doc.name}</a>`;
+                            } else {
+                                li.textContent = JSON.stringify(doc);
+                            }
+                            docsList.appendChild(li);
+                        });
+                    } else {
+                        docsList.innerHTML = '<li>No documents attached</li>';
+                    }
+                } else if (typeof documents === 'object' && documents !== null) {
+                    // Handle object format
+                    let hasDocuments = false;
+                    for (const key in documents) {
+                        if (key === 'recommended_by' && documents[key]) {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<strong>Recommended by:</strong> ${documents[key]}`;
+                            docsList.appendChild(li);
+                            hasDocuments = true;
+                        } else if (typeof documents[key] === 'object' && documents[key].path) {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<a href="../${documents[key].path}" target="_blank">${documents[key].name}</a>`;
+                            docsList.appendChild(li);
+                            hasDocuments = true;
+                        } else if (key !== 'path' && key !== 'name' && documents[key]) {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<strong>${key.replace('_', ' ')}:</strong> ${documents[key]}`;
+                            docsList.appendChild(li);
+                            hasDocuments = true;
+                        }
+                    }
+                    if (!hasDocuments) {
+                        docsList.innerHTML = '<li>No documents attached</li>';
+                    }
+                } else {
+                    docsList.innerHTML = '<li>No documents attached</li>';
+                }
+            } catch (e) {
+                // Handle case where documents is not valid JSON
+                if (app.documents) {
+                    const li = document.createElement('li');
+                    li.textContent = app.documents;
+                    docsList.appendChild(li);
+                } else {
+                    docsList.innerHTML = '<li>No documents attached</li>';
+                }
+            }
+            
+            document.getElementById('viewModal').style.display = 'block';
+        }
+        
+        function approveApplication(applicationId) {
+            currentApplicationId = applicationId;
+            document.getElementById('approve_application_id').value = applicationId;
+            document.getElementById('approveModal').style.display = 'block';
+        }
+        
+        function approveFromModal() {
+            if (currentApplicationId) {
+                document.getElementById('approve_application_id').value = currentApplicationId;
+                document.querySelector('#approveModal form').submit();
+            }
+        }
+        
+        function rejectApplication(applicationId) {
+            currentApplicationId = applicationId;
+            document.getElementById('reject_application_id').value = applicationId;
+            document.getElementById('rejectModal').style.display = 'block';
+        }
+        
+        function rejectFromModal() {
+            if (currentApplicationId) {
+                document.getElementById('reject_application_id').value = currentApplicationId;
+                document.querySelector('#rejectModal form').submit();
+            }
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const modals = document.getElementsByClassName('modal');
+            for (let i = 0; i < modals.length; i++) {
+                if (event.target == modals[i]) {
+                    modals[i].style.display = 'none';
+                }
+            }
         }
     </script>
 </body>
