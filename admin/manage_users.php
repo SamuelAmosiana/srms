@@ -26,19 +26,28 @@ if ($_POST) {
                 case 'add_user':
                     $pdo->beginTransaction();
                     
+                    // Validate required fields
+                    if (empty($_POST['username']) || empty($_POST['password']) || empty($_POST['email']) || empty($_POST['full_name']) || empty($_POST['role_id'])) {
+                        throw new Exception("Required fields are missing");
+                    }
+                    
                     // Insert into users table
                     $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, email, contact, is_active) VALUES (?, ?, ?, ?, 1)");
-                    $stmt->execute([
+                    $result = $stmt->execute([
                         $_POST['username'],
                         password_hash($_POST['password'], PASSWORD_DEFAULT),
                         $_POST['email'],
                         $_POST['phone'] ?? null
                     ]);
                     
+                    if (!$result) {
+                        throw new Exception("Failed to create user");
+                    }
+                    
                     $userId = $pdo->lastInsertId();
                     
                     // Debug: Check if userId is valid
-                    if (!$userId) {
+                    if (!$userId || !is_numeric($userId) || $userId <= 0) {
                         throw new Exception("Failed to get user ID after inserting user");
                     }
                     
@@ -75,8 +84,9 @@ if ($_POST) {
                                 }
                             }
                         }
-                    } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)') {
+                    } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)' || $roleName == 'Enrollment Officer') {
                         $staff_id = $_POST['staff_id'] ?: 'STF-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
+                        // Fixed: Updated the query to match the actual staff_profile table structure
                         $stmt = $pdo->prepare("INSERT INTO staff_profile (user_id, full_name, staff_id, NRC, gender, qualification) VALUES (?, ?, ?, ?, ?, ?)");
                         $stmt->execute([$userId, $_POST['full_name'], $staff_id, $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null]);
                         
@@ -103,93 +113,149 @@ if ($_POST) {
                 case 'update_user':
                     $pdo->beginTransaction();
                     
-                    // Debug: Check if user_id is set and valid
+                    // Fixed: Properly check if user_id is set and valid before using it
                     if (!isset($_POST['user_id']) || empty($_POST['user_id'])) {
                         throw new Exception("User ID is missing or invalid");
                     }
                     
+                    $userId = $_POST['user_id'];
+                    
+                    // Validate that userId is a valid integer
+                    if (!is_numeric($userId) || $userId <= 0) {
+                        throw new Exception("Invalid User ID provided");
+                    }
+                    
                     // Debug: Check if user exists in database
                     $userCheckStmt = $pdo->prepare("SELECT id FROM users WHERE id = ?");
-                    $userCheckStmt->execute([$_POST['user_id']]);
+                    $userCheckStmt->execute([$userId]);
                     if (!$userCheckStmt->fetch()) {
-                        // Fixed: Properly handle the case where user_id might not exist
-                        $userId = isset($_POST['user_id']) ? $_POST['user_id'] : 'undefined';
-                        throw new Exception("User with ID " . htmlspecialchars($userId) . " does not exist in the database");
+                        throw new Exception("User with ID " . (int)$userId . " does not exist in the database");
                     }
                     
                     // Update users table
                     if (!empty($_POST['password'])) {
                         $stmt = $pdo->prepare("UPDATE users SET username = ?, password_hash = ?, email = ?, contact = ?, is_active = ? WHERE id = ?");
-                        $stmt->execute([
-                            $_POST['username'],
+                        $result = $stmt->execute([
+                            $_POST['username'] ?? '',
                             password_hash($_POST['password'], PASSWORD_DEFAULT),
-                            $_POST['email'],
+                            $_POST['email'] ?? '',
                             $_POST['phone'] ?? null,
-                            $_POST['is_active'],
-                            $_POST['user_id']
+                            $_POST['is_active'] ?? 1,
+                            $userId
                         ]);
+                        
+                        if (!$result) {
+                            throw new Exception("Failed to update user details");
+                        }
                     } else {
                         $stmt = $pdo->prepare("UPDATE users SET username = ?, email = ?, contact = ?, is_active = ? WHERE id = ?");
-                        $stmt->execute([
-                            $_POST['username'],
-                            $_POST['email'],
+                        $result = $stmt->execute([
+                            $_POST['username'] ?? '',
+                            $_POST['email'] ?? '',
                             $_POST['phone'] ?? null,
-                            $_POST['is_active'],
-                            $_POST['user_id']
+                            $_POST['is_active'] ?? 1,
+                            $userId
                         ]);
+                        
+                        if (!$result) {
+                            throw new Exception("Failed to update user details");
+                        }
                     }
                     
                     // Update role assignment
-                    $stmt = $pdo->prepare("UPDATE user_roles SET role_id = ? WHERE user_id = ?");
-                    $stmt->execute([$_POST['role_id'], $_POST['user_id']]);
+                    if (isset($_POST['role_id']) && !empty($_POST['role_id'])) {
+                        $stmt = $pdo->prepare("UPDATE user_roles SET role_id = ? WHERE user_id = ?");
+                        $stmt->execute([$_POST['role_id'], $userId]);
+                    }
                     
                     // Update profile based on role
-                    $roleStmt = $pdo->prepare("SELECT name FROM roles WHERE id = ?");
-                    $roleStmt->execute([$_POST['role_id']]);
-                    $roleName = $roleStmt->fetchColumn();
-                    
-                    if ($roleName == 'Super Admin') {
-                        $stmt = $pdo->prepare("UPDATE admin_profile SET full_name = ?, staff_id = ? WHERE user_id = ?");
-                        $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['user_id']]);
-                    } elseif ($roleName == 'Student') {
-                        $stmt = $pdo->prepare("UPDATE student_profile SET full_name = ?, student_number = ?, NRC = ?, gender = ?, programme_id = ?, intake_id = ?, school_id = ? WHERE user_id = ?");
-                        $stmt->execute([$_POST['full_name'], $_POST['student_number'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['programme_id'] ?? null, $_POST['intake_id'] ?? null, $_POST['school_id'] ?? null, $_POST['user_id']]);
+                    if (isset($_POST['role_id']) && !empty($_POST['role_id'])) {
+                        $roleStmt = $pdo->prepare("SELECT name FROM roles WHERE id = ?");
+                        $roleStmt->execute([$_POST['role_id']]);
+                        $roleName = $roleStmt->fetchColumn();
                         
-                        // Update courses
-                        $delete_stmt = $pdo->prepare("DELETE FROM course_enrollment WHERE student_user_id = ?");
-                        $delete_stmt->execute([$_POST['user_id']]);
-                        if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
-                            // First, verify that the courses exist
-                            $courseCheckStmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
-                            foreach ($_POST['course_ids'] as $course_id) {
-                                $courseCheckStmt->execute([$course_id]);
-                                if ($courseCheckStmt->fetch()) {
-                                    // Course exists, so we can enroll the student
-                                    $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
-                                    if (!$course_stmt->execute([$_POST['user_id'], $course_id])) {
-                                        throw new Exception("Failed to enroll student in course ID: " . $course_id);
-                                    }
-                                }
-                            }
-                        }
-                    } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)') {
-                        // Fixed: Removed department_id and school_id from the UPDATE query as they don't exist in staff_profile table
-                        $stmt = $pdo->prepare("UPDATE staff_profile SET full_name = ?, staff_id = ?, NRC = ?, gender = ?, qualification = ? WHERE user_id = ?");
-                        $stmt->execute([$_POST['full_name'], $_POST['staff_id'], $_POST['nrc'] ?? null, $_POST['gender'] ?? null, $_POST['qualification'] ?? null, $_POST['user_id']]);
-                        
-                        // Update courses for lecturers
-                        if ($roleName == 'Lecturer') {
-                            $delete_stmt = $pdo->prepare("DELETE FROM course_assignment WHERE lecturer_id = ?");
-                            $delete_stmt->execute([$_POST['user_id']]);
+                        if ($roleName == 'Super Admin') {
+                            $stmt = $pdo->prepare("UPDATE admin_profile SET full_name = ?, staff_id = ? WHERE user_id = ?");
+                            $stmt->execute([$_POST['full_name'] ?? '', $_POST['staff_id'] ?? '', $userId]);
+                        } elseif ($roleName == 'Student') {
+                            $stmt = $pdo->prepare("UPDATE student_profile SET full_name = ?, student_number = ?, NRC = ?, gender = ?, programme_id = ?, intake_id = ?, school_id = ? WHERE user_id = ?");
+                            $stmt->execute([
+                                $_POST['full_name'] ?? '', 
+                                $_POST['student_number'] ?? '', 
+                                $_POST['nrc'] ?? null, 
+                                $_POST['gender'] ?? null, 
+                                $_POST['programme_id'] ?? null, 
+                                $_POST['intake_id'] ?? null, 
+                                $_POST['school_id'] ?? null, 
+                                $userId
+                            ]);
+                            
+                            // Update courses
+                            $delete_stmt = $pdo->prepare("DELETE FROM course_enrollment WHERE student_user_id = ?");
+                            $delete_stmt->execute([$userId]);
                             if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
                                 // First, verify that the courses exist
                                 $courseCheckStmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
                                 foreach ($_POST['course_ids'] as $course_id) {
                                     $courseCheckStmt->execute([$course_id]);
                                     if ($courseCheckStmt->fetch()) {
-                                        // Course exists, so we can assign it to the lecturer
-                                        $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
-                                        $course_stmt->execute([$course_id, $_POST['user_id']]);
+                                        // Course exists, so we can enroll the student
+                                        $course_stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, status) VALUES (?, ?, 'approved')");
+                                        if (!$course_stmt->execute([$userId, $course_id])) {
+                                            throw new Exception("Failed to enroll student in course ID: " . $course_id);
+                                        }
+                                    }
+                                }
+                            }
+                        } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)' || $roleName == 'Enrollment Officer') {
+                            // Fixed: Updated the query to match the actual staff_profile table structure
+                            // The staff_profile table has: user_id, full_name, staff_id, NRC, gender, qualification, bio
+                            // Handle Lecturer, Sub Admin (Finance), and Enrollment Officer roles the same way
+                            
+                            // Check if staff profile exists for this user
+                            $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM staff_profile WHERE user_id = ?");
+                            $checkStmt->execute([$userId]);
+                            $profileExists = $checkStmt->fetchColumn() > 0;
+                            
+                            if ($profileExists) {
+                                // Update existing staff profile
+                                $stmt = $pdo->prepare("UPDATE staff_profile SET full_name = ?, staff_id = ?, NRC = ?, gender = ?, qualification = ? WHERE user_id = ?");
+                                $stmt->execute([
+                                    $_POST['full_name'] ?? '', 
+                                    $_POST['staff_id'] ?? '', 
+                                    $_POST['nrc'] ?? null, 
+                                    $_POST['gender'] ?? null, 
+                                    $_POST['qualification'] ?? null, 
+                                    $userId
+                                ]);
+                            } else {
+                                // Insert new staff profile
+                                $staff_id = $_POST['staff_id'] ?: 'STF-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
+                                $stmt = $pdo->prepare("INSERT INTO staff_profile (user_id, full_name, staff_id, NRC, gender, qualification) VALUES (?, ?, ?, ?, ?, ?)");
+                                $stmt->execute([
+                                    $userId,
+                                    $_POST['full_name'] ?? '', 
+                                    $staff_id,
+                                    $_POST['nrc'] ?? null, 
+                                    $_POST['gender'] ?? null, 
+                                    $_POST['qualification'] ?? null
+                                ]);
+                            }
+                            
+                            // Update courses for lecturers
+                            if ($roleName == 'Lecturer') {
+                                $delete_stmt = $pdo->prepare("DELETE FROM course_assignment WHERE lecturer_id = ?");
+                                $delete_stmt->execute([$userId]);
+                                if (isset($_POST['course_ids']) && is_array($_POST['course_ids'])) {
+                                    // First, verify that the courses exist
+                                    $courseCheckStmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
+                                    foreach ($_POST['course_ids'] as $course_id) {
+                                        $courseCheckStmt->execute([$course_id]);
+                                        if ($courseCheckStmt->fetch()) {
+                                            // Course exists, so we can assign it to the lecturer
+                                            $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
+                                            $course_stmt->execute([$course_id, $userId]);
+                                        }
                                     }
                                 }
                             }
@@ -207,30 +273,42 @@ if ($_POST) {
                         throw new Exception("User ID is missing or invalid for delete operation");
                     }
                     
+                    $userId = $_POST['user_id'];
+                    
+                    // Validate that userId is a valid integer
+                    if (!is_numeric($userId) || $userId <= 0) {
+                        throw new Exception("Invalid User ID provided for delete operation");
+                    }
+                    
                     $pdo->beginTransaction();
                     
                     // Get user role first to determine which profile table to delete from
                     $stmt = $pdo->prepare("SELECT r.name FROM roles r JOIN user_roles ur ON r.id = ur.role_id WHERE ur.user_id = ?");
-                    $stmt->execute([$_POST['user_id']]);
+                    $stmt->execute([$userId]);
                     $roleName = $stmt->fetchColumn();
                     
                     // Delete from profile table first
                     if ($roleName == 'Super Admin') {
                         $stmt = $pdo->prepare("DELETE FROM admin_profile WHERE user_id = ?");
+                        $stmt->execute([$userId]);
                     } elseif ($roleName == 'Student') {
                         $stmt = $pdo->prepare("DELETE FROM student_profile WHERE user_id = ?");
-                    } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)') {
+                        $stmt->execute([$userId]);
+                    } elseif ($roleName == 'Lecturer' || $roleName == 'Sub Admin (Finance)' || $roleName == 'Enrollment Officer') {
                         $stmt = $pdo->prepare("DELETE FROM staff_profile WHERE user_id = ?");
+                        $stmt->execute([$userId]);
+                    } elseif (!$roleName) {
+                        // If no role found, that might indicate the user doesn't exist
+                        throw new Exception("User with ID " . (int)$userId . " not found or has no role assigned");
                     }
-                    $stmt->execute([$_POST['user_id']]);
                     
                     // Delete from user_roles
                     $stmt = $pdo->prepare("DELETE FROM user_roles WHERE user_id = ?");
-                    $stmt->execute([$_POST['user_id']]);
+                    $stmt->execute([$userId]);
                     
                     // Delete from users table
                     $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
-                    $stmt->execute([$_POST['user_id']]);
+                    $stmt->execute([$userId]);
                     
                     $pdo->commit();
                     $message = 'User deleted successfully!';
@@ -242,8 +320,12 @@ if ($_POST) {
         if ($pdo->inTransaction()) {
             $pdo->rollback();
         }
-        // Clean the error message to avoid HTML issues
-        $errorMessage = htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+        // More robust error message handling
+        $rawMessage = $e->getMessage();
+        // Remove any HTML tags and entities that might be in the message
+        $cleanMessage = strip_tags($rawMessage);
+        $cleanMessage = htmlspecialchars_decode($cleanMessage);
+        $errorMessage = htmlspecialchars($cleanMessage, ENT_QUOTES, 'UTF-8');
         $message = 'Error: ' . $errorMessage;
         $messageType = 'error';
     }
@@ -307,7 +389,7 @@ $courses = $pdo->query("SELECT id, name FROM course ORDER BY name")->fetchAll();
 // Get user for editing if specified
 $editUser = null;
 if (isset($_GET['edit'])) {
-    $stmt = $pdo->prepare("SELECT u.*, r.id as role_id, r.name as role_name,
+    $stmt = $pdo->prepare("SELECT u.*, u.id as user_id, r.id as role_id, r.name as role_name,
                           COALESCE(ap.full_name, sp.full_name, stp.full_name) as full_name,
                           COALESCE(ap.staff_id, sp.student_number, stp.staff_id) as identifier,
                           sp.NRC as student_nrc, sp.gender as student_gender, sp.programme_id, sp.intake_id, sp.school_id,
