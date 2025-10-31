@@ -10,6 +10,59 @@ if (!currentUserId()) {
 
 requireRole('Enrollment Officer', $pdo);
 
+// Handle CSV export for personal approvals
+if (isset($_GET['export']) && $_GET['export'] === 'personal') {
+    // Set headers for CSV download
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="my_approvals_' . date('Y-m-d') . '.csv"');
+    
+    // Get all applications processed by current enrollment officer
+    $stmt = $pdo->prepare("
+        SELECT a.*, p.name as programme_name, i.name as intake_name, 
+               CASE 
+                   WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'Undergraduate'
+                   WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'Short Course'
+                   WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' THEN 'Corporate Training'
+                   ELSE 'Other'
+               END as category,
+               u.username as processed_by_username,
+               sp.full_name as processed_by_name
+        FROM applications a
+        LEFT JOIN programme p ON a.programme_id = p.id
+        LEFT JOIN intake i ON a.intake_id = i.id
+        LEFT JOIN users u ON a.processed_by = u.id
+        LEFT JOIN staff_profile sp ON u.id = sp.user_id
+        WHERE a.processed_by = ?
+        ORDER BY a.updated_at DESC
+    ");
+    $stmt->execute([currentUserId()]);
+    $personalApplications = $stmt->fetchAll();
+    
+    // Output CSV headers
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['ID', 'Full Name', 'Email', 'Phone', 'Category', 'Programme', 'Intake', 'Status', 'Submitted Date', 'Processed Date', 'Rejection Reason']);
+    
+    // Output data
+    foreach ($personalApplications as $app) {
+        fputcsv($output, [
+            $app['id'],
+            $app['full_name'],
+            $app['email'],
+            $app['phone'] ?? '',
+            $app['category'],
+            $app['programme_name'],
+            $app['intake_name'],
+            $app['status'],
+            date('Y-m-d', strtotime($app['created_at'])),
+            $app['updated_at'] ? date('Y-m-d', strtotime($app['updated_at'])) : '',
+            $app['rejection_reason'] ?? ''
+        ]);
+    }
+    
+    fclose($output);
+    exit;
+}
+
 // Get enrollment officer profile
 $stmt = $pdo->prepare("SELECT sp.full_name, sp.staff_id FROM staff_profile sp WHERE sp.user_id = ?");
 $stmt->execute([currentUserId()]);
@@ -167,6 +220,12 @@ foreach ($rejectionsByCategory as $apps) {
         <div class="content-header">
             <h1><i class="fas fa-thumbs-up"></i> My Approvals</h1>
             <p>View your monthly enrollment approvals and rejections</p>
+            <!-- Export Button -->
+            <div class="action-bar">
+                <a href="?export=personal" class="btn btn-primary">
+                    <i class="fas fa-download"></i> Export My Approvals (CSV)
+                </a>
+            </div>
         </div>
         
         <!-- Statistics Cards -->
