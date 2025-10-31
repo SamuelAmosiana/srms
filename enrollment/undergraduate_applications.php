@@ -434,7 +434,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                                 li.textContent = doc;
                             } else if (doc.path && doc.name) {
                                 // Handle new format with path and name
-                                li.innerHTML = `<a href="../${doc.path}" target="_blank">${doc.name}</a>`;
+                                li.innerHTML = `<a href="../${doc.path}" download="${doc.name}">${doc.name}</a>`;
                             } else {
                                 // Handle other formats
                                 li.textContent = JSON.stringify(doc);
@@ -464,7 +464,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                     if (fileDocs.length > 0) {
                         fileDocs.forEach(doc => {
                             const li = document.createElement('li');
-                            li.innerHTML = `<a href="../${doc.path}" target="_blank">${doc.name}</a>`;
+                            li.innerHTML = `<a href="../${doc.path}" download="${doc.name}">${doc.name}</a>`;
                             docsList.appendChild(li);
                         });
                     }
