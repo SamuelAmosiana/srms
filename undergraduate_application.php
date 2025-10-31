@@ -1,9 +1,11 @@
 <?php
 require 'config.php';
 
-// Fetch all programmes from the database
+// Fetch only undergraduate programmes from the database
+// Undergraduate programmes should contain 'Diploma', 'Business', or 'Admin'
 try {
-    $stmt = $pdo->query("SELECT id, name, code FROM programme ORDER BY name");
+    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE name LIKE '%Diploma%' OR name LIKE '%Business%' OR name LIKE '%Admin%' ORDER BY name");
+    $stmt->execute();
     $programmes = $stmt->fetchAll();
 } catch (Exception $e) {
     $programmes = [];
