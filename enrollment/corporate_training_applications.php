@@ -2,6 +2,9 @@
 require '../config.php';
 require '../auth.php';
 
+// Include the new acceptance letter with fees function
+require_once '../finance/generate_acceptance_letter_with_fees.php';
+
 // Check if user is logged in and has enrollment officer role
 if (!currentUserId()) {
     header('Location: ../login.php');
@@ -27,9 +30,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             switch ($_POST['action']) {
                 case 'approve':
+                    // First get application details
+                    $app_stmt = $pdo->prepare("
+                        SELECT a.*, p.name as programme_name, i.name as intake_name, p.id as programme_id
+                        FROM applications a
+                        LEFT JOIN programme p ON a.programme_id = p.id
+                        LEFT JOIN intake i ON a.intake_id = i.id
+                        WHERE a.id = ?
+                    ");
+                    $app_stmt->execute([$application_id]);
+                    $application = $app_stmt->fetch();
+                    
+                    // Update application status
                     $stmt = $pdo->prepare("UPDATE applications SET status = 'approved', processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([$current_user_id, $application_id]);
-                    $message = "Application approved successfully!";
+                    
+                    // Add to awaiting registration
+                    $pending_stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, documents, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    $pending_stmt->execute([
+                        $application['full_name'],
+                        $application['email'],
+                        $application['programme_id'],
+                        $application['intake_id'],
+                        $application['documents']
+                    ]);
+                    
+                    // Generate acceptance letter with fees
+                    $letter_path = generateAcceptanceLetterWithFees($application, $pdo);
+                    
+                    $message = "Application approved successfully! Acceptance letter with fees generated.";
                     $messageType = "success";
                     break;
                     

@@ -218,14 +218,18 @@ foreach ($rejectionsByCategory as $apps) {
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-thumbs-up"></i> My Approvals</h1>
-            <p>View your monthly enrollment approvals and rejections</p>
-            <!-- Export Button -->
-            <div class="action-bar">
-                <a href="?export=personal" class="btn btn-primary">
-                    <i class="fas fa-download"></i> Export My Approvals (CSV)
-                </a>
-            </div>
+            <h1><i class="fas fa-thumbs-up"></i> My Approvals & Rejections</h1>
+            <p>View and export your processed applications</p>
+        </div>
+        
+        <!-- Export Button -->
+        <div class="action-bar">
+            <a href="?export=personal" class="btn green">
+                <i class="fas fa-file-csv"></i> Export My Approvals (CSV)
+            </a>
+            <a href="../finance/manage_programme_fees.php" class="btn blue" target="_blank">
+                <i class="fas fa-file-invoice-dollar"></i> Manage Programme Fees
+            </a>
         </div>
         
         <!-- Statistics Cards -->

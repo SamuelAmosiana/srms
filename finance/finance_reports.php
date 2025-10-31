@@ -82,6 +82,10 @@ foreach ($transactions as $transaction) {
             </div>
             
             <div class="nav-actions">
+                <a href="manage_programme_fees.php" class="nav-link" title="Programme Fees">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </a>
+                
                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
                     <i class="fas fa-moon" id="theme-icon"></i>
                 </button>

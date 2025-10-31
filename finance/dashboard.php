@@ -148,6 +148,10 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
             </div>
             
             <div class="nav-actions">
+                <a href="manage_programme_fees.php" class="nav-link" title="Programme Fees">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </a>
+                
                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
                     <i class="fas fa-moon" id="theme-icon"></i>
                 </button>
@@ -189,6 +193,10 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
                 <a href="manage_fees.php" class="nav-item">
                     <i class="fas fa-money-bill"></i>
                     <span>Manage Fees & Finances</span>
+                </a>
+                <a href="manage_programme_fees.php" class="nav-item">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span>Programme Fees</span>
                 </a>
                 <a href="results_access.php" class="nav-item">
                     <i class="fas fa-lock"></i>

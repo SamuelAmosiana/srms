@@ -1,23 +1,32 @@
 <?php
-require_once 'config.php';
+require 'config.php';
 
 try {
-    $stmt = $pdo->query("SHOW TABLES");
-    $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    // Get all tables
+    $stmt = $pdo->query('SHOW TABLES');
+    $tables = $stmt->fetchAll();
     
-    echo "Existing tables in the database:\n";
+    echo "All database tables:\n";
     foreach ($tables as $table) {
-        echo "- " . $table . "\n";
+        $tableName = array_values($table)[0];
+        echo "- " . $tableName . "\n";
     }
     
-    // Check for the specific tables we need
-    echo "\nChecking for course registration tables:\n";
-    $needed_tables = ['course_registration', 'intake_courses'];
-    foreach ($needed_tables as $table) {
-        if (in_array($table, $tables)) {
-            echo "✅ $table table exists\n";
-        } else {
-            echo "❌ $table table does not exist\n";
+    // Check if any fee-related tables exist
+    echo "\nChecking for fee-related tables:\n";
+    $feeTables = [];
+    foreach ($tables as $table) {
+        $tableName = array_values($table)[0];
+        if (stripos($tableName, 'fee') !== false) {
+            $feeTables[] = $tableName;
+        }
+    }
+    
+    if (empty($feeTables)) {
+        echo "No fee-related tables found.\n";
+    } else {
+        foreach ($feeTables as $table) {
+            echo "- " . $table . "\n";
         }
     }
     

@@ -75,6 +75,10 @@ $students = $stmt->fetchAll();
             </div>
             
             <div class="nav-actions">
+                <a href="manage_programme_fees.php" class="nav-link" title="Programme Fees">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </a>
+                
                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
                     <i class="fas fa-moon" id="theme-icon"></i>
                 </button>
@@ -219,6 +223,12 @@ $students = $stmt->fetchAll();
                     <i class="fas fa-chart-pie"></i>
                     <h3>Manage Income/Expenses</h3>
                     <p>Record and track financial transactions</p>
+                </a>
+                
+                <a href="manage_programme_fees.php" class="action-card blue">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <h3>Programme Fees</h3>
+                    <p>Manage fees for each programme</p>
                 </a>
                 
                 <a href="finance_reports.php?type=income" class="action-card green">

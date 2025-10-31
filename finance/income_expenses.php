@@ -15,42 +15,57 @@ $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WH
 $stmt->execute([currentUserId()]);
 $admin = $stmt->fetch();
 
-// Handle income submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_income'])) {
-    $description = $_POST['description'];
-    $amount = $_POST['amount'];
-    $income_date = $_POST['income_date'];
-    
-    // Insert income record into finance_transactions table
-    $stmt = $pdo->prepare("INSERT INTO finance_transactions (type, amount, description, created_at) VALUES ('income', ?, ?, ?)");
-    $stmt->execute([$amount, $description, $income_date]);
-    
-    $success_message = "Income recorded successfully!";
+// Handle form submissions
+$message = '';
+$messageType = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        if (isset($_POST['add_income'])) {
+            $description = $_POST['description'];
+            $amount = $_POST['amount'];
+            $date = $_POST['date'];
+            
+            $stmt = $pdo->prepare("INSERT INTO finance_transactions (type, amount, description, created_at) VALUES ('income', ?, ?, ?)");
+            $stmt->execute([$amount, $description, $date]);
+            
+            $message = "Income recorded successfully!";
+            $messageType = "success";
+        } elseif (isset($_POST['add_expense'])) {
+            $description = $_POST['description'];
+            $amount = $_POST['amount'];
+            $date = $_POST['date'];
+            
+            $stmt = $pdo->prepare("INSERT INTO finance_transactions (type, amount, description, created_at) VALUES ('expense', ?, ?, ?)");
+            $stmt->execute([$amount, $description, $date]);
+            
+            $message = "Expense recorded successfully!";
+            $messageType = "success";
+        }
+    } catch (Exception $e) {
+        $message = "Error: " . $e->getMessage();
+        $messageType = "error";
+    }
 }
 
-// Handle expense submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_expense'])) {
-    $description = $_POST['description'];
-    $amount = $_POST['amount'];
-    $expense_date = $_POST['expense_date'];
-    
-    // Insert expense record into finance_transactions table
-    $stmt = $pdo->prepare("INSERT INTO finance_transactions (type, amount, description, created_at) VALUES ('expense', ?, ?, ?)");
-    $stmt->execute([$amount, $description, $expense_date]);
-    
-    $success_message = "Expense recorded successfully!";
-}
+// Fetch income and expense data
+$income_stmt = $pdo->query("SELECT * FROM finance_transactions WHERE type = 'income' ORDER BY created_at DESC");
+$incomes = $income_stmt->fetchAll();
 
-// Fetch recent transactions (income and expenses combined)
-$stmt = $pdo->query("SELECT type, amount, description, created_at as transaction_date FROM finance_transactions ORDER BY created_at DESC LIMIT 10");
-$transactions = $stmt->fetchAll();
+$expense_stmt = $pdo->query("SELECT * FROM finance_transactions WHERE type = 'expense' ORDER BY created_at DESC");
+$expenses = $expense_stmt->fetchAll();
+
+// Calculate totals
+$total_income = array_sum(array_column($incomes, 'amount'));
+$total_expenses = array_sum(array_column($expenses, 'amount'));
+$net_balance = $total_income - $total_expenses;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Income & Expenses - LSC SRMS</title>
+    <title>Income & Expenses - LSC SRMS</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -75,6 +90,10 @@ $transactions = $stmt->fetchAll();
             </div>
             
             <div class="nav-actions">
+                <a href="manage_programme_fees.php" class="nav-link" title="Programme Fees">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </a>
+                
                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
                     <i class="fas fa-moon" id="theme-icon"></i>
                 </button>
@@ -144,9 +163,9 @@ $transactions = $stmt->fetchAll();
             <p>Record and track financial transactions for income and expenses</p>
         </div>
         
-        <?php if (isset($success_message)): ?>
-            <div class="alert success">
-                <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success_message); ?>
+        <?php if ($message): ?>
+            <div class="alert <?php echo $messageType; ?>">
+                <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($message); ?>
             </div>
         <?php endif; ?>
         
@@ -164,10 +183,10 @@ $transactions = $stmt->fetchAll();
                 </div>
                 <div class="form-group">
                     <label for="income_date">Date</label>
-                    <input type="date" name="income_date" id="income_date" required>
+                    <input type="date" name="date" id="income_date" required>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" name="record_income" class="btn green">Record Income</button>
+                    <button type="submit" name="add_income" class="btn green">Record Income</button>
                 </div>
             </form>
         </div>
@@ -186,10 +205,10 @@ $transactions = $stmt->fetchAll();
                 </div>
                 <div class="form-group">
                     <label for="expense_date">Date</label>
-                    <input type="date" name="expense_date" id="expense_date" required>
+                    <input type="date" name="date" id="expense_date" required>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" name="record_expense" class="btn orange">Record Expense</button>
+                    <button type="submit" name="add_expense" class="btn orange">Record Expense</button>
                 </div>
             </form>
         </div>

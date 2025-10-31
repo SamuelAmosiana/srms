@@ -3,6 +3,9 @@ session_start();
 require_once '../config.php';
 require_once '../auth.php';
 
+// Include the new acceptance letter with fees function
+require_once '../finance/generate_acceptance_letter_with_fees.php';
+
 // Check if user is logged in and has permission
 if (!currentUserId()) {
     header('Location: ../login.php');
@@ -20,39 +23,6 @@ $stmt = $pdo->prepare("SELECT u.*, ap.full_name, ap.staff_id FROM users u LEFT J
 $stmt->execute([currentUserId()]);
 $user = $stmt->fetch();
 
-// Function to generate text acceptance letter (fallback from PDF)
-function generateAcceptanceLetter($application, $pdo) {
-    $letter_content = "LSC SRMS
-123 University Road, City, Country
-Email: admissions@lsc.edu
-
-Date: " . date('F d, Y') . "
-
-To:
-{$application['full_name']}
-{$application['email']}
-
-Subject: Admission Acceptance Letter
-
-Dear {$application['full_name']},
-
-Congratulations! We are pleased to inform you that your application for admission to the following programme has been accepted:
-
-Programme: {$application['programme_name']}
-Intake: {$application['intake_name']}
-
-Please proceed with the registration process as outlined in the student portal. We look forward to welcoming you to LSC.
-
-Best regards,
-Admissions Office
-LSC SRMS";
-
-    // Save as text file
-    $letter_path = '../letters/acceptance_' . $application['id'] . '.txt';
-    file_put_contents($letter_path, $letter_content);
-    return $letter_path;
-}
-
 // Handle form submissions
 $message = '';
 $messageType = '';
@@ -66,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 try {
                     // Get application details
                     $app_stmt = $pdo->prepare("
-                        SELECT a.*, p.name as programme_name, i.name as intake_name
+                        SELECT a.*, p.name as programme_name, i.name as intake_name, p.id as programme_id
                         FROM applications a
                         LEFT JOIN programme p ON a.programme_id = p.id
                         LEFT JOIN intake i ON a.intake_id = i.id
@@ -89,15 +59,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $application['documents']
                     ]);
                     
-                    // Generate text acceptance letter
-                    $letter_path = generateAcceptanceLetter($application, $pdo);
+                    // Generate acceptance letter with fees
+                    $letter_path = generateAcceptanceLetterWithFees($application, $pdo);
                     
                     // Send email with attachment (placeholder)
                     $to = $application['email'];
                     $subject = 'Application Approved - LSC SRMS';
                     $body = "Dear {$application['full_name']},
 
-Congratulations! Your application has been approved. Please find your acceptance letter attached.
+Congratulations! Your application has been approved. Please find your acceptance letter with fee structure attached.
 
 Best regards,
 LSC SRMS Admissions";
@@ -106,7 +76,7 @@ LSC SRMS Admissions";
                     // $mailer->addAttachment($letter_path);
                     // $mailer->send($to, $subject, $body);
                     
-                    $message = "Application approved! Acceptance letter generated and email sent. <a href='$letter_path' target='_blank'>Download Letter</a>";
+                    $message = "Application approved! Acceptance letter with fees generated and email sent. <a href='$letter_path' target='_blank'>Download Letter</a>";
                     $messageType = 'success';
                 } catch (Exception $e) {
                     $message = "Error: " . $e->getMessage();

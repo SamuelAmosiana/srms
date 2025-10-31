@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dropdown Functionality</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input { padding: 8px; width: 300px; }
+        #fee_name_custom { display: none; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Test Fee Name Dropdown Functionality</h1>
+    
+    <div class="form-group">
+        <label for="fee_name">Fee Name:</label>
+        <select name="fee_name" id="fee_name" required>
+            <option value="">Select or Type Fee Name</option>
+            <option value="Application Fee">Application Fee</option>
+            <option value="Tuition Fee">Tuition Fee</option>
+            <option value="other">-- Other --</option>
+        </select>
+        <input type="text" name="fee_name_custom" id="fee_name_custom" placeholder="Enter custom fee name">
+    </div>
+    
+    <button onclick="testFunctionality()">Test Selection</button>
+    <div id="result" style="margin-top: 20px; padding: 10px; background: #f0f0f0;"></div>
+    
+    <script>
+        // Handle fee name selection
+        document.getElementById('fee_name').addEventListener('change', function() {
+            const customInput = document.getElementById('fee_name_custom');
+            if (this.value === 'other') {
+                customInput.style.display = 'block';
+                customInput.required = true;
+                customInput.value = '';
+            } else {
+                customInput.style.display = 'none';
+                customInput.required = false;
+            }
+        });
+        
+        function testFunctionality() {
+            const feeNameSelect = document.getElementById('fee_name');
+            const customInput = document.getElementById('fee_name_custom');
+            const resultDiv = document.getElementById('result');
+            
+            let result = "Selected fee name: " + feeNameSelect.value + "<br>";
+            if (feeNameSelect.value === 'other') {
+                result += "Custom fee name field is visible and required<br>";
+                result += "Custom fee name value: " + customInput.value + "<br>";
+            } else {
+                result += "Custom fee name field is hidden<br>";
+            }
+            
+            resultDiv.innerHTML = result;
+        }
+    </script>
+</body>
+</html>
