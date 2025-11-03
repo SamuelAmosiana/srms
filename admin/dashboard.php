@@ -59,7 +59,7 @@ $stats['total_courses'] = $stmt->fetch()['count'];
         
         <div class="nav-right">
             <div class="user-info">
-                <span class="welcome-text">Welcome, <?php echo htmlspecialchars($admin['full_name'] ?? 'Administrator'); ?></span>
+                <span class="welcome-text">Welcome Sam, <?php echo htmlspecialchars($admin['full_name'] ?? 'Administrator'); ?></span>
                 <span class="staff-id">(<?php echo htmlspecialchars($admin['staff_id'] ?? 'N/A'); ?>)</span>
             </div>
             
