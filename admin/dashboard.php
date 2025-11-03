@@ -170,7 +170,7 @@ $stats['total_courses'] = $stmt->fetch()['count'];
     <main class="main-content">
         <div class="content-header">
             <h1><i class="fas fa-tachometer-alt"></i> Dashboard Overview</h1>
-            <p>Welcome to the Lusaka South College Student Records Management System</p>
+            <p>Welcome Sam to the Lusaka South College Student Records Management System</p>
         </div>
         
         <!-- Statistics Cards -->
