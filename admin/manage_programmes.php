@@ -482,7 +482,7 @@ try {
             </a>
             
             <div class="nav-section">
-                <h4>User Management</h4>
+                <h4>Users Management!</h4>
                 <a href="manage_users.php" class="nav-item">
                     <i class="fas fa-users"></i>
                     <span>Manage Users</span>
