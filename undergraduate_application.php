@@ -1,10 +1,10 @@
 <?php
 require 'config.php';
 
-// Fetch only undergraduate programmes from the database
-// Undergraduate programmes should contain 'Diploma', 'Business', or 'Admin'
+// Fetch all programmes from the database
+// Showing all programmes as both certificate and diploma programmes are relevant for undergraduate applications
 try {
-    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE name LIKE '%Diploma%' OR name LIKE '%Business%' OR name LIKE '%Admin%' ORDER BY name");
+    $stmt = $pdo->prepare("SELECT id, name, code FROM programme ORDER BY name");
     $stmt->execute();
     $programmes = $stmt->fetchAll();
 } catch (Exception $e) {
