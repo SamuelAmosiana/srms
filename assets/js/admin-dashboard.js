@@ -41,9 +41,22 @@ function initializeDropdowns() {
     document.addEventListener('click', function(event) {
         const dropdowns = document.querySelectorAll('.dropdown-menu');
         dropdowns.forEach(dropdown => {
-            if (!dropdown.parentElement.contains(event.target)) {
-                dropdown.classList.remove('show');
+            // Check if the click is on the profile button or within the dropdown
+            const dropdownContainer = dropdown.parentElement; // This is the .dropdown div
+            const profileBtn = dropdownContainer.querySelector('.profile-btn');
+            
+            // If click is on the profile button, let the button's onclick handler handle it
+            if (profileBtn && profileBtn.contains(event.target)) {
+                return;
             }
+            
+            // If click is on the dropdown itself or its children, don't close it
+            if (dropdown.contains(event.target)) {
+                return;
+            }
+            
+            // If click is outside both the button and dropdown, close the dropdown
+            dropdown.classList.remove('show');
         });
     });
 }

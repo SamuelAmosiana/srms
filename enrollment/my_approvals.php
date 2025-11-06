@@ -75,7 +75,6 @@ $stmt = $pdo->prepare("
            CASE 
                WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'undergraduate'
                WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'short_course'
-               WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' THEN 'corporate'
                ELSE 'other'
            END as category
     FROM applications a
@@ -91,14 +90,12 @@ $processedApplications = $stmt->fetchAll();
 $approvalsByCategory = [
     'undergraduate' => [],
     'short_course' => [],
-    'corporate' => [],
     'other' => []
 ];
 
 $rejectionsByCategory = [
     'undergraduate' => [],
     'short_course' => [],
-    'corporate' => [],
     'other' => []
 ];
 
@@ -190,10 +187,6 @@ foreach ($rejectionsByCategory as $apps) {
                 <a href="short_courses_applications.php" class="nav-item">
                     <i class="fas fa-book"></i>
                     <span>Short Courses</span>
-                </a>
-                <a href="corporate_training_applications.php" class="nav-item">
-                    <i class="fas fa-building"></i>
-                    <span>Corporate Training</span>
                 </a>
             </div>
             
@@ -358,26 +351,6 @@ foreach ($rejectionsByCategory as $apps) {
                     <?php endif; ?>
                 </div>
             </div>
-            
-            <!-- Corporate Training Approvals -->
-            <div class="data-panel">
-                <div class="panel-header">
-                    <h3><i class="fas fa-building"></i> Corporate Training Approvals (<?php echo count($approvalsByCategory['corporate']); ?>)</h3>
-                </div>
-                <div class="panel-content">
-                    <?php if (empty($approvalsByCategory['corporate'])): ?>
-                        <div class="empty-state">
-                            <i class="fas fa-building"></i>
-                            <p>No corporate training approvals</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Programme</th>
                                         <th>Intake</th>
                                         <th>Approved Date</th>
                                     </tr>
@@ -395,7 +368,6 @@ foreach ($rejectionsByCategory as $apps) {
                                 </tbody>
                             </table>
                         </div>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -472,48 +444,6 @@ foreach ($rejectionsByCategory as $apps) {
                                 </thead>
                                 <tbody>
                                     <?php foreach ($rejectionsByCategory['short_course'] as $app): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($app['full_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['email']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
-                                            <td><?php echo date('Y-m-d', strtotime($app['updated_at'])); ?></td>
-                                            <td><?php echo htmlspecialchars($app['rejection_reason'] ?? 'No reason provided'); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <!-- Corporate Training Rejections -->
-            <div class="data-panel">
-                <div class="panel-header">
-                    <h3><i class="fas fa-building"></i> Corporate Training Rejections (<?php echo count($rejectionsByCategory['corporate']); ?>)</h3>
-                </div>
-                <div class="panel-content">
-                    <?php if (empty($rejectionsByCategory['corporate'])): ?>
-                        <div class="empty-state">
-                            <i class="fas fa-building"></i>
-                            <p>No corporate training rejections</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Programme</th>
-                                        <th>Intake</th>
-                                        <th>Rejected Date</th>
-                                        <th>Rejection Reason</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($rejectionsByCategory['corporate'] as $app): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                             <td><?php echo htmlspecialchars($app['email']); ?></td>

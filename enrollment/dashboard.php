@@ -56,8 +56,7 @@ $stmt = $pdo->prepare("
     SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 1 ELSE 0 END) as undergrad,
-        SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 1 ELSE 0 END) as short_courses,
-        SUM(CASE WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' THEN 1 ELSE 0 END) as corporate
+        SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 1 ELSE 0 END) as short_courses
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     WHERE a.status = 'pending'
@@ -81,7 +80,6 @@ $stmt = $pdo->prepare("
            CASE 
                WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'undergraduate'
                WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'short_course'
-               WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' THEN 'corporate'
                ELSE 'other'
            END as category
     FROM applications a
@@ -98,7 +96,6 @@ $pendingApplications = $stmt->fetchAll();
 $applicationsByCategory = [
     'undergraduate' => [],
     'short_course' => [],
-    'corporate' => [],
     'other' => []
 ];
 
@@ -245,10 +242,6 @@ foreach ($pendingApplications as $application) {
                 <a href="short_courses_applications.php" class="nav-item">
                     <i class="fas fa-book"></i>
                     <span>Short Courses</span>
-                </a>
-                <a href="corporate_training_applications.php" class="nav-item">
-                    <i class="fas fa-building"></i>
-                    <span>Corporate Training</span>
                 </a>
             </div>
             
@@ -409,58 +402,6 @@ foreach ($pendingApplications as $application) {
                                 </thead>
                                 <tbody>
                                     <?php foreach ($applicationsByCategory['short_course'] as $app): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($app['full_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['email']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
-                                            <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-info" onclick='viewApplication(<?php echo json_encode($app, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
-                                                    <i class="fas fa-eye"></i> View
-                                                </button>
-                                                <button class="btn btn-sm btn-success" onclick="approveApplication(<?php echo (int)$app['id']; ?>)">
-                                                    <i class="fas fa-check"></i> Approve
-                                                </button>
-                                                <button class="btn btn-sm btn-danger" onclick="rejectApplication(<?php echo (int)$app['id']; ?>)">
-                                                    <i class="fas fa-times"></i> Reject
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <!-- Corporate Training Applications -->
-            <div class="data-panel">
-                <div class="panel-header">
-                    <h3><i class="fas fa-building"></i> Corporate Training Applications (<?php echo count($applicationsByCategory['corporate']); ?>)</h3>
-                </div>
-                <div class="panel-content">
-                    <?php if (empty($applicationsByCategory['corporate'])): ?>
-                        <div class="empty-state">
-                            <i class="fas fa-building"></i>
-                            <p>No pending corporate training applications</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Programme</th>
-                                        <th>Intake</th>
-                                        <th>Submitted</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($applicationsByCategory['corporate'] as $app): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                             <td><?php echo htmlspecialchars($app['email']); ?></td>

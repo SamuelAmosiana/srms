@@ -606,7 +606,7 @@ html {
     margin: 5px 0;
 }
 
-.dropdown.show .dropdown-menu {
+.dropdown-menu.show {
     display: block;
 }
 
@@ -654,8 +654,6 @@ html {
 .user-dropdown a {
     display: flex;
     align-items: center;
-}
-
     gap: 12px;
     padding: 14px 18px;
     color: var(--text-dark);

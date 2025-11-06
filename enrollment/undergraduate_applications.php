@@ -190,10 +190,6 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                     <i class="fas fa-book"></i>
                     <span>Short Courses</span>
                 </a>
-                <a href="corporate_training_applications.php" class="nav-item">
-                    <i class="fas fa-building"></i>
-                    <span>Corporate Training</span>
-                </a>
             </div>
             
             <div class="nav-section">

@@ -22,7 +22,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'all') {
                CASE 
                    WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'Undergraduate'
                    WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'Short Course'
-                   WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' OR a.documents LIKE '%corporate_training%' THEN 'Corporate Training'
                    ELSE 'Other'
                END as category,
                u.username as processed_by_username,
@@ -92,7 +91,6 @@ $stmt = $pdo->prepare("
         COUNT(*) as total,
         SUM(CASE WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 1 ELSE 0 END) as undergrad,
         SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 1 ELSE 0 END) as short_courses,
-        SUM(CASE WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' OR a.documents LIKE '%corporate_training%' THEN 1 ELSE 0 END) as corporate
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
 ");
@@ -119,7 +117,6 @@ $stmt = $pdo->prepare("
            CASE 
                WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'Undergraduate'
                WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'Short Course'
-               WHEN p.name LIKE '%Corporate%' OR p.name LIKE '%Training%' OR a.documents LIKE '%corporate_training%' THEN 'Corporate Training'
                ELSE 'Other'
            END as category
     FROM applications a
@@ -201,10 +198,6 @@ $recentApplications = $stmt->fetchAll();
                 <a href="short_courses_applications.php" class="nav-item">
                     <i class="fas fa-book"></i>
                     <span>Short Courses</span>
-                </a>
-                <a href="corporate_training_applications.php" class="nav-item">
-                    <i class="fas fa-building"></i>
-                    <span>Corporate Training</span>
                 </a>
             </div>
             
@@ -309,15 +302,6 @@ $recentApplications = $stmt->fetchAll();
                         </div>
                     </div>
                     
-                    <div class="stat-card">
-                        <div class="stat-icon teal">
-                            <i class="fas fa-building"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3><?php echo number_format($categoryStats['corporate'] ?? 0); ?></h3>
-                            <p>Corporate Training</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

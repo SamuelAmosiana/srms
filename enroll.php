@@ -107,12 +107,6 @@
                 <a href="short_courses_application.php" class="btn">Enroll Now</a>
             </div>
             
-            <div class="enrollment-card">
-                <div class="icon">🏢</div>
-                <h3>Corporate Training</h3>
-                <p>Customized training solutions for organizations and businesses.</p>
-                <a href="corporate_training_application.php" class="btn">Request Training</a>
-            </div>
         </div>
         
         <div class="back-link">
