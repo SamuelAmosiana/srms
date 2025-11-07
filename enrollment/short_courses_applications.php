@@ -87,7 +87,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'pending' 
-    AND (p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%')
+    AND (p.name LIKE '%Certificate%' OR (p.name LIKE '%Computer%' AND p.name NOT LIKE '%Diploma%') OR p.name LIKE '%IT%' OR p.name LIKE '%Solar%' OR p.name LIKE '%Electrical%' OR p.name LIKE '%Automotive%' OR p.name LIKE '%Safety%' OR p.name LIKE '%Secretarial%' OR p.name LIKE '%Childhood%' OR p.name LIKE '%Food%' OR p.name LIKE '%Nursing%')
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
@@ -100,7 +100,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'approved' 
-    AND (p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%')
+    AND (p.name LIKE '%Certificate%' OR (p.name LIKE '%Computer%' AND p.name NOT LIKE '%Diploma%') OR p.name LIKE '%IT%' OR p.name LIKE '%Solar%' OR p.name LIKE '%Electrical%' OR p.name LIKE '%Automotive%' OR p.name LIKE '%Safety%' OR p.name LIKE '%Secretarial%' OR p.name LIKE '%Childhood%' OR p.name LIKE '%Food%' OR p.name LIKE '%Nursing%')
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
@@ -113,7 +113,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'rejected' 
-    AND (p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%')
+    AND (p.name LIKE '%Certificate%' OR (p.name LIKE '%Computer%' AND p.name NOT LIKE '%Diploma%') OR p.name LIKE '%IT%' OR p.name LIKE '%Solar%' OR p.name LIKE '%Electrical%' OR p.name LIKE '%Automotive%' OR p.name LIKE '%Safety%' OR p.name LIKE '%Secretarial%' OR p.name LIKE '%Childhood%' OR p.name LIKE '%Food%' OR p.name LIKE '%Nursing%')
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();

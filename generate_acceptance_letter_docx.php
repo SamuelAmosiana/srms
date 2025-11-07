@@ -199,14 +199,23 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     $body .= "Admissions Office\n";
     $body .= "LSC SRMS";
     
-    // In a real implementation, you would use PHPMailer or similar
-    // For now, we'll just log the email content
-    error_log("EMAIL TO: " . $application['email']);
-    error_log("SUBJECT: " . $subject);
-    error_log("BODY: " . $body);
+    // Send email using PHP's mail function
+    $headers = "From: admissions@lsc.edu\r\n";
+    $headers .= "Reply-To: admissions@lsc.edu\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
     
-    // Return true to indicate success
-    return true;
+    // Try to send the email
+    $result = mail($application['email'], $subject, $body, $headers);
+    
+    // If mail() fails, log it for debugging
+    if (!$result) {
+        error_log("Failed to send email to: " . $application['email']);
+        error_log("Subject: " . $subject);
+        error_log("Body: " . $body);
+    }
+    
+    return $result;
 }
 
 // Example usage (for testing)

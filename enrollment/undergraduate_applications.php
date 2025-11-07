@@ -151,7 +151,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'pending' 
-    AND (p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%')
+    AND (p.name LIKE '%Diploma%' OR p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Teaching%' OR p.name LIKE '%Law%' OR p.name LIKE '%Accountancy%' OR p.name LIKE '%Marketing%' OR p.name LIKE '%Procurement%' OR p.name LIKE '%Human Resource%' OR p.name LIKE '%Transport%' OR p.name LIKE '%Public Health%' OR p.name LIKE '%Environmental Health%' OR p.name LIKE '%Agriculture%') AND p.name NOT LIKE '%Certificate%'
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
@@ -164,7 +164,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'approved' 
-    AND (p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%')
+    AND (p.name LIKE '%Diploma%' OR p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Teaching%' OR p.name LIKE '%Law%' OR p.name LIKE '%Accountancy%' OR p.name LIKE '%Marketing%' OR p.name LIKE '%Procurement%' OR p.name LIKE '%Human Resource%' OR p.name LIKE '%Transport%' OR p.name LIKE '%Public Health%' OR p.name LIKE '%Environmental Health%' OR p.name LIKE '%Agriculture%') AND p.name NOT LIKE '%Certificate%'
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
@@ -177,7 +177,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'rejected' 
-    AND (p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%')
+    AND (p.name LIKE '%Diploma%' OR p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Teaching%' OR p.name LIKE '%Law%' OR p.name LIKE '%Accountancy%' OR p.name LIKE '%Marketing%' OR p.name LIKE '%Procurement%' OR p.name LIKE '%Human Resource%' OR p.name LIKE '%Transport%' OR p.name LIKE '%Public Health%' OR p.name LIKE '%Environmental Health%' OR p.name LIKE '%Agriculture%') AND p.name NOT LIKE '%Certificate%'
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
