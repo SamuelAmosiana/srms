@@ -476,9 +476,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                     
                     // Extract file documents and additional info
                     for (const key in documents) {
-                        if (key === 'recommended_by') {
-                            additionalInfo.push({label: key, value: documents[key]});
-                        } else if (typeof documents[key] === 'object' && documents[key].path) {
+                        if (typeof documents[key] === 'object' && documents[key].path) {
                             fileDocs.push(documents[key]);
                         } else if (key !== 'path' && key !== 'name' && documents[key]) {
                             additionalInfo.push({label: key, value: documents[key]});

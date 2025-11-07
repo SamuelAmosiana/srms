@@ -90,7 +90,7 @@ $stmt = $pdo->prepare("
     SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 1 ELSE 0 END) as undergrad,
-        SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 1 ELSE 0 END) as short_courses,
+        SUM(CASE WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 1 ELSE 0 END) as short_courses
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
 ");

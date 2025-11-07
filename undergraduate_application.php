@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $email,
             $programme_id,
             $intake_id,
-            json_encode(array_merge($documents, ['recommended_by' => $recommended_by])) // Include recommended by in documents
+            json_encode(array_merge($documents, ['phone' => $phone, 'recommended_by' => $recommended_by])) // Include recommended by in documents
         ]);
         
         $success = "Your application has been submitted successfully! Our enrollment team will review your application and contact you soon.";

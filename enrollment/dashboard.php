@@ -538,19 +538,18 @@ foreach ($pendingApplications as $application) {
                     // Handle object format
                     let hasDocuments = false;
                     for (const key in documents) {
-                        if (key === 'recommended_by' && documents[key]) {
-                            const li = document.createElement('li');
-                            li.innerHTML = `<strong>Recommended by:</strong> ${documents[key]}`;
-                            docsList.appendChild(li);
-                            hasDocuments = true;
-                        } else if (typeof documents[key] === 'object' && documents[key].path) {
+                        if (typeof documents[key] === 'object' && documents[key].path) {
                             const li = document.createElement('li');
                             li.innerHTML = `<a href="../${documents[key].path}" download="${documents[key].name}">${documents[key].name}</a>`;
                             docsList.appendChild(li);
                             hasDocuments = true;
                         } else if (key !== 'path' && key !== 'name' && documents[key]) {
                             const li = document.createElement('li');
-                            li.innerHTML = `<strong>${key.replace('_', ' ')}:</strong> ${documents[key]}`;
+                            // Format the label nicely
+                            let label = key.replace('_', ' ');
+                            // Capitalize first letter
+                            label = label.charAt(0).toUpperCase() + label.slice(1);
+                            li.innerHTML = `<strong>${label}:</strong> ${documents[key]}`;
                             docsList.appendChild(li);
                             hasDocuments = true;
                         }

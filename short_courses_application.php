@@ -36,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $programme_id,
             $intake_id,
             json_encode([
+                'phone' => $phone,
                 'occupation' => $occupation,
                 'schedule' => $schedule,
                 'experience' => $experience,
