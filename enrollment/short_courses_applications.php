@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get short courses applications - updated logic to match actual programme names
 $stmt = $pdo->prepare("
-    SELECT a.*, p.name as programme_name, i.name as intake_name
+    SELECT a.*, a.phone, p.name as programme_name, i.name as intake_name
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
@@ -95,7 +95,7 @@ $shortCoursesApplications = $stmt->fetchAll();
 
 // Get approved short courses applications
 $stmt = $pdo->prepare("
-    SELECT a.*, p.name as programme_name, i.name as intake_name
+    SELECT a.*, a.phone, p.name as programme_name, i.name as intake_name
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
@@ -108,7 +108,7 @@ $approvedShortCoursesApplications = $stmt->fetchAll();
 
 // Get rejected short courses applications
 $stmt = $pdo->prepare("
-    SELECT a.*, p.name as programme_name, i.name as intake_name
+    SELECT a.*, a.phone, p.name as programme_name, i.name as intake_name
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
@@ -242,6 +242,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                 <tr>
                                     <th>Name</th>
                                     <th>Email</th>
+                                    <th>Phone</th>
                                     <th>Programme</th>
                                     <th>Intake</th>
                                     <th>Submitted</th>
@@ -253,6 +254,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                     <tr>
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
                                         <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
@@ -294,6 +296,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                 <tr>
                                     <th>Name</th>
                                     <th>Email</th>
+                                    <th>Phone</th>
                                     <th>Programme</th>
                                     <th>Intake</th>
                                     <th>Submitted</th>
@@ -305,6 +308,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                     <tr>
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
                                         <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
@@ -336,6 +340,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                 <tr>
                                     <th>Name</th>
                                     <th>Email</th>
+                                    <th>Phone</th>
                                     <th>Programme</th>
                                     <th>Intake</th>
                                     <th>Submitted</th>
@@ -348,6 +353,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                     <tr>
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
                                         <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
@@ -373,6 +379,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
             <div class="modal-body">
                 <p><strong>Name:</strong> <span id="view_name"></span></p>
                 <p><strong>Email:</strong> <span id="view_email"></span></p>
+                <p><strong>Phone:</strong> <span id="view_phone"></span></p>
                 <p><strong>Programme:</strong> <span id="view_programme"></span></p>
                 <p><strong>Intake:</strong> <span id="view_intake"></span></p>
                 <p><strong>Submitted:</strong> <span id="view_submitted"></span></p>
@@ -438,6 +445,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
         function viewApplication(app) {
             document.getElementById('view_name').textContent = app.full_name || 'N/A';
             document.getElementById('view_email').textContent = app.email || 'N/A';
+            document.getElementById('view_phone').textContent = app.phone || 'N/A';
             document.getElementById('view_programme').textContent = app.programme_name || 'N/A';
             document.getElementById('view_intake').textContent = app.intake_name || 'N/A';
             document.getElementById('view_submitted').textContent = app.created_at ? new Date(app.created_at).toLocaleDateString() : 'N/A';
