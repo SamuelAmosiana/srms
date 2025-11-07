@@ -106,15 +106,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         // Add success message about student account creation
                         $student_message = " Student account created with username: " . $student_number . " and default password: " . $default_password;
+                                            
+                        // Send acceptance letter email with download link
+                        $login_details = [
+                            'username' => $student_number,
+                            'password' => $default_password
+                        ];
+                        sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo);
                     } catch (Exception $e) {
                         $pdo->rollBack();
                         $student_message = " Warning: Failed to create student account automatically. Error: " . $e->getMessage();
                     }
                     
-                    // Generate acceptance letter with fees
-                    $letter_path = generateAcceptanceLetterWithFees($application, $pdo);
+                    // Generate acceptance letter in DOCX format
+                    require_once '../finance/generate_acceptance_letter_docx.php';
+                    $letter_path = generateAcceptanceLetterDOCX($application, $pdo);
                     
-                    $message = "Application approved successfully! Acceptance letter with fees generated." . ($student_message ?? '');
+                    $message = "Application approved successfully! Acceptance letter generated and email sent to applicant." . ($student_message ?? '');
                     $messageType = "success";
                     break;
                     
