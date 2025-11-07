@@ -29,11 +29,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $intake_id = $intake_data ? $intake_data['id'] : null;
         
         // Insert application into database
-        $stmt = $pdo->prepare("INSERT INTO applications (full_name, email, phone, programme_id, intake_id, documents) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO applications (full_name, email, phone, application_type, programme_id, intake_id, documents) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $firstname . ' ' . $lastname,
             $email,
             $phone,
+            'short_course',
             $programme_id,
             $intake_id,
             json_encode([
