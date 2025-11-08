@@ -1,5 +1,15 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/email_config.php';
+
+// Try to load PHPMailer if available
+$phpmailer_available = false;
+if (file_exists(__DIR__ . '/lib/PHPMailer/PHPMailer.php')) {
+    require_once __DIR__ . '/lib/PHPMailer/PHPMailer.php';
+    require_once __DIR__ . '/lib/PHPMailer/SMTP.php';
+    require_once __DIR__ . '/lib/PHPMailer/Exception.php';
+    $phpmailer_available = true;
+}
 
 /**
  * Generate an acceptance letter in DOCX format from intake-specific templates
@@ -98,6 +108,7 @@ function generateAcceptanceLetterDOCX($application, $pdo) {
  * @return bool Whether email was sent successfully
  */
 function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo) {
+    global $phpmailer_available;
     // Get programme fees for email content
     $stmt = $pdo->prepare("
         SELECT pf.*
@@ -185,7 +196,7 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     $body .= "=============\n";
     $body .= "Username: " . $login_details['username'] . "\n";
     $body .= "Password: " . $login_details['password'] . "\n";
-    $body .= "Portal URL: http://" . $_SERVER['HTTP_HOST'] . "/srms/login.php\n\n";
+    $body .= "Portal URL: " . PORTAL_URL . "\n\n";
     
     $body .= "To download your acceptance letter, please click the link below:\n";
     $body .= $download_link . "\n\n";
@@ -199,29 +210,78 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     $body .= "Admissions Office\n";
     $body .= "LSC SRMS";
     
-    // Send email using PHP's mail function
-    $headers = "From: admissions@lsc.edu\r\n";
-    $headers .= "Reply-To: admissions@lsc.edu\r\n";
-    $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    
-    // Try to send the email
-    $result = mail($application['email'], $subject, $body, $headers);
-    
-    // Log email details for debugging (whether successful or not)
-    error_log("Email attempt to: " . $application['email']);
-    error_log("Subject: " . $subject);
-    error_log("Body: " . $body);
-    
-    // If mail() fails due to SMTP configuration, provide a more user-friendly message
-    if (!$result) {
-        error_log("Failed to send email to: " . $application['email'] . ". This is likely due to SMTP configuration issues in local development environment.");
-        // Return true anyway so the application process continues
-        // In production, you would want to handle this more carefully
-        return true;
+    // Try to use PHPMailer if available, otherwise fall back to mail()
+    if ($phpmailer_available) {
+        return sendEmailWithPHPMailer($application['email'], $subject, $body);
+    } else {
+        // Send email using PHP's mail function
+        $headers = "From: " . EMAIL_FROM . "\r\n";
+        $headers .= "Reply-To: " . EMAIL_REPLY_TO . "\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        
+        // Try to send the email
+        $result = mail($application['email'], $subject, $body, $headers);
+        
+        // Log email details for debugging (whether successful or not)
+        error_log("Email attempt to: " . $application['email']);
+        error_log("Subject: " . $subject);
+        error_log("Body: " . $body);
+        
+        // If mail() fails due to SMTP configuration, provide a more user-friendly message
+        if (!$result) {
+            error_log("Failed to send email to: " . $application['email'] . ". This is likely due to SMTP configuration issues.");
+            // Return true anyway so the application process continues
+            return true;
+        }
+        
+        return $result;
     }
-    
-    return $result;
+}
+
+/**
+ * Send email using PHPMailer with Namecheap SMTP settings
+ * 
+ * @param string $to Recipient email address
+ * @param string $subject Email subject
+ * @param string $body Email body
+ * @return bool Whether email was sent successfully
+ */
+function sendEmailWithPHPMailer($to, $subject, $body) {
+    try {
+        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host = SMTP_HOST;
+        $mail->SMTPAuth = true;
+        $mail->Username = SMTP_USERNAME;
+        $mail->Password = SMTP_PASSWORD;
+        $mail->SMTPSecure = SMTP_SECURE;
+        $mail->Port = SMTP_PORT;
+        
+        // Recipients
+        $mail->setFrom(EMAIL_FROM, EMAIL_FROM_NAME);
+        $mail->addAddress($to);
+        $mail->addReplyTo(EMAIL_REPLY_TO);
+        
+        // Content
+        $mail->isHTML(false);
+        $mail->Subject = $subject;
+        $mail->Body = $body;
+        
+        // Send email
+        $mail->send();
+        
+        // Log success
+        error_log("Email sent successfully to: " . $to);
+        return true;
+        
+    } catch (Exception $e) {
+        // Log error
+        error_log("Failed to send email to: " . $to . ". Error: " . $mail->ErrorInfo);
+        return false;
+    }
 }
 
 // Example usage (for testing)
