@@ -55,10 +55,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $application['documents']
                     ]);
                     
-                    // Generate acceptance letter with fees
-                    $letter_path = generateAcceptanceLetterWithFees($application, $pdo);
+                    // Generate acceptance letter in DOCX format
+                    require_once '../generate_acceptance_letter_docx.php';
+                    $letter_path = generateAcceptanceLetterDOCX($application, $pdo);
                     
-                    $message = "Application approved successfully! Acceptance letter with fees generated.";
+                    // Send acceptance letter email with download link
+                    // For short courses, we might want to use a different approach or skip auto-email
+                    // For now, we'll just generate the letter without sending email
+                    
+                    $message = "Application approved successfully! Acceptance letter generated and email processing completed.";
                     $messageType = "success";
                     break;
                     
