@@ -4,3 +4,5 @@ Lecturer	lecturer1@lsc.ac.zm	Lecturer@123
 Finance	finance@lsc.ac.zm	Finance@123
 Student	LSC000001	LSC000001
 Enrollment enrollment@lsc.ac.zm enrollment123
+
+#@adm1missions
