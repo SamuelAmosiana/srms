@@ -17,8 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     try {
         // Get programme ID (for short courses, we'll use a generic approach)
-        $stmt = $pdo->prepare("SELECT id FROM programme WHERE name LIKE ? LIMIT 1");
-        $stmt->execute(["%$course%"]);
+        $stmt = $pdo->prepare("SELECT id FROM programme WHERE id = ? AND category = 'short_course' LIMIT 1");
+        $stmt->execute([$course]);
         $programme = $stmt->fetch();
         $programme_id = $programme ? $programme['id'] : null;
         
@@ -49,6 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Exception $e) {
         $error = "There was an error submitting your enrollment. Please try again.";
     }
+}
+
+// Fetch only short course programmes
+try {
+    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE category = 'short_course' ORDER BY name");
+    $stmt->execute();
+    $programmes = $stmt->fetchAll();
+} catch (Exception $e) {
+    $programmes = [];
 }
 ?>
 <!DOCTYPE html>
@@ -243,12 +252,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="sc-course">Select Course *</label>
                     <select id="sc-course" name="course" required>
                         <option value="">Choose Course</option>
-                        <option value="digital-marketing">Digital Marketing & Social Media</option>
-                        <option value="project-management">Project Management Certification</option>
-                        <option value="computer-applications">Computer Applications (Microsoft Office)</option>
-                        <option value="financial-management">Financial Management & Accounting</option>
-                        <option value="leadership">Leadership & Management Skills</option>
-                        <option value="web-development">Web Development & Design</option>
+                        <?php foreach ($programmes as $prog): ?>
+                            <option value="<?php echo $prog['id']; ?>">
+                                <?php echo htmlspecialchars($prog['name'] . ' (' . $prog['code'] . ')'); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 

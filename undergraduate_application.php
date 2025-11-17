@@ -4,7 +4,7 @@ require 'config.php';
 // Fetch all programmes from the database
 // Showing all programmes as both certificate and diploma programmes are relevant for undergraduate applications
 try {
-    $stmt = $pdo->prepare("SELECT id, name, code FROM programme ORDER BY name");
+    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE category = 'undergraduate' ORDER BY name");
     $stmt->execute();
     $programmes = $stmt->fetchAll();
 } catch (Exception $e) {
@@ -49,6 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         // Get programme ID from the selected programme
         $programme_id = $program; // Now directly using the programme ID from the dropdown
+        
+        // Verify that the programme is an undergraduate programme
+        $stmt = $pdo->prepare("SELECT id FROM programme WHERE id = ? AND category = 'undergraduate' LIMIT 1");
+        $stmt->execute([$programme_id]);
+        $programme = $stmt->fetch();
+        
+        if (!$programme) {
+            throw new Exception("Invalid programme selection");
+        }
         
         // Get intake ID
         $stmt = $pdo->prepare("SELECT id FROM intake WHERE name LIKE ? LIMIT 1");

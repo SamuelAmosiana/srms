@@ -182,9 +182,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $school_id = $_POST['school_id'];
                 $duration = trim($_POST['duration']);
                 $description = trim($_POST['description']);
+                $category = $_POST['category']; // New field for programme category
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($school_id) || empty($duration)) {
+                if (empty($name) || empty($code) || empty($school_id) || empty($duration) || empty($category)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -203,8 +204,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                            if ($stmt->execute([$name, $code, $school_id, $duration, $description])) {
+                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, description, category, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                            if ($stmt->execute([$name, $code, $school_id, $duration, $description, $category])) {
                                 $message = "Programme added successfully!";
                                 $messageType = 'success';
                             } else {
@@ -226,9 +227,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $school_id = $_POST['school_id'];
                 $duration = trim($_POST['duration']);
                 $description = trim($_POST['description']);
+                $category = $_POST['category']; // New field for programme category
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($school_id) || empty($duration)) {
+                if (empty($name) || empty($code) || empty($school_id) || empty($duration) || empty($category)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -247,8 +249,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, code = ?, school_id = ?, duration = ?, description = ?, updated_at = NOW() WHERE id = ?");
-                            if ($stmt->execute([$name, $code, $school_id, $duration, $description, $id])) {
+                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, code = ?, school_id = ?, duration = ?, description = ?, category = ?, updated_at = NOW() WHERE id = ?");
+                            if ($stmt->execute([$name, $code, $school_id, $duration, $description, $category, $id])) {
                                 $message = "Programme updated successfully!";
                                 $messageType = 'success';
                             } else {
@@ -399,6 +401,8 @@ try {
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration INT");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    // Add category column for programme type
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS category ENUM('undergraduate', 'short_course') DEFAULT 'undergraduate'");
     
     // Add programme_id to course
     $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS programme_id INT");
@@ -697,6 +701,21 @@ try {
                     </div>
                     
                     <div class="form-row">
+                        <div class="form-group">
+                            <label for="category">Programme Category *</label>
+                            <select id="category" name="category" required>
+                                <option value="">-- Select Category --</option>
+                                <option value="undergraduate" <?php echo isset($editProgramme['category']) && $editProgramme['category'] == 'undergraduate' ? 'selected' : ''; ?>>Undergraduate</option>
+                                <option value="short_course" <?php echo isset($editProgramme['category']) && $editProgramme['category'] == 'short_course' ? 'selected' : ''; ?>>Short Course</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <!-- Empty div for spacing -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
                         <div class="form-group full-width">
                             <label for="description">Description</label>
                             <textarea id="description" name="description" rows="3" 
@@ -727,6 +746,13 @@ try {
                     <p class="department-code">Code: <?php echo htmlspecialchars($viewProgramme['code']); ?></p>
                     <p class="school-info">School: <?php echo htmlspecialchars($viewProgramme['school_name'] ?? 'N/A'); ?></p>
                     <p class="school-info">Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> Years</p>
+                    <p class="school-info">Category: 
+                        <?php if ($viewProgramme['category'] == 'undergraduate'): ?>
+                            <span class="count-badge green">Undergraduate</span>
+                        <?php else: ?>
+                            <span class="count-badge orange">Short Course</span>
+                        <?php endif; ?>
+                    </p>
                     <p class="school-description"><?php echo htmlspecialchars($viewProgramme['description'] ?? 'No description available'); ?></p>
                 </div>
                 <div class="school-actions">
@@ -901,6 +927,7 @@ try {
                                     <th>Name</th>
                                     <th>School</th>
                                     <th>Duration (Years)</th>
+                                    <th>Category</th>
                                     <th>Students</th>
                                     <th>Courses</th>
                                     <th>Actions</th>
@@ -914,6 +941,13 @@ try {
                                         <td><strong><?php echo htmlspecialchars($programme['name']); ?></strong></td>
                                         <td><?php echo htmlspecialchars($programme['school_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo $programme['duration']; ?></td>
+                                        <td>
+                                            <?php if ($programme['category'] == 'undergraduate'): ?>
+                                                <span class="count-badge green">Undergraduate</span>
+                                            <?php else: ?>
+                                                <span class="count-badge orange">Short Course</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><span class="count-badge green"><?php echo $programme['student_count']; ?></span></td>
                                         <td><span class="count-badge orange"><?php echo $programme['course_count']; ?></span></td>
                                         <td class="actions">
