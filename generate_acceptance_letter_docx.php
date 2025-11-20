@@ -161,7 +161,7 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     $download_link = "https://" . $_SERVER['HTTP_HOST'] . "/srms/download_letter.php?file=" . urlencode($letter_filename);
     
     // Create email content
-    $subject = "Admission Acceptance - LSC SRMS";
+    $subject = "Admission Acceptance - Lusaka South College";
     
     $body = "Dear " . $application['full_name'] . ",\n\n";
     $body .= "Congratulations! We are pleased to inform you that your application for admission has been accepted.\n\n";
@@ -210,11 +210,11 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     $body .= "Please proceed with the registration process as outlined in the student portal.\n";
     $body .= "Payment can be made at the Finance Office or through our online payment portal.\n\n";
     
-    $body .= "For any queries regarding fees, please contact the Finance Office at finance@lsc.edu.\n\n";
+    $body .= "For any queries regarding fees, please contact the Admissions Office at admissions@lsuczm.com.\n\n";
     $body .= "We look forward to welcoming you to LSC.\n\n";
     $body .= "Best regards,\n";
     $body .= "Admissions Office\n";
-    $body .= "LSC SRMS";
+    $body .= "Lusaka South College";
     
     // Try to use PHPMailer if available, otherwise fall back to mail()
     if ($phpmailer_available) {
