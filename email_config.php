@@ -1,24 +1,27 @@
+
+text/x-generic email_config.php ( PHP script, ASCII text, with CRLF line terminators )
 <?php
 /**
- * Email Configuration for Namecheap Hosting
- * 
- * This file contains the SMTP settings for sending emails through Namecheap's mail servers
+ * Email Configuration for Namecheap Hosting (LSUCLMS)
  */
 
-// Email configuration constants
-define('SMTP_HOST', '');
-define('SMTP_USERNAME', '');
-define('SMTP_PASSWORD', '');
-define('SMTP_PORT', 587);
-define('SMTP_SECURE', 'tls');
-define('EMAIL_FROM', '');
-define('EMAIL_FROM_NAME', 'LSC Admissions Office');
-define('EMAIL_REPLY_TO', '');
-define('PORTAL_URL', 'http://' . $_SERVER['HTTP_HOST'] . '/srms/login.php');
+// SMTP settings for enroll@lsuclms.com
+define('SMTP_HOST', 'lsuclms.com'); 
+define('SMTP_USERNAME', 'enroll@lsuclms.com');
+define('SMTP_PASSWORD', '****');  // Hidden for security purposes, replace with actual password
+define('SMTP_PORT', 465);          
+define('SMTP_SECURE', 'ssl');      
 
-// Test email function
+// Email metadata
+define('EMAIL_FROM', 'enroll@lsuclms.com');
+define('EMAIL_FROM_NAME', 'LSC Enrollment Office');
+define('EMAIL_REPLY_TO', 'enroll@lsuclms.com');
+
+// Portal URL
+define('PORTAL_URL', 'https://lsuclms.com/srms/login.php');
+
+// Test function
 function testEmailConfig() {
-    echo "Email Configuration:\n";
     echo "SMTP Host: " . SMTP_HOST . "\n";
     echo "SMTP Username: " . SMTP_USERNAME . "\n";
     echo "SMTP Port: " . SMTP_PORT . "\n";
@@ -26,7 +29,4 @@ function testEmailConfig() {
     echo "From Email: " . EMAIL_FROM . "\n";
     echo "From Name: " . EMAIL_FROM_NAME . "\n";
 }
-
-// Example usage (uncomment to test)
-// testEmailConfig();
 ?>

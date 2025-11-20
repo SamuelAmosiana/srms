@@ -18,7 +18,17 @@ $filepath = __DIR__ . '/letters/' . $filename;
 
 // Check if file exists
 if (!file_exists($filepath)) {
-    die('File not found.');
+    // Try to regenerate the letter if it doesn't exist
+    $file_parts = explode('_', $filename);
+    if (count($file_parts) >= 3 && $file_parts[0] === 'acceptance' && $file_parts[1] === 'letter') {
+        $application_id = (int)str_replace('.docx', '', $file_parts[2]);
+        if ($application_id > 0) {
+            // Redirect to regenerate script
+            header('Location: regenerate_letter.php?application_id=' . $application_id);
+            exit;
+        }
+    }
+    die('File not found. Please contact support.');
 }
 
 // Check file extension for security

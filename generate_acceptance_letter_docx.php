@@ -83,8 +83,14 @@ function generateAcceptanceLetterDOCX($application, $pdo) {
     }
     
     // Copy template to new file
-    $output_filename = 'acceptance_letter_' . $application['id'] . '_' . time() . '.docx';
+    // Use consistent naming per application to avoid broken links
+    $output_filename = 'acceptance_letter_' . $application['id'] . '.docx';
     $output_path = __DIR__ . '/letters/' . $output_filename;
+    
+    // Remove any existing letter for this application
+    if (file_exists($output_path)) {
+        unlink($output_path);
+    }
     
     if (!copy($template_path, $output_path)) {
         throw new Exception("Failed to copy template file");
