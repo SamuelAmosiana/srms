@@ -158,7 +158,7 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     
     // Generate download link
     $letter_filename = basename($letter_path);
-    $download_link = "http://" . $_SERVER['HTTP_HOST'] . "/srms/download_letter.php?file=" . urlencode($letter_filename);
+    $download_link = "https://" . $_SERVER['HTTP_HOST'] . "/srms/download_letter.php?file=" . urlencode($letter_filename);
     
     // Create email content
     $subject = "Admission Acceptance - LSC SRMS";
