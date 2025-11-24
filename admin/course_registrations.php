@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             case 'define_intake_courses':
                 $intake_id = $_POST['intake_id'];
                 $term = trim($_POST['term']);
+                $programme_id = $_POST['programme_id'] ?? null; // New field (optional for backward compatibility)
                 $course_ids = $_POST['course_ids'] ?? [];
                 
                 if (empty($intake_id) || empty($term)) {
@@ -73,14 +74,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = 'error';
                 } else {
                     try {
-                        // Delete existing courses for this intake/term
-                        $delete_stmt = $pdo->prepare("DELETE FROM intake_courses WHERE intake_id = ? AND term = ?");
-                        $delete_stmt->execute([$intake_id, $term]);
+                        // Check if programme_id column exists
+                        $column_exists = false;
+                        try {
+                            $check_column = $pdo->query("SHOW COLUMNS FROM intake_courses LIKE 'programme_id'");
+                            $column_exists = $check_column->rowCount() > 0;
+                        } catch (Exception $e) {
+                            $column_exists = false;
+                        }
                         
-                        // Add new courses
-                        foreach ($course_ids as $course_id) {
-                            $insert_stmt = $pdo->prepare("INSERT INTO intake_courses (intake_id, term, course_id) VALUES (?, ?, ?)");
-                            $insert_stmt->execute([$intake_id, $term, $course_id]);
+                        if ($column_exists) {
+                            // Delete existing courses for this intake/term (and programme if provided)
+                            if (!empty($programme_id)) {
+                                $delete_stmt = $pdo->prepare("DELETE FROM intake_courses WHERE intake_id = ? AND term = ? AND programme_id = ?");
+                                $delete_stmt->execute([$intake_id, $term, $programme_id]);
+                            } else {
+                                $delete_stmt = $pdo->prepare("DELETE FROM intake_courses WHERE intake_id = ? AND term = ? AND (programme_id IS NULL OR programme_id = ?)");
+                                $delete_stmt->execute([$intake_id, $term, 0]);
+                            }
+                            
+                            // Add new courses
+                            foreach ($course_ids as $course_id) {
+                                $insert_stmt = $pdo->prepare("INSERT INTO intake_courses (intake_id, term, programme_id, course_id) VALUES (?, ?, ?, ?)");
+                                $insert_stmt->execute([$intake_id, $term, $programme_id ?: null, $course_id]);
+                            }
+                        } else {
+                            // Use old method without programme_id
+                            $delete_stmt = $pdo->prepare("DELETE FROM intake_courses WHERE intake_id = ? AND term = ?");
+                            $delete_stmt->execute([$intake_id, $term]);
+                            
+                            // Add new courses
+                            foreach ($course_ids as $course_id) {
+                                $insert_stmt = $pdo->prepare("INSERT INTO intake_courses (intake_id, term, course_id) VALUES (?, ?, ?)");
+                                $insert_stmt->execute([$intake_id, $term, $course_id]);
+                            }
                         }
                         
                         $message = "Courses defined for intake and term successfully!";
@@ -110,20 +137,37 @@ $pending_registrations = $pdo->query($pending_query)->fetchAll();
 // Get intakes for defining courses
 $intakes = $pdo->query("SELECT * FROM intake ORDER BY start_date DESC")->fetchAll();
 
+// Get all programmes for the dropdown
+$programmes = $pdo->query("SELECT * FROM programme ORDER BY name")->fetchAll();
+
 // Get all courses for selection
 $courses = $pdo->query("SELECT * FROM course ORDER BY name")->fetchAll();
 
-// Get defined intake courses (for display or edit)
-$defined_courses_query = "
-    SELECT ic.*, i.name as intake_name, c.name as course_name
-    FROM intake_courses ic
-    JOIN intake i ON ic.intake_id = i.id
-    JOIN course c ON ic.course_id = c.id
-    ORDER BY i.name, ic.term, c.name
-";
-$defined_courses = $pdo->query($defined_courses_query)->fetchAll();
+// Get defined intake courses (for display or edit) - handle both old and new schema
+try {
+    // Try to get data with programme information first
+    $defined_courses_query = "
+        SELECT ic.*, i.name as intake_name, c.name as course_name, p.name as programme_name
+        FROM intake_courses ic
+        JOIN intake i ON ic.intake_id = i.id
+        JOIN course c ON ic.course_id = c.id
+        LEFT JOIN programme p ON ic.programme_id = p.id
+        ORDER BY i.name, ic.term, p.name, c.name
+    ";
+    $defined_courses = $pdo->query($defined_courses_query)->fetchAll();
+} catch (Exception $e) {
+    // Fall back to old query without programme information
+    $defined_courses_query = "
+        SELECT ic.*, i.name as intake_name, c.name as course_name, NULL as programme_name
+        FROM intake_courses ic
+        JOIN intake i ON ic.intake_id = i.id
+        JOIN course c ON ic.course_id = c.id
+        ORDER BY i.name, ic.term, c.name
+    ";
+    $defined_courses = $pdo->query($defined_courses_query)->fetchAll();
+}
 
-// Create necessary tables if not exist
+// Create necessary tables if not exist and update schema
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS course_registration (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -145,6 +189,14 @@ try {
         FOREIGN KEY (intake_id) REFERENCES intake(id),
         FOREIGN KEY (course_id) REFERENCES course(id)
     )");
+    
+    // Try to add programme_id column if it doesn't exist
+    try {
+        $pdo->exec("ALTER TABLE intake_courses ADD COLUMN programme_id INT");
+        $pdo->exec("ALTER TABLE intake_courses ADD CONSTRAINT fk_intake_courses_programme FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL");
+    } catch (Exception $e) {
+        // Column might already exist, which is fine
+    }
 } catch (Exception $e) {
     // Tables might already exist
 }
@@ -366,6 +418,15 @@ try {
                         </div>
                     </div>
                     <div class="form-group">
+                        <label for="programme_id">Programme</label>
+                        <select id="programme_id" name="programme_id">
+                            <option value="">-- Select Programme --</option>
+                            <?php foreach ($programmes as $programme): ?>
+                                <option value="<?php echo $programme['id']; ?>"><?php echo htmlspecialchars($programme['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Courses *</label>
                         <div class="checkbox-list">
                             <?php foreach ($courses as $course): ?>
@@ -399,6 +460,7 @@ try {
                                 <tr>
                                     <th>Intake</th>
                                     <th>Term</th>
+                                    <th>Programme</th>
                                     <th>Course</th>
                                 </tr>
                             </thead>
@@ -407,6 +469,7 @@ try {
                                     <tr>
                                         <td><?php echo htmlspecialchars($dc['intake_name']); ?></td>
                                         <td><?php echo htmlspecialchars($dc['term']); ?></td>
+                                        <td><?php echo htmlspecialchars($dc['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($dc['course_name']); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
