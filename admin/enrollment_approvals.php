@@ -2,6 +2,7 @@
 session_start();
 require_once '../config.php';
 require_once '../auth.php';
+require_once '../send_temporary_credentials.php';
 
 // Include the new acceptance letter with fees function
 require_once '../finance/generate_acceptance_letter_with_fees.php';
@@ -30,61 +31,54 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
-            case 'approve_application':
+            case 'approve':
                 $application_id = $_POST['application_id'];
                 
                 try {
                     // Get application details
-                    $app_stmt = $pdo->prepare("
-                        SELECT a.*, p.name as programme_name, i.name as intake_name, p.id as programme_id
-                        FROM applications a
-                        LEFT JOIN programme p ON a.programme_id = p.id
-                        LEFT JOIN intake i ON a.intake_id = i.id
-                        WHERE a.id = ?
-                    ");
-                    $app_stmt->execute([$application_id]);
-                    $application = $app_stmt->fetch();
-                    
-                    // Update application status
-                    $stmt = $pdo->prepare("UPDATE applications SET status = 'approved' WHERE id = ?");
+                    $stmt = $pdo->prepare("SELECT * FROM applications WHERE id = ?");
                     $stmt->execute([$application_id]);
+                    $application = $stmt->fetch();
                     
-                    // Add to awaiting registration
-                    $pending_stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, documents, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $pending_stmt->execute([
-                        $application['full_name'],
-                        $application['email'],
-                        $application['programme_id'],
-                        $application['intake_id'],
-                        $application['documents']
-                    ]);
-                    
-                    // Generate acceptance letter with fees
-                    $letter_path = generateAcceptanceLetterWithFees($application, $pdo);
-                    
-                    // Send email with attachment (placeholder)
-                    $to = $application['email'];
-                    $subject = 'Application Approved - LSC SRMS';
-                    $body = "Dear {$application['full_name']},
-
-Congratulations! Your application has been approved. Please find your acceptance letter with fee structure attached.
-
-Best regards,
-LSC SRMS Admissions";
-                    // Use PHPMailer or similar in production:
-                    // $mailer = new PHPMailer();
-                    // $mailer->addAttachment($letter_path);
-                    // $mailer->send($to, $subject, $body);
-                    
-                    $message = "Application approved! Acceptance letter with fees generated and email sent. <a href='$letter_path' target='_blank'>Download Letter</a>";
-                    $messageType = 'success';
+                    if ($application) {
+                        // Generate temporary password
+                        $temp_password = generateTemporaryPassword();
+                        
+                        // Move application to pending_students table
+                        $stmt = $pdo->prepare("INSERT INTO pending_students 
+                            (full_name, email, contact, NRC, gender, programme_id, intake_id, temp_password, status, created_at) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'accepted', NOW())");
+                        $stmt->execute([
+                            $application['full_name'],
+                            $application['email'],
+                            $application['phone'],
+                            $application['nrc'],
+                            $application['gender'],
+                            $application['programme_id'],
+                            $application['intake_id'],
+                            $temp_password
+                        ]);
+                        
+                        // Delete from applications table
+                        $stmt = $pdo->prepare("DELETE FROM applications WHERE id = ?");
+                        $stmt->execute([$application_id]);
+                        
+                        // Send email with temporary credentials
+                        sendTemporaryCredentialsEmail($application['email'], $application['full_name'], $application['email'], $temp_password);
+                        
+                        $message = "Application approved successfully! Temporary credentials have been sent to the student.";
+                        $messageType = 'success';
+                    } else {
+                        $message = "Application not found!";
+                        $messageType = 'error';
+                    }
                 } catch (Exception $e) {
                     $message = "Error: " . $e->getMessage();
                     $messageType = 'error';
                 }
                 break;
-                
-            case 'reject_application':
+
+            case 'reject':
                 $application_id = $_POST['application_id'];
                 $rejection_reason = trim($_POST['rejection_reason']);
                 
@@ -98,9 +92,9 @@ LSC SRMS Admissions";
                         $stmt->execute([$rejection_reason, $application_id]);
                         
                         // Get application details
-                        $app_stmt = $pdo->prepare("SELECT * FROM applications WHERE id = ?");
-                        $app_stmt->execute([$application_id]);
-                        $application = $app_stmt->fetch();
+                        $stmt = $pdo->prepare("SELECT * FROM applications WHERE id = ?");
+                        $stmt->execute([$application_id]);
+                        $application = $stmt->fetch();
                         
                         // Send email
                         $to = $application['email'];
@@ -129,76 +123,16 @@ LSC SRMS Admissions";
 }
 
 // Get pending applications
-$pending_query = "
+$stmt = $pdo->prepare("
     SELECT a.*, p.name as programme_name, i.name as intake_name
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'pending'
     ORDER BY a.created_at DESC
-";
-$pending_applications = $pdo->query($pending_query)->fetchAll();
-
-// Get enrollment history (monthly)
-$history_query = "
-    SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count
-    FROM applications
-    WHERE status = 'approved'
-    GROUP BY month
-    ORDER BY month DESC
-";
-$enrollment_history = $pdo->query($history_query)->fetchAll();
-
-// Get awaiting registration students
-$awaiting_query = "
-    SELECT ps.*, p.name as programme_name, i.name as intake_name
-    FROM pending_students ps
-    LEFT JOIN programme p ON ps.programme_id = p.id
-    LEFT JOIN intake i ON ps.intake_id = i.id
-    ORDER BY ps.created_at DESC
-";
-$awaiting_students = $pdo->query($awaiting_query)->fetchAll();
-
-// Get enrollment officer statistics for commission tracking
-$officer_stats_query = "
-    SELECT 
-        u.id as officer_id,
-        COALESCE(sp.full_name, u.username) as officer_name,
-        sp.staff_id,
-        COUNT(CASE WHEN a.status = 'approved' THEN 1 END) as approved_count,
-        COUNT(CASE WHEN a.status = 'rejected' THEN 1 END) as rejected_count,
-        COUNT(a.id) as total_processed,
-        DATE_FORMAT(MAX(a.updated_at), '%Y-%m-%d') as last_activity
-    FROM users u
-    JOIN user_roles ur ON u.id = ur.user_id
-    JOIN roles r ON ur.role_id = r.id
-    LEFT JOIN staff_profile sp ON u.id = sp.user_id
-    LEFT JOIN applications a ON u.id = a.processed_by
-    WHERE r.name = 'Enrollment Officer'
-    GROUP BY u.id, sp.full_name, u.username, sp.staff_id
-    ORDER BY total_processed DESC
-";
-$officer_statistics = $pdo->query($officer_stats_query)->fetchAll();
-
-// Get monthly statistics by officer
-$monthly_officer_stats_query = "
-    SELECT 
-        u.id as officer_id,
-        COALESCE(sp.full_name, u.username) as officer_name,
-        DATE_FORMAT(a.updated_at, '%Y-%m') as month,
-        COUNT(CASE WHEN a.status = 'approved' THEN 1 END) as approved_count,
-        COUNT(CASE WHEN a.status = 'rejected' THEN 1 END) as rejected_count,
-        COUNT(a.id) as total_processed
-    FROM users u
-    JOIN user_roles ur ON u.id = ur.user_id
-    JOIN roles r ON ur.role_id = r.id
-    LEFT JOIN staff_profile sp ON u.id = sp.user_id
-    LEFT JOIN applications a ON u.id = a.processed_by
-    WHERE r.name = 'Enrollment Officer' AND a.updated_at IS NOT NULL
-    GROUP BY u.id, sp.full_name, u.username, DATE_FORMAT(a.updated_at, '%Y-%m')
-    ORDER BY month DESC, total_processed DESC
-";
-$monthly_officer_statistics = $pdo->query($monthly_officer_stats_query)->fetchAll();
+");
+$stmt->execute();
+$pending_applications = $stmt->fetchAll();
 
 // Create necessary tables if not exist
 try {
@@ -206,9 +140,11 @@ try {
         id INT AUTO_INCREMENT PRIMARY KEY,
         full_name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
+        phone VARCHAR(255),
+        nrc VARCHAR(255),
+        gender ENUM('male', 'female', 'other'),
         programme_id INT,
         intake_id INT,
-        documents TEXT,
         status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
         rejection_reason TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -220,13 +156,28 @@ try {
         id INT AUTO_INCREMENT PRIMARY KEY,
         full_name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
+        contact VARCHAR(255),
+        NRC VARCHAR(255),
+        gender ENUM('male', 'female', 'other'),
         programme_id INT,
         intake_id INT,
-        documents TEXT,
+        temp_password VARCHAR(255),
+        status ENUM('accepted', 'declined') DEFAULT 'accepted',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 } catch (Exception $e) {
     // Tables might already exist
+}
+
+// Add this function at the end of the file before the closing PHP tag
+function generateTemporaryPassword($length = 8) {
+    $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $charactersLength = strlen($characters);
+    $randomString = '';
+    for ($i = 0; $i < $length; $i++) {
+        $randomString .= $characters[rand(0, $charactersLength - 1)];
+    }
+    return $randomString;
 }
 ?>
 <!DOCTYPE html>
@@ -429,178 +380,6 @@ try {
             </div>
         </div>
 
-        <!-- Awaiting Registration -->
-        <div class="data-panel">
-            <div class="panel-header">
-                <h3><i class="fas fa-user-plus"></i> Awaiting Registration (<?php echo count($awaiting_students); ?>)</h3>
-            </div>
-            <div class="panel-content">
-                <?php if (empty($awaiting_students)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-user-plus"></i>
-                        <p>No students awaiting registration</p>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Programme</th>
-                                    <th>Intake</th>
-                                    <th>Approved</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($awaiting_students as $student): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($student['full_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['email']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['programme_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['intake_name']); ?></td>
-                                        <td><?php echo date('Y-m-d', strtotime($student['created_at'])); ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Enrollment History -->
-        <div class="data-panel">
-            <div class="panel-header">
-                <h3><i class="fas fa-history"></i> Enrollment History (Monthly)</h3>
-            </div>
-            <div class="panel-content">
-                <?php if (empty($enrollment_history)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-history"></i>
-                        <p>No enrollment history</p>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Month</th>
-                                    <th>Enrollments</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($enrollment_history as $history): ?>
-                                    <tr>
-                                        <td><?php echo $history['month']; ?></td>
-                                        <td><?php echo $history['count']; ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Enrollment Officer Performance for Commission Tracking -->
-        <div class="data-panel">
-            <div class="panel-header">
-                <h3><i class="fas fa-chart-line"></i> Enrollment Officer Performance (Commission Tracking)</h3>
-            </div>
-            <div class="panel-content">
-                <?php if (empty($officer_statistics)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-users"></i>
-                        <p>No enrollment officers found</p>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Officer Name</th>
-                                    <th>Staff ID</th>
-                                    <th>Approved</th>
-                                    <th>Rejected</th>
-                                    <th>Total Processed</th>
-                                    <th>Approval Rate</th>
-                                    <th>Last Activity</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($officer_statistics as $stats): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($stats['officer_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($stats['staff_id'] ?? 'N/A'); ?></td>
-                                        <td><?php echo number_format($stats['approved_count']); ?></td>
-                                        <td><?php echo number_format($stats['rejected_count']); ?></td>
-                                        <td><?php echo number_format($stats['total_processed']); ?></td>
-                                        <td>
-                                            <?php 
-                                            $approval_rate = $stats['total_processed'] > 0 ? 
-                                                round(($stats['approved_count'] / $stats['total_processed']) * 100, 2) : 0;
-                                            echo $approval_rate . '%';
-                                            ?>
-                                        </td>
-                                        <td><?php echo $stats['last_activity'] ?? 'Never'; ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Monthly Performance by Officer -->
-        <div class="data-panel">
-            <div class="panel-header">
-                <h3><i class="fas fa-calendar-alt"></i> Monthly Performance by Officer</h3>
-            </div>
-            <div class="panel-content">
-                <?php if (empty($monthly_officer_statistics)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-calendar-alt"></i>
-                        <p>No monthly performance data</p>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Month</th>
-                                    <th>Officer Name</th>
-                                    <th>Approved</th>
-                                    <th>Rejected</th>
-                                    <th>Total Processed</th>
-                                    <th>Approval Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($monthly_officer_statistics as $stats): ?>
-                                    <tr>
-                                        <td><?php echo $stats['month']; ?></td>
-                                        <td><?php echo htmlspecialchars($stats['officer_name']); ?></td>
-                                        <td><?php echo number_format($stats['approved_count']); ?></td>
-                                        <td><?php echo number_format($stats['rejected_count']); ?></td>
-                                        <td><?php echo number_format($stats['total_processed']); ?></td>
-                                        <td>
-                                            <?php 
-                                            $approval_rate = $stats['total_processed'] > 0 ? 
-                                                round(($stats['approved_count'] / $stats['total_processed']) * 100, 2) : 0;
-                                            echo $approval_rate . '%';
-                                            ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
     </main>
 
     <!-- View Application Modal -->
@@ -623,7 +402,7 @@ try {
             </div>
             <div class="modal-footer">
                 <form method="POST" id="approveForm">
-                    <input type="hidden" name="action" value="approve_application">
+                    <input type="hidden" name="action" value="approve">
                     <input type="hidden" id="approve_id" name="application_id">
                     <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Approve</button>
                 </form>
@@ -640,7 +419,7 @@ try {
                 <span class="close" onclick="closeModal('rejectModal')">&times;</span>
             </div>
             <form method="POST">
-                <input type="hidden" name="action" value="reject_application">
+                <input type="hidden" name="action" value="reject">
                 <input type="hidden" id="reject_id" name="application_id">
                 <div class="modal-body">
                     <div class="form-group">

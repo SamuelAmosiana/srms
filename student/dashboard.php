@@ -1,19 +1,24 @@
 <?php
-require '../config.php';
-require '../auth.php';
+session_start();
+require_once '../config.php';
+require_once '../auth.php';
 
 // Check if user is logged in and has student role
-if (!currentUserId()) {
-    header('Location: ../login.php');
-    exit;
+if (!currentUserId() || !currentUserHasRole('Student', $pdo)) {
+    header('Location: ../student_login.php');
+    exit();
 }
 
-requireRole('Student', $pdo);
-
 // Get student profile
-$stmt = $pdo->prepare("SELECT sp.full_name, sp.student_number, sp.balance FROM student_profile sp WHERE sp.user_id = ?");
+$stmt = $pdo->prepare("SELECT sp.*, u.email, u.contact, p.name as programme_name, i.name as intake_name FROM student_profile sp JOIN users u ON sp.user_id = u.id LEFT JOIN programme p ON sp.programme_id = p.id LEFT JOIN intake i ON sp.intake_id = i.id WHERE sp.user_id = ?");
 $stmt->execute([currentUserId()]);
 $student = $stmt->fetch();
+
+if (!$student) {
+    // Student profile not found
+    header('Location: ../student_login.php');
+    exit();
+}
 
 // Get dashboard statistics
 $stats = [];
