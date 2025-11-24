@@ -118,36 +118,100 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
                 }
                 break;
+                
+            case 'delete_defined_course':
+                $defined_course_id = $_POST['defined_course_id'];
+                
+                try {
+                    $stmt = $pdo->prepare("DELETE FROM intake_courses WHERE id = ?");
+                    $stmt->execute([$defined_course_id]);
+                    
+                    $message = "Defined course deleted successfully!";
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
+            case 'update_defined_course':
+                $defined_course_id = $_POST['defined_course_id'];
+                $intake_id = $_POST['edit_intake_id'];
+                $term = trim($_POST['edit_term']);
+                $programme_id = $_POST['edit_programme_id'] ?? null;
+                $course_id = $_POST['edit_course_id'];
+                
+                try {
+                    // Check if programme_id column exists
+                    $column_exists = false;
+                    try {
+                        $check_column = $pdo->query("SHOW COLUMNS FROM intake_courses LIKE 'programme_id'");
+                        $column_exists = $check_column->rowCount() > 0;
+                    } catch (Exception $e) {
+                        $column_exists = false;
+                    }
+                    
+                    if ($column_exists) {
+                        $stmt = $pdo->prepare("UPDATE intake_courses SET intake_id = ?, term = ?, programme_id = ?, course_id = ? WHERE id = ?");
+                        $stmt->execute([$intake_id, $term, $programme_id ?: null, $course_id, $defined_course_id]);
+                    } else {
+                        $stmt = $pdo->prepare("UPDATE intake_courses SET intake_id = ?, term = ?, course_id = ? WHERE id = ?");
+                        $stmt->execute([$intake_id, $term, $course_id, $defined_course_id]);
+                    }
+                    
+                    $message = "Defined course updated successfully!";
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
         }
     }
 }
 
 // Get pending registrations
-$pending_query = "
-    SELECT cr.*, sp.full_name, sp.student_number as student_id, c.name as course_name, i.name as intake_name
-    FROM course_registration cr
-    JOIN student_profile sp ON cr.student_id = sp.user_id
-    JOIN course c ON cr.course_id = c.id
-    JOIN intake i ON sp.intake_id = i.id
-    WHERE cr.status = 'pending'
-    ORDER BY cr.submitted_at DESC
-";
-$pending_registrations = $pdo->query($pending_query)->fetchAll();
+try {
+    $pending_query = "
+        SELECT cr.*, sp.full_name, sp.student_number as student_id, c.name as course_name, i.name as intake_name
+        FROM course_registration cr
+        JOIN student_profile sp ON cr.student_id = sp.user_id
+        JOIN course c ON cr.course_id = c.id
+        JOIN intake i ON sp.intake_id = i.id
+        WHERE cr.status = 'pending'
+        ORDER BY cr.submitted_at DESC
+    ";
+    $pending_registrations = $pdo->query($pending_query)->fetchAll();
+} catch (Exception $e) {
+    $pending_registrations = [];
+}
 
 // Get intakes for defining courses
-$intakes = $pdo->query("SELECT * FROM intake ORDER BY start_date DESC")->fetchAll();
+try {
+    $intakes = $pdo->query("SELECT * FROM intake ORDER BY start_date DESC")->fetchAll();
+} catch (Exception $e) {
+    $intakes = [];
+}
 
 // Get all programmes for the dropdown
-$programmes = $pdo->query("SELECT * FROM programme ORDER BY name")->fetchAll();
+try {
+    $programmes = $pdo->query("SELECT * FROM programme ORDER BY name")->fetchAll();
+} catch (Exception $e) {
+    $programmes = [];
+}
 
 // Get all courses for selection
-$courses = $pdo->query("SELECT * FROM course ORDER BY name")->fetchAll();
+try {
+    $courses = $pdo->query("SELECT * FROM course ORDER BY name")->fetchAll();
+} catch (Exception $e) {
+    $courses = [];
+}
 
 // Get defined intake courses (for display or edit) - handle both old and new schema
 try {
     // Try to get data with programme information first
     $defined_courses_query = "
-        SELECT ic.*, i.name as intake_name, c.name as course_name, p.name as programme_name
+        SELECT ic.*, i.name as intake_name, c.name as course_name, c.code as course_code, p.name as programme_name
         FROM intake_courses ic
         JOIN intake i ON ic.intake_id = i.id
         JOIN course c ON ic.course_id = c.id
@@ -157,14 +221,18 @@ try {
     $defined_courses = $pdo->query($defined_courses_query)->fetchAll();
 } catch (Exception $e) {
     // Fall back to old query without programme information
-    $defined_courses_query = "
-        SELECT ic.*, i.name as intake_name, c.name as course_name, NULL as programme_name
-        FROM intake_courses ic
-        JOIN intake i ON ic.intake_id = i.id
-        JOIN course c ON ic.course_id = c.id
-        ORDER BY i.name, ic.term, c.name
-    ";
-    $defined_courses = $pdo->query($defined_courses_query)->fetchAll();
+    try {
+        $defined_courses_query = "
+            SELECT ic.*, i.name as intake_name, c.name as course_name, c.code as course_code, NULL as programme_name
+            FROM intake_courses ic
+            JOIN intake i ON ic.intake_id = i.id
+            JOIN course c ON ic.course_id = c.id
+            ORDER BY i.name, ic.term, c.name
+        ";
+        $defined_courses = $pdo->query($defined_courses_query)->fetchAll();
+    } catch (Exception $e) {
+        $defined_courses = [];
+    }
 }
 
 // Create necessary tables if not exist and update schema
@@ -210,6 +278,113 @@ try {
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 5px;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+            flex: 1;
+        }
+        
+        .form-group.full-width {
+            flex: 1 100%;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-orange {
+            background-color: #fd7e14;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        .action-bar {
+            margin: 20px 0;
+        }
+        
+        .action-bar button {
+            margin-right: 10px;
+        }
+    </style>
 </head>
 <body class="admin-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -407,9 +582,11 @@ try {
                             <label for="intake_id">Intake *</label>
                             <select id="intake_id" name="intake_id" required>
                                 <option value="">-- Select Intake --</option>
-                                <?php foreach ($intakes as $intake): ?>
-                                    <option value="<?php echo $intake['id']; ?>"><?php echo htmlspecialchars($intake['name']); ?></option>
-                                <?php endforeach; ?>
+                                <?php if (!empty($intakes)): ?>
+                                    <?php foreach ($intakes as $intake): ?>
+                                        <option value="<?php echo $intake['id']; ?>"><?php echo htmlspecialchars($intake['name']); ?></option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </select>
                         </div>
                         <div class="form-group">
@@ -421,20 +598,24 @@ try {
                         <label for="programme_id">Programme</label>
                         <select id="programme_id" name="programme_id">
                             <option value="">-- Select Programme --</option>
-                            <?php foreach ($programmes as $programme): ?>
-                                <option value="<?php echo $programme['id']; ?>"><?php echo htmlspecialchars($programme['name']); ?></option>
-                            <?php endforeach; ?>
+                            <?php if (!empty($programmes)): ?>
+                                <?php foreach ($programmes as $programme): ?>
+                                    <option value="<?php echo $programme['id']; ?>"><?php echo htmlspecialchars($programme['name']); ?></option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Courses *</label>
                         <div class="checkbox-list">
-                            <?php foreach ($courses as $course): ?>
-                                <label>
-                                    <input type="checkbox" name="course_ids[]" value="<?php echo $course['id']; ?>">
-                                    <?php echo htmlspecialchars($course['name'] . ' (' . $course['code'] . ')'); ?>
-                                </label><br>
-                            <?php endforeach; ?>
+                            <?php if (!empty($courses)): ?>
+                                <?php foreach ($courses as $course): ?>
+                                    <label>
+                                        <input type="checkbox" name="course_ids[]" value="<?php echo $course['id']; ?>">
+                                        <?php echo htmlspecialchars($course['name'] . ' (' . $course['code'] . ')'); ?>
+                                    </label><br>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Courses</button>
@@ -446,6 +627,11 @@ try {
         <div class="data-panel">
             <div class="panel-header">
                 <h3><i class="fas fa-check-circle"></i> Defined Courses</h3>
+                <div class="panel-actions">
+                    <button class="btn btn-primary" onclick="document.getElementById('addDefinedCourseModal').style.display='block'">
+                        <i class="fas fa-plus"></i> Add Defined Course
+                    </button>
+                </div>
             </div>
             <div class="panel-content">
                 <?php if (empty($defined_courses)): ?>
@@ -462,6 +648,7 @@ try {
                                     <th>Term</th>
                                     <th>Programme</th>
                                     <th>Course</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -470,7 +657,15 @@ try {
                                         <td><?php echo htmlspecialchars($dc['intake_name']); ?></td>
                                         <td><?php echo htmlspecialchars($dc['term']); ?></td>
                                         <td><?php echo htmlspecialchars($dc['programme_name'] ?? 'N/A'); ?></td>
-                                        <td><?php echo htmlspecialchars($dc['course_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($dc['course_name'] . ' (' . $dc['course_code'] . ')'); ?></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-orange" onclick="editDefinedCourse(<?php echo $dc['id']; ?>, <?php echo $dc['intake_id']; ?>, '<?php echo htmlspecialchars($dc['term']); ?>', <?php echo $dc['programme_id'] ?? 'null'; ?>, <?php echo $dc['course_id']; ?>)">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteDefinedCourse(<?php echo $dc['id']; ?>)">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -498,6 +693,128 @@ try {
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('deleteModal')">&times;</span>
+            <h2>Confirm Delete</h2>
+            <p>Are you sure you want to delete this defined course?</p>
+            <form method="POST">
+                <input type="hidden" name="action" value="delete_defined_course">
+                <input type="hidden" id="delete_defined_course_id" name="defined_course_id">
+                <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editModal')">&times;</span>
+            <h2>Edit Defined Course</h2>
+            <form method="POST">
+                <input type="hidden" name="action" value="update_defined_course">
+                <input type="hidden" id="edit_defined_course_id" name="defined_course_id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit_intake_id">Intake *</label>
+                        <select id="edit_intake_id" name="edit_intake_id" required>
+                            <option value="">-- Select Intake --</option>
+                            <?php if (!empty($intakes)): ?>
+                                <?php foreach ($intakes as $intake): ?>
+                                    <option value="<?php echo $intake['id']; ?>"><?php echo htmlspecialchars($intake['name']); ?></option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_term">Term *</label>
+                        <input type="text" id="edit_term" name="edit_term" required placeholder="e.g., Semester 1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="edit_programme_id">Programme</label>
+                    <select id="edit_programme_id" name="edit_programme_id">
+                        <option value="">-- Select Programme --</option>
+                        <?php if (!empty($programmes)): ?>
+                            <?php foreach ($programmes as $programme): ?>
+                                <option value="<?php echo $programme['id']; ?>"><?php echo htmlspecialchars($programme['name']); ?></option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit_course_id">Course *</label>
+                    <select id="edit_course_id" name="edit_course_id" required>
+                        <option value="">-- Select Course --</option>
+                        <?php if (!empty($courses)): ?>
+                            <?php foreach ($courses as $course): ?>
+                                <option value="<?php echo $course['id']; ?>"><?php echo htmlspecialchars($course['name'] . ' (' . $course['code'] . ')'); ?></option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Course</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Defined Course Modal -->
+    <div id="addDefinedCourseModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addDefinedCourseModal')">&times;</span>
+            <h2>Add Defined Course</h2>
+            <form method="POST">
+                <input type="hidden" name="action" value="define_intake_courses">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="add_intake_id">Intake *</label>
+                        <select id="add_intake_id" name="intake_id" required>
+                            <option value="">-- Select Intake --</option>
+                            <?php if (!empty($intakes)): ?>
+                                <?php foreach ($intakes as $intake): ?>
+                                    <option value="<?php echo $intake['id']; ?>"><?php echo htmlspecialchars($intake['name']); ?></option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="add_term">Term *</label>
+                        <input type="text" id="add_term" name="term" required placeholder="e.g., Semester 1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="add_programme_id">Programme</label>
+                    <select id="add_programme_id" name="programme_id">
+                        <option value="">-- Select Programme --</option>
+                        <?php if (!empty($programmes)): ?>
+                            <?php foreach ($programmes as $programme): ?>
+                                <option value="<?php echo $programme['id']; ?>"><?php echo htmlspecialchars($programme['name']); ?></option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="add_course_ids">Courses *</label>
+                    <div class="checkbox-list">
+                        <?php if (!empty($courses)): ?>
+                            <?php foreach ($courses as $course): ?>
+                                <label>
+                                    <input type="checkbox" name="course_ids[]" value="<?php echo $course['id']; ?>">
+                                    <?php echo htmlspecialchars($course['name'] . ' (' . $course['code'] . ')'); ?>
+                                </label><br>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Course</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addDefinedCourseModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
         function openRejectModal(id) {
@@ -516,6 +833,20 @@ try {
                     modals[i].style.display = 'none';
                 }
             }
+        }
+        
+        function deleteDefinedCourse(id) {
+            document.getElementById('delete_defined_course_id').value = id;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        function editDefinedCourse(id, intakeId, term, programmeId, courseId) {
+            document.getElementById('edit_defined_course_id').value = id;
+            document.getElementById('edit_intake_id').value = intakeId;
+            document.getElementById('edit_term').value = term;
+            document.getElementById('edit_programme_id').value = programmeId || '';
+            document.getElementById('edit_course_id').value = courseId;
+            document.getElementById('editModal').style.display = 'block';
         }
     </script>
 </body>
