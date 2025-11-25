@@ -166,11 +166,61 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = 'error';
                 }
                 break;
+                
+            // New action to approve pending students (first-time registrations)
+            case 'approve_pending_student':
+                $pending_student_id = $_POST['pending_student_id'];
+                
+                try {
+                    // Get pending student details
+                    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE id = ?");
+                    $stmt->execute([$pending_student_id]);
+                    $pending_student = $stmt->fetch();
+                    
+                    if ($pending_student) {
+                        // Update registration status to approved
+                        $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'approved' WHERE id = ?");
+                        $stmt->execute([$pending_student_id]);
+                        
+                        $message = "Pending student registration approved successfully!";
+                        $messageType = 'success';
+                    } else {
+                        $message = "Pending student not found!";
+                        $messageType = 'error';
+                    }
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
+            // New action to reject pending students (first-time registrations)
+            case 'reject_pending_student':
+                $pending_student_id = $_POST['pending_student_id'];
+                $rejection_reason = trim($_POST['rejection_reason']);
+                
+                if (empty($rejection_reason)) {
+                    $message = "Please provide a rejection reason!";
+                    $messageType = 'error';
+                } else {
+                    try {
+                        // Update registration status to rejected
+                        $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'rejected', rejection_reason = ? WHERE id = ?");
+                        $stmt->execute([$rejection_reason, $pending_student_id]);
+                        
+                        $message = "Pending student registration rejected!";
+                        $messageType = 'success';
+                    } catch (Exception $e) {
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
         }
     }
 }
 
-// Get pending registrations
+// Get pending registrations (existing course registrations)
 try {
     $pending_query = "
         SELECT cr.*, sp.full_name, sp.student_number as student_id, c.name as course_name, i.name as intake_name
@@ -184,6 +234,21 @@ try {
     $pending_registrations = $pdo->query($pending_query)->fetchAll();
 } catch (Exception $e) {
     $pending_registrations = [];
+}
+
+// Get pending students (first-time registrations from approved applications)
+try {
+    $pending_students_query = "
+        SELECT ps.*, p.name as programme_name, i.name as intake_name
+        FROM pending_students ps
+        LEFT JOIN programme p ON ps.programme_id = p.id
+        LEFT JOIN intake i ON ps.intake_id = i.id
+        WHERE ps.registration_status = 'pending_approval'
+        ORDER BY ps.created_at DESC
+    ";
+    $pending_students = $pdo->query($pending_students_query)->fetchAll();
+} catch (Exception $e) {
+    $pending_students = [];
 }
 
 // Get intakes for defining courses
@@ -569,6 +634,62 @@ try {
             </div>
         </div>
 
+        <!-- Pending Students (First-Time Registrations) -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-user-graduate"></i> Pending Students (<?php echo count($pending_students); ?>)</h3>
+            </div>
+            <div class="panel-content">
+                <?php if (empty($pending_students)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-user-graduate"></i>
+                        <p>No pending students</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Payment Method</th>
+                                    <th>Amount</th>
+                                    <th>Submitted</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($pending_students as $student): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['programme_name'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($student['intake_name'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($student['payment_method'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($student['payment_amount'] ?? 'N/A'); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($student['created_at'])); ?></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-info" onclick="viewPaymentProof(<?php echo $student['id']; ?>, '<?php echo htmlspecialchars($student['payment_proof'] ?? ''); ?>')">
+                                                <i class="fas fa-receipt"></i> View Proof
+                                            </button>
+                                            <form method="POST" style="display: inline;" onsubmit="return confirm('Approve this student registration?');">
+                                                <input type="hidden" name="action" value="approve_pending_student">
+                                                <input type="hidden" name="pending_student_id" value="<?php echo $student['id']; ?>">
+                                                <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approve</button>
+                                            </form>
+                                            <button class="btn btn-sm btn-danger" onclick="openStudentRejectModal(<?php echo $student['id']; ?>)"><i class="fas fa-times"></i> Reject</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- Define Intake Courses -->
         <div class="data-panel">
             <div class="panel-header">
@@ -814,6 +935,23 @@ try {
             </form>
         </div>
     </div>
+    
+    <!-- Student Reject Modal -->
+    <div id="studentRejectModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('studentRejectModal')">&times;</span>
+            <h2>Reject Student Registration</h2>
+            <form method="POST">
+                <input type="hidden" name="action" value="reject_pending_student">
+                <input type="hidden" id="reject_student_id" name="pending_student_id">
+                <div class="form-group">
+                    <label for="student_rejection_reason">Rejection Reason</label>
+                    <textarea id="student_rejection_reason" name="rejection_reason" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-danger">Reject</button>
+            </form>
+        </div>
+    </div>
 
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
@@ -847,6 +985,22 @@ try {
             document.getElementById('edit_programme_id').value = programmeId || '';
             document.getElementById('edit_course_id').value = courseId;
             document.getElementById('editModal').style.display = 'block';
+        }
+        
+        // New functions for student rejection modal
+        function openStudentRejectModal(id) {
+            document.getElementById('reject_student_id').value = id;
+            document.getElementById('studentRejectModal').style.display = 'block';
+        }
+        
+        // Function to view payment proof
+        function viewPaymentProof(studentId, proofPath) {
+            if (proofPath) {
+                // Open the payment proof in a new window/tab
+                window.open('../' + proofPath, '_blank');
+            } else {
+                alert('No payment proof available for this student.');
+            }
         }
     </script>
 </body>

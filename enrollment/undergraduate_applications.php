@@ -45,8 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("UPDATE applications SET status = 'approved', processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([$current_user_id, $application_id]);
                     
-                    // Add to awaiting registration
-                    $pending_stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, documents, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                    // Add to pending_students for course registration approval
+                    // Set registration_status to 'pending_approval' so it appears in the admin panel
+                    $pending_stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, documents, created_at, registration_status) VALUES (?, ?, ?, ?, ?, NOW(), 'pending_approval')");
                     $pending_stmt->execute([
                         $application['full_name'],
                         $application['email'],

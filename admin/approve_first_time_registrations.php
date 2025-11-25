@@ -33,61 +33,85 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 try {
                     // Get pending student details
-                    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE id = ?");
+                    $stmt = $pdo->prepare("
+                        SELECT ps.*, p.name as programme_name, i.name as intake_name 
+                        FROM pending_students ps 
+                        LEFT JOIN programme p ON ps.programme_id = p.id 
+                        LEFT JOIN intake i ON ps.intake_id = i.id 
+                        WHERE ps.id = ?
+                    ");
                     $stmt->execute([$pending_student_id]);
                     $pending_student = $stmt->fetch();
                     
-                    if ($pending_student) {
-                        // Generate student number
-                        $student_number = generateStudentNumber($pdo);
-                        
-                        // Generate a secure password
-                        $password = generateSecurePassword();
-                        $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                        
+                    if (!$pending_student) {
+                        throw new Exception("Pending student not found!");
+                    }
+                    
+                    // Generate student number
+                    $student_number = generateStudentNumber($pdo);
+                    
+                    // Generate temporary password
+                    $temp_password = 'LSC@' . date('Y') . rand(1000, 9999);
+                    $hashed_password = password_hash($temp_password, PASSWORD_DEFAULT);
+                    
+                    // Update pending student with student number and approved status
+                    $stmt = $pdo->prepare("UPDATE pending_students SET student_number = ?, temp_password = ?, registration_status = 'approved', updated_at = NOW() WHERE id = ?");
+                    $stmt->execute([$student_number, $hashed_password, $pending_student_id]);
+                    
+                    // Create user account
+                    $pdo->beginTransaction();
+                    
+                    try {
                         // Create user account
-                        $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, email, contact, is_active) VALUES (?, ?, ?, ?, 1)");
-                        $stmt->execute([$student_number, $password_hash, $pending_student['email'], $pending_student['contact']]);
+                        $user_stmt = $pdo->prepare("INSERT INTO users (username, password_hash, email, contact, is_active) VALUES (?, ?, ?, ?, 1)");
+                        $user_stmt->execute([
+                            $student_number,
+                            $hashed_password,
+                            $pending_student['email'],
+                            '' // No contact info available
+                        ]);
+                        
                         $user_id = $pdo->lastInsertId();
                         
+                        // Assign student role
+                        $role_stmt = $pdo->prepare("SELECT id FROM roles WHERE name = 'Student'");
+                        $role_stmt->execute();
+                        $student_role = $role_stmt->fetch();
+                        
+                        if ($student_role) {
+                            $user_role_stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
+                            $user_role_stmt->execute([$user_id, $student_role['id']]);
+                        }
+                        
                         // Create student profile
-                        $stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, NRC, gender, programme_id, intake_id, balance) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
-                        $stmt->execute([
-                            $user_id, 
-                            $pending_student['full_name'], 
-                            $student_number, 
-                            $pending_student['NRC'], 
-                            $pending_student['gender'], 
-                            $pending_student['programme_id'], 
+                        $profile_stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, programme_id, intake_id) VALUES (?, ?, ?, ?, ?)");
+                        $profile_stmt->execute([
+                            $user_id,
+                            $pending_student['full_name'],
+                            $student_number,
+                            $pending_student['programme_id'],
                             $pending_student['intake_id']
                         ]);
                         
-                        // Assign student role
-                        $stmt = $pdo->prepare("SELECT id FROM roles WHERE name = 'Student'");
-                        $stmt->execute();
-                        $student_role = $stmt->fetch();
+                        $pdo->commit();
                         
-                        if ($student_role) {
-                            $stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
-                            $stmt->execute([$user_id, $student_role['id']]);
-                        }
+                        // Send registration confirmation email
+                        sendRegistrationConfirmationEmail(
+                            $pending_student['email'],
+                            $pending_student['full_name'],
+                            $student_number,
+                            $temp_password
+                        );
                         
-                        // Update pending student status
-                        $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'approved', student_number = ? WHERE id = ?");
-                        $stmt->execute([$student_number, $pending_student_id]);
-                        
-                        // Send confirmation email with student number and credentials
-                        sendRegistrationConfirmationEmail($pending_student['email'], $pending_student['full_name'], $student_number, $password);
-                        
-                        $message = "Student registration approved successfully! Confirmation email sent to student.";
-                        $messageType = 'success';
-                    } else {
-                        $message = "Pending student not found!";
-                        $messageType = 'error';
+                        $message = "Registration approved successfully! Student account created and email sent.";
+                        $messageType = "success";
+                    } catch (Exception $e) {
+                        $pdo->rollBack();
+                        throw new Exception("Failed to create student account: " . $e->getMessage());
                     }
                 } catch (Exception $e) {
                     $message = "Error: " . $e->getMessage();
-                    $messageType = 'error';
+                    $messageType = "error";
                 }
                 break;
                 
@@ -95,31 +119,73 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $pending_student_id = $_POST['pending_student_id'];
                 $rejection_reason = trim($_POST['rejection_reason']);
                 
-                try {
-                    $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'rejected', rejection_reason = ? WHERE id = ?");
-                    $stmt->execute([$rejection_reason, $pending_student_id]);
-                    
-                    $message = "Student registration rejected!";
-                    $messageType = 'success';
-                } catch (Exception $e) {
-                    $message = "Error: " . $e->getMessage();
-                    $messageType = 'error';
+                if (empty($rejection_reason)) {
+                    $message = "Please provide a rejection reason!";
+                    $messageType = "error";
+                } else {
+                    try {
+                        $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'rejected', rejection_reason = ?, updated_at = NOW() WHERE id = ?");
+                        $stmt->execute([$rejection_reason, $pending_student_id]);
+                        
+                        $message = "Registration rejected successfully!";
+                        $messageType = "success";
+                    } catch (Exception $e) {
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = "error";
+                    }
                 }
                 break;
         }
     }
 }
 
-// Get pending registrations
-$pending_registrations_query = "
-    SELECT ps.*, p.name as programme_name, i.name as intake_name
-    FROM pending_students ps
-    LEFT JOIN programme p ON ps.programme_id = p.id
-    LEFT JOIN intake i ON ps.intake_id = i.id
-    WHERE ps.registration_status = 'pending_approval'
-    ORDER BY ps.created_at DESC
-";
-$pending_registrations = $pdo->query($pending_registrations_query)->fetchAll();
+// Get pending registrations with 'pending_approval' status
+try {
+    $stmt = $pdo->prepare("
+        SELECT ps.*, p.name as programme_name, i.name as intake_name 
+        FROM pending_students ps 
+        LEFT JOIN programme p ON ps.programme_id = p.id 
+        LEFT JOIN intake i ON ps.intake_id = i.id 
+        WHERE ps.registration_status = 'pending_approval' 
+        ORDER BY ps.created_at DESC
+    ");
+    $stmt->execute();
+    $pending_registrations = $stmt->fetchAll();
+} catch (Exception $e) {
+    $pending_registrations = [];
+}
+
+// Get approved registrations
+try {
+    $stmt = $pdo->prepare("
+        SELECT ps.*, p.name as programme_name, i.name as intake_name 
+        FROM pending_students ps 
+        LEFT JOIN programme p ON ps.programme_id = p.id 
+        LEFT JOIN intake i ON ps.intake_id = i.id 
+        WHERE ps.registration_status = 'approved' 
+        ORDER BY ps.updated_at DESC
+    ");
+    $stmt->execute();
+    $approved_registrations = $stmt->fetchAll();
+} catch (Exception $e) {
+    $approved_registrations = [];
+}
+
+// Get rejected registrations
+try {
+    $stmt = $pdo->prepare("
+        SELECT ps.*, p.name as programme_name, i.name as intake_name 
+        FROM pending_students ps 
+        LEFT JOIN programme p ON ps.programme_id = p.id 
+        LEFT JOIN intake i ON ps.intake_id = i.id 
+        WHERE ps.registration_status = 'rejected' 
+        ORDER BY ps.updated_at DESC
+    ");
+    $stmt->execute();
+    $rejected_registrations = $stmt->fetchAll();
+} catch (Exception $e) {
+    $rejected_registrations = [];
+}
 
 // Function to generate student number
 function generateStudentNumber($pdo) {
@@ -128,57 +194,6 @@ function generateStudentNumber($pdo) {
     $result = $stmt->fetch();
     $next_num = ($result['max_num'] ?? 0) + 1;
     return sprintf("LSC%06d", $next_num);
-}
-
-// Function to generate secure password
-function generateSecurePassword($length = 12) {
-    $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*';
-    $charactersLength = strlen($characters);
-    $randomString = '';
-    for ($i = 0; $i < $length; $i++) {
-        $randomString .= $characters[rand(0, $charactersLength - 1)];
-    }
-    return $randomString;
-}
-
-// Function to send registration confirmation email
-function sendRegistrationConfirmationEmail($to, $name, $student_number, $password) {
-    $subject = "LSC Registration Approved - Your Student Credentials";
-    
-    $message = "
-    <html>
-    <head>
-        <title>LSC Registration Approved</title>
-    </head>
-    <body>
-        <h2>Welcome to Lusaka South College</h2>
-        <p>Dear $name,</p>
-        <p>Congratulations! Your registration has been approved.</p>
-        <p>You are now a full-time student at Lusaka South College. Please use the following credentials to access your student dashboard:</p>
-        <p><strong>Student Number (Username):</strong> $student_number</p>
-        <p><strong>Password:</strong> $password</p>
-        <p>Visit <a href='https://lsuclms.com/student_login.php'>https://lsuclms.com/student_login.php</a> to login to your student dashboard.</p>
-        <p><strong>Important:</strong> Please change your password immediately after your first login for security purposes.</p>
-        <p>Welcome to the LSC community!</p>
-        <p>Best regards,<br>LSC Admissions Team</p>
-    </body>
-    </html>
-    ";
-    
-    // In a real implementation, you would use PHPMailer:
-    // $mail = new PHPMailer\PHPMailer\PHPMailer();
-    // $mail->setFrom('admissions@lsuclms.com', 'LSC Admissions');
-    // $mail->addAddress($to, $name);
-    // $mail->Subject = $subject;
-    // $mail->Body = $message;
-    // $mail->isHTML(true);
-    // $mail->send();
-    
-    // For now, we'll just log to a file
-    $log_entry = date('Y-m-d H:i:s') . " - Registration confirmed for $to: Student Number=$student_number, Password=$password\n";
-    file_put_contents('registration_confirmations.txt', $log_entry, FILE_APPEND);
-    
-    return true;
 }
 ?>
 

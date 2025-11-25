@@ -29,78 +29,59 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         mkdir($upload_dir, 0777, true);
                     }
                     
-                    $file_extension = pathinfo($_FILES['payment_proof']['name'], PATHINFO_EXTENSION);
-                    $file_name = uniqid() . '.' . $file_extension;
-                    $file_path = $upload_dir . $file_name;
+                    $file_extension = strtolower(pathinfo($_FILES['payment_proof']['name'], PATHINFO_EXTENSION));
+                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'];
                     
-                    if (move_uploaded_file($_FILES['payment_proof']['tmp_name'], $file_path)) {
-                        $payment_proof = $file_path;
+                    if (in_array($file_extension, $allowed_extensions)) {
+                        $new_filename = uniqid() . '_' . time() . '.' . $file_extension;
+                        $target_file = $upload_dir . $new_filename;
+                        
+                        if (move_uploaded_file($_FILES['payment_proof']['tmp_name'], $target_file)) {
+                            $payment_proof = $target_file;
+                        }
                     }
                 }
                 
+                // Insert into pending_students table with 'pending_approval' status
                 try {
-                    // Check if student already exists in pending_students
-                    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ?");
-                    $stmt->execute([$email]);
-                    $existing_student = $stmt->fetch();
+                    $stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, payment_method, payment_amount, transaction_id, payment_proof, created_at, registration_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'pending_approval')");
+                    $stmt->execute([
+                        $full_name,
+                        $email,
+                        $programme_id,
+                        $intake_id,
+                        $payment_method,
+                        $payment_amount,
+                        $transaction_id,
+                        $payment_proof
+                    ]);
                     
-                    if ($existing_student) {
-                        // Update existing record
-                        $stmt = $pdo->prepare("UPDATE pending_students SET 
-                            full_name = ?,
-                            intake_id = ?, 
-                            programme_id = ?, 
-                            payment_method = ?, 
-                            payment_amount = ?, 
-                            transaction_id = ?, 
-                            payment_proof = ?,
-                            registration_status = 'pending_approval',
-                            updated_at = NOW()
-                            WHERE email = ?");
-                        $stmt->execute([$full_name, $intake_id, $programme_id, $payment_method, $payment_amount, $transaction_id, $payment_proof, $email]);
-                        
-                        $message = "Registration updated successfully! Waiting for admin approval.";
-                        $messageType = 'success';
-                        $registration_complete = true;
-                    } else {
-                        // Create new record
-                        $stmt = $pdo->prepare("INSERT INTO pending_students 
-                            (full_name, email, intake_id, programme_id, payment_method, payment_amount, transaction_id, payment_proof, registration_status, created_at) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_approval', NOW())");
-                        $stmt->execute([$full_name, $email, $intake_id, $programme_id, $payment_method, $payment_amount, $transaction_id, $payment_proof]);
-                        
-                        $message = "Registration submitted successfully! Waiting for admin approval.";
-                        $messageType = 'success';
-                        $registration_complete = true;
-                    }
-                    
-                    // Redirect to success page after successful submission
-                    if ($registration_complete) {
-                        header('Location: registration_success.php');
-                        exit();
-                    }
+                    $registration_complete = true;
+                    $message = "Registration submitted successfully! Our team will review your application and contact you soon.";
+                    $messageType = "success";
                 } catch (Exception $e) {
-                    $message = "Error: " . $e->getMessage();
-                    $messageType = 'error';
+                    $message = "Error submitting registration: " . $e->getMessage();
+                    $messageType = "error";
                 }
                 break;
         }
     }
 }
 
-// Get available intakes (removed status condition since it doesn't exist)
-$intakes = $pdo->query("SELECT * FROM intake ORDER BY start_date ASC")->fetchAll();
+// Get intakes
+try {
+    $stmt = $pdo->query("SELECT * FROM intake ORDER BY start_date ASC");
+    $intakes = $stmt->fetchAll();
+} catch (Exception $e) {
+    $intakes = [];
+}
 
-// Get available programmes
-$programmes = $pdo->query("SELECT * FROM programme WHERE is_active = 1 ORDER BY name")->fetchAll();
-
-// Get student data if email is provided in URL
-$email = isset($_GET['email']) ? trim($_GET['email']) : '';
-$student_data = null;
-if ($email) {
-    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ?");
-    $stmt->execute([$email]);
-    $student_data = $stmt->fetch();
+// Get programmes
+try {
+    $stmt = $pdo->query("SELECT * FROM programme ORDER BY name");
+    $programmes = $stmt->fetchAll();
+} catch (Exception $e) {
+    $programmes = [];
 }
 ?>
 <!DOCTYPE html>

@@ -45,13 +45,17 @@ function requireRole($roleName, $pdo) {
 function currentUserHasPermission($permissionName, $pdo) {
     if (!currentUserId()) return false;
     
-    // Check for user-specific permission override first
-    $stmt = $pdo->prepare("SELECT granted FROM user_permissions WHERE user_id = ? AND permission_id = (SELECT id FROM permissions WHERE name = ?)");
-    $stmt->execute([currentUserId(), $permissionName]);
-    $userPermission = $stmt->fetchColumn();
-    
-    if ($userPermission !== false) {
-        return (bool)$userPermission;
+    // Check for user-specific permission override first (if table exists)
+    try {
+        $stmt = $pdo->prepare("SELECT granted FROM user_permissions WHERE user_id = ? AND permission_id = (SELECT id FROM permissions WHERE name = ?)");
+        $stmt->execute([currentUserId(), $permissionName]);
+        $userPermission = $stmt->fetchColumn();
+        
+        if ($userPermission !== false) {
+            return (bool)$userPermission;
+        }
+    } catch (Exception $e) {
+        // Table doesn't exist, continue with role-based permissions
     }
     
     // Fall back to role-based permissions
@@ -87,14 +91,19 @@ function getCurrentUserPermissions($pdo) {
     $stmt->execute([currentUserId()]);
     $rolePermissions = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
-    // Get user-specific permission overrides
-    $stmt = $pdo->prepare("
-        SELECT p.name, up.granted FROM permissions p
-        JOIN user_permissions up ON p.id = up.permission_id
-        WHERE up.user_id = ?
-    ");
-    $stmt->execute([currentUserId()]);
-    $userOverrides = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    // Get user-specific permission overrides (if table exists)
+    $userOverrides = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT p.name, up.granted FROM permissions p
+            JOIN user_permissions up ON p.id = up.permission_id
+            WHERE up.user_id = ?
+        ");
+        $stmt->execute([currentUserId()]);
+        $userOverrides = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    } catch (Exception $e) {
+        // Table doesn't exist, continue without user overrides
+    }
     
     // Apply user overrides to role permissions
     $finalPermissions = [];
@@ -144,3 +153,4 @@ function logout() {
     header('Location: login.php');
     exit;
 }
+?>
