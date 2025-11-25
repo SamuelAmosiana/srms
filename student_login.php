@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $messageType = 'error';
     } else {
         try {
-            // First check if it's a regular student user
+            // Check if it's a regular student user
             $stmt = $pdo->prepare("SELECT * FROM users u JOIN student_profile sp ON u.id = sp.user_id WHERE u.username = ? AND u.is_active = 1");
             $stmt->execute([$username]);
             $user = $stmt->fetch();
@@ -26,27 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 header('Location: student/dashboard.php');
                 exit();
             } else {
-                // Check if it's a pending student with temporary credentials
-                $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND temp_password = ? AND status = 'accepted'");
-                $stmt->execute([$username, $password]); // For pending students, we're using plain text temp password
-                $pending_user = $stmt->fetch();
-                
-                if ($pending_user) {
-                    // Temporary user login - redirect to first-time registration
-                    $_SESSION['temp_user_id'] = $pending_user['id'];
-                    header('Location: first_time_registration.php');
-                    exit();
-                } else {
-                    $message = "Invalid username or password!";
-                    $messageType = 'error';
-                }
+                $message = "Invalid username or password!";
+                $messageType = 'error';
             }
         } catch (Exception $e) {
             $message = "Login error: " . $e->getMessage();
             $messageType = 'error';
         }
     }
-} 
+}
 ?>
 
 <!DOCTYPE html>
@@ -143,6 +131,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             margin-top: 20px;
             color: #666;
         }
+        
+        .first-time-link {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        .first-time-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .first-time-link a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body class="login-body">
@@ -162,8 +165,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         <form method="POST">
             <div class="form-group">
-                <label for="username">Email Address</label>
-                <input type="text" id="username" name="username" required placeholder="Enter your email">
+                <label for="username">Student Number</label>
+                <input type="text" id="username" name="username" required placeholder="Enter your student number (LSC######)">
             </div>
             
             <div class="form-group">
@@ -176,8 +179,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </button>
         </form>
         
+        <div class="first-time-link">
+            <a href="first_time_registration.php">First time registration</a>
+        </div>
+        
         <div class="login-footer">
-            <p>First time user? Please use the credentials sent to your email.</p>
+            <p>Use your student number as username to login.</p>
         </div>
     </div>
 </body>

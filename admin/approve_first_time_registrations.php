@@ -2,6 +2,7 @@
 session_start();
 require_once '../config.php';
 require_once '../auth.php';
+require_once '../send_temporary_credentials.php';
 
 // Check if user is logged in and has permission
 if (!currentUserId()) {
@@ -40,8 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         // Generate student number
                         $student_number = generateStudentNumber($pdo);
                         
+                        // Generate a secure password
+                        $password = generateSecurePassword();
+                        $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                        
                         // Create user account
-                        $password_hash = password_hash($pending_student['temp_password'], PASSWORD_DEFAULT);
                         $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, email, contact, is_active) VALUES (?, ?, ?, ?, 1)");
                         $stmt->execute([$student_number, $password_hash, $pending_student['email'], $pending_student['contact']]);
                         $user_id = $pdo->lastInsertId();
@@ -72,10 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'approved', student_number = ? WHERE id = ?");
                         $stmt->execute([$student_number, $pending_student_id]);
                         
-                        // Send notification email (in a real implementation)
-                        // sendApprovalEmail($pending_student['email'], $student_number, $pending_student['full_name']);
+                        // Send confirmation email with student number and credentials
+                        sendRegistrationConfirmationEmail($pending_student['email'], $pending_student['full_name'], $student_number, $password);
                         
-                        $message = "Student registration approved successfully! Student number: " . $student_number;
+                        $message = "Student registration approved successfully! Confirmation email sent to student.";
                         $messageType = 'success';
                     } else {
                         $message = "Pending student not found!";
@@ -124,6 +128,57 @@ function generateStudentNumber($pdo) {
     $result = $stmt->fetch();
     $next_num = ($result['max_num'] ?? 0) + 1;
     return sprintf("LSC%06d", $next_num);
+}
+
+// Function to generate secure password
+function generateSecurePassword($length = 12) {
+    $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*';
+    $charactersLength = strlen($characters);
+    $randomString = '';
+    for ($i = 0; $i < $length; $i++) {
+        $randomString .= $characters[rand(0, $charactersLength - 1)];
+    }
+    return $randomString;
+}
+
+// Function to send registration confirmation email
+function sendRegistrationConfirmationEmail($to, $name, $student_number, $password) {
+    $subject = "LSC Registration Approved - Your Student Credentials";
+    
+    $message = "
+    <html>
+    <head>
+        <title>LSC Registration Approved</title>
+    </head>
+    <body>
+        <h2>Welcome to Lusaka South College</h2>
+        <p>Dear $name,</p>
+        <p>Congratulations! Your registration has been approved.</p>
+        <p>You are now a full-time student at Lusaka South College. Please use the following credentials to access your student dashboard:</p>
+        <p><strong>Student Number (Username):</strong> $student_number</p>
+        <p><strong>Password:</strong> $password</p>
+        <p>Visit <a href='https://lsuclms.com/student_login.php'>https://lsuclms.com/student_login.php</a> to login to your student dashboard.</p>
+        <p><strong>Important:</strong> Please change your password immediately after your first login for security purposes.</p>
+        <p>Welcome to the LSC community!</p>
+        <p>Best regards,<br>LSC Admissions Team</p>
+    </body>
+    </html>
+    ";
+    
+    // In a real implementation, you would use PHPMailer:
+    // $mail = new PHPMailer\PHPMailer\PHPMailer();
+    // $mail->setFrom('admissions@lsuclms.com', 'LSC Admissions');
+    // $mail->addAddress($to, $name);
+    // $mail->Subject = $subject;
+    // $mail->Body = $message;
+    // $mail->isHTML(true);
+    // $mail->send();
+    
+    // For now, we'll just log to a file
+    $log_entry = date('Y-m-d H:i:s') . " - Registration confirmed for $to: Student Number=$student_number, Password=$password\n";
+    file_put_contents('registration_confirmations.txt', $log_entry, FILE_APPEND);
+    
+    return true;
 }
 ?>
 

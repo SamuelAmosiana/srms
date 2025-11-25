@@ -2,7 +2,6 @@
 session_start();
 require_once '../config.php';
 require_once '../auth.php';
-require_once '../send_temporary_credentials.php';
 
 // Include the new acceptance letter with fees function
 require_once '../finance/generate_acceptance_letter_with_fees.php';
@@ -41,13 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $application = $stmt->fetch();
                     
                     if ($application) {
-                        // Generate temporary password
-                        $temp_password = generateTemporaryPassword();
-                        
-                        // Move application to pending_students table
+                        // Move application to pending_students table without temp password
                         $stmt = $pdo->prepare("INSERT INTO pending_students 
-                            (full_name, email, contact, NRC, gender, programme_id, intake_id, temp_password, status, created_at) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'accepted', NOW())");
+                            (full_name, email, contact, NRC, gender, programme_id, intake_id, status, created_at) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'accepted', NOW())");
                         $stmt->execute([
                             $application['full_name'],
                             $application['email'],
@@ -55,18 +51,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             $application['nrc'],
                             $application['gender'],
                             $application['programme_id'],
-                            $application['intake_id'],
-                            $temp_password
+                            $application['intake_id']
                         ]);
                         
                         // Delete from applications table
                         $stmt = $pdo->prepare("DELETE FROM applications WHERE id = ?");
                         $stmt->execute([$application_id]);
                         
-                        // Send email with temporary credentials
-                        sendTemporaryCredentialsEmail($application['email'], $application['full_name'], $application['email'], $temp_password);
-                        
-                        $message = "Application approved successfully! Temporary credentials have been sent to the student.";
+                        $message = "Application approved successfully! Student can now complete registration at first_time_registration.php";
                         $messageType = 'success';
                     } else {
                         $message = "Application not found!";

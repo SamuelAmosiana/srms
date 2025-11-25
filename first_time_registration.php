@@ -1,39 +1,20 @@
 <?php
-session_start();
+// Remove all login requirements and session checks
+// This will be an independent registration form accessed via direct link
+
 require_once 'config.php';
-require_once 'auth.php';
-
-// Check if user is logged in
-if (!isset($_SESSION['temp_user_id'])) {
-    header('Location: student_login.php');
-    exit();
-}
-
-// Get user info
-$temp_user_id = $_SESSION['temp_user_id'];
-$stmt = $pdo->prepare("SELECT * FROM pending_students WHERE id = ?");
-$stmt->execute([$temp_user_id]);
-$user = $stmt->fetch();
-
-if (!$user) {
-    header('Location: student_login.php');
-    exit();
-}
-
-// Check if registration is already approved
-if ($user['registration_status'] === 'approved' && !empty($user['student_number'])) {
-    header('Location: registration_success.php');
-    exit();
-}
 
 // Handle form submissions
 $message = '';
 $messageType = '';
+$registration_complete = false;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'submit_registration':
+                $email = trim($_POST['email']);
+                $full_name = trim($_POST['full_name']);
                 $intake_id = $_POST['intake_id'];
                 $programme_id = $_POST['programme_id'];
                 $payment_method = $_POST['payment_method'];
@@ -58,26 +39,46 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 
                 try {
-                    // Update pending student with registration details
-                    $stmt = $pdo->prepare("UPDATE pending_students SET 
-                        intake_id = ?, 
-                        programme_id = ?, 
-                        payment_method = ?, 
-                        payment_amount = ?, 
-                        transaction_id = ?, 
-                        payment_proof = ?,
-                        registration_status = 'pending_approval',
-                        updated_at = NOW()
-                        WHERE id = ?");
-                    $stmt->execute([$intake_id, $programme_id, $payment_method, $payment_amount, $transaction_id, $payment_proof, $temp_user_id]);
+                    // Check if student already exists in pending_students
+                    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ?");
+                    $stmt->execute([$email]);
+                    $existing_student = $stmt->fetch();
                     
-                    $message = "Registration submitted successfully! Waiting for admin approval.";
-                    $messageType = 'success';
+                    if ($existing_student) {
+                        // Update existing record
+                        $stmt = $pdo->prepare("UPDATE pending_students SET 
+                            full_name = ?,
+                            intake_id = ?, 
+                            programme_id = ?, 
+                            payment_method = ?, 
+                            payment_amount = ?, 
+                            transaction_id = ?, 
+                            payment_proof = ?,
+                            registration_status = 'pending_approval',
+                            updated_at = NOW()
+                            WHERE email = ?");
+                        $stmt->execute([$full_name, $intake_id, $programme_id, $payment_method, $payment_amount, $transaction_id, $payment_proof, $email]);
+                        
+                        $message = "Registration updated successfully! Waiting for admin approval.";
+                        $messageType = 'success';
+                        $registration_complete = true;
+                    } else {
+                        // Create new record
+                        $stmt = $pdo->prepare("INSERT INTO pending_students 
+                            (full_name, email, intake_id, programme_id, payment_method, payment_amount, transaction_id, payment_proof, registration_status, created_at) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_approval', NOW())");
+                        $stmt->execute([$full_name, $email, $intake_id, $programme_id, $payment_method, $payment_amount, $transaction_id, $payment_proof]);
+                        
+                        $message = "Registration submitted successfully! Waiting for admin approval.";
+                        $messageType = 'success';
+                        $registration_complete = true;
+                    }
                     
-                    // Refresh user data
-                    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE id = ?");
-                    $stmt->execute([$temp_user_id]);
-                    $user = $stmt->fetch();
+                    // Redirect to success page after successful submission
+                    if ($registration_complete) {
+                        header('Location: registration_success.php');
+                        exit();
+                    }
                 } catch (Exception $e) {
                     $message = "Error: " . $e->getMessage();
                     $messageType = 'error';
@@ -87,16 +88,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get available intakes
-$intakes = $pdo->query("SELECT * FROM intake WHERE status = 'active' ORDER BY start_date ASC")->fetchAll();
+// Get available intakes (removed status condition since it doesn't exist)
+$intakes = $pdo->query("SELECT * FROM intake ORDER BY start_date ASC")->fetchAll();
 
 // Get available programmes
 $programmes = $pdo->query("SELECT * FROM programme WHERE is_active = 1 ORDER BY name")->fetchAll();
 
-// Get user's existing registration data
-$stmt = $pdo->prepare("SELECT * FROM pending_students WHERE id = ?");
-$stmt->execute([$temp_user_id]);
-$registration_data = $stmt->fetch();
+// Get student data if email is provided in URL
+$email = isset($_GET['email']) ? trim($_GET['email']) : '';
+$student_data = null;
+if ($email) {
+    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ?");
+    $stmt->execute([$email]);
+    $student_data = $stmt->fetch();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -234,6 +239,17 @@ $registration_data = $stmt->fetch();
         .course-item:last-child {
             border-bottom: none;
         }
+        
+        .success-message {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .success-icon {
+            font-size: 64px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body class="student-layout">
@@ -245,18 +261,6 @@ $registration_data = $stmt->fetch();
                 <span class="logo-text">LSC SRMS</span>
             </div>
         </div>
-        
-        <div class="nav-right">
-            <div class="user-info">
-                <span class="welcome-text">Welcome, <?php echo htmlspecialchars($user['full_name']); ?></span>
-            </div>
-            
-            <div class="nav-actions">
-                <a href="logout.php" class="btn btn-outline">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
-            </div>
-        </div>
     </nav>
 
     <!-- Main Content -->
@@ -266,105 +270,140 @@ $registration_data = $stmt->fetch();
             <p>Complete your registration to become a full-time student</p>
         </div>
 
-        <?php if ($message): ?>
-            <div class="alert alert-<?php echo $messageType; ?>">
-                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
-                <?php echo htmlspecialchars($message); ?>
+        <?php if ($registration_complete): ?>
+            <div class="registration-container">
+                <div class="success-message">
+                    <div class="success-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h2>Registration Submitted Successfully!</h2>
+                    <p>Thank you for completing your registration. Our admissions team will review your application and payment proof.</p>
+                    <p>You will receive an email with your student number and login credentials once your registration is approved.</p>
+                    <p>Please check your email (including spam/junk folder) within 2-3 business days.</p>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="registration-container">
+                <?php if ($message): ?>
+                    <div class="alert alert-<?php echo $messageType; ?>">
+                        <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
+                        <?php echo htmlspecialchars($message); ?>
+                    </div>
+                <?php endif; ?>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="submit_registration">
+                    
+                    <!-- Personal Information -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-user"></i> Personal Information</h3>
+                        <div class="form-group">
+                            <label for="full_name">Full Name *</label>
+                            <input type="text" id="full_name" name="full_name" required 
+                                   value="<?php echo htmlspecialchars($student_data['full_name'] ?? ''); ?>"
+                                   placeholder="Enter your full name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email Address *</label>
+                            <input type="email" id="email" name="email" required 
+                                   value="<?php echo htmlspecialchars($email ?? $student_data['email'] ?? ''); ?>"
+                                   placeholder="Enter your email address" <?php echo $email ? 'readonly' : ''; ?>>
+                            <?php if ($email): ?>
+                                <small>This email was pre-filled from your invitation link.</small>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- Programme Selection -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-graduation-cap"></i> Programme Information</h3>
+                        <div class="form-group">
+                            <label for="programme_id">Select Programme *</label>
+                            <select id="programme_id" name="programme_id" required>
+                                <option value="">-- Select Programme --</option>
+                                <?php foreach ($programmes as $programme): ?>
+                                    <option value="<?php echo $programme['id']; ?>" <?php echo (isset($student_data['programme_id']) && $student_data['programme_id'] == $programme['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($programme['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="intake_id">Select Intake *</label>
+                            <select id="intake_id" name="intake_id" required>
+                                <option value="">-- Select Intake --</option>
+                                <?php foreach ($intakes as $intake): ?>
+                                    <option value="<?php echo $intake['id']; ?>" <?php echo (isset($student_data['intake_id']) && $student_data['intake_id'] == $intake['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($intake['name']); ?> 
+                                        (<?php echo date('M Y', strtotime($intake['start_date'])); ?> - <?php echo date('M Y', strtotime($intake['end_date'])); ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <!-- Programme Courses -->
+                        <div class="form-group">
+                            <label>Courses for Selected Programme</label>
+                            <div class="course-list" id="courseList">
+                                <p>Select a programme to see available courses</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Information -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-money-bill-wave"></i> Payment Information</h3>
+                        
+                        <div class="form-group">
+                            <label for="payment_method">Payment Method *</label>
+                            <div class="payment-methods">
+                                <div class="payment-method" onclick="selectPaymentMethod('bank_transfer')">
+                                    <i class="fas fa-university"></i>
+                                    <div>Bank Transfer</div>
+                                </div>
+                                <div class="payment-method" onclick="selectPaymentMethod('mobile_money')">
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <div>Mobile Money</div>
+                                </div>
+                                <div class="payment-method" onclick="selectPaymentMethod('credit_card')">
+                                    <i class="fas fa-credit-card"></i>
+                                    <div>Credit Card</div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="payment_method" name="payment_method" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payment_amount">Payment Amount (ZMW) *</label>
+                            <input type="number" id="payment_amount" name="payment_amount" step="0.01" min="0" required 
+                                   value="<?php echo htmlspecialchars($student_data['payment_amount'] ?? ''); ?>">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="transaction_id">Transaction ID *</label>
+                            <input type="text" id="transaction_id" name="transaction_id" required 
+                                   value="<?php echo htmlspecialchars($student_data['transaction_id'] ?? ''); ?>"
+                                   placeholder="Enter transaction reference number">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payment_proof">Payment Proof *</label>
+                            <input type="file" id="payment_proof" name="payment_proof" accept="image/*,application/pdf" required>
+                            <small>Upload a screenshot or scanned copy of your payment receipt (JPG, PNG, PDF)</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <div class="form-group" style="text-align: center;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Submit Registration
+                        </button>
+                    </div>
+                </form>
             </div>
         <?php endif; ?>
-
-        <div class="registration-container">
-            <form method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="action" value="submit_registration">
-                
-                <!-- Programme Selection -->
-                <div class="form-section">
-                    <h3><i class="fas fa-graduation-cap"></i> Programme Information</h3>
-                    <div class="form-group">
-                        <label for="programme_id">Select Programme *</label>
-                        <select id="programme_id" name="programme_id" required>
-                            <option value="">-- Select Programme --</option>
-                            <?php foreach ($programmes as $programme): ?>
-                                <option value="<?php echo $programme['id']; ?>" <?php echo ($registration_data['programme_id'] == $programme['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($programme['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="intake_id">Select Intake *</label>
-                        <select id="intake_id" name="intake_id" required>
-                            <option value="">-- Select Intake --</option>
-                            <?php foreach ($intakes as $intake): ?>
-                                <option value="<?php echo $intake['id']; ?>" <?php echo ($registration_data['intake_id'] == $intake['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($intake['name']); ?> 
-                                    (<?php echo date('M Y', strtotime($intake['start_date'])); ?> - <?php echo date('M Y', strtotime($intake['end_date'])); ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <!-- Programme Courses -->
-                    <div class="form-group">
-                        <label>Courses for Selected Programme</label>
-                        <div class="course-list" id="courseList">
-                            <p>Select a programme to see available courses</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Payment Information -->
-                <div class="form-section">
-                    <h3><i class="fas fa-money-bill-wave"></i> Payment Information</h3>
-                    
-                    <div class="form-group">
-                        <label for="payment_method">Payment Method *</label>
-                        <div class="payment-methods">
-                            <div class="payment-method" onclick="selectPaymentMethod('bank_transfer')">
-                                <i class="fas fa-university"></i>
-                                <div>Bank Transfer</div>
-                            </div>
-                            <div class="payment-method" onclick="selectPaymentMethod('mobile_money')">
-                                <i class="fas fa-mobile-alt"></i>
-                                <div>Mobile Money</div>
-                            </div>
-                            <div class="payment-method" onclick="selectPaymentMethod('credit_card')">
-                                <i class="fas fa-credit-card"></i>
-                                <div>Credit Card</div>
-                            </div>
-                        </div>
-                        <input type="hidden" id="payment_method" name="payment_method" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="payment_amount">Payment Amount (ZMW) *</label>
-                        <input type="number" id="payment_amount" name="payment_amount" step="0.01" min="0" required 
-                               value="<?php echo htmlspecialchars($registration_data['payment_amount'] ?? ''); ?>">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="transaction_id">Transaction ID *</label>
-                        <input type="text" id="transaction_id" name="transaction_id" required 
-                               value="<?php echo htmlspecialchars($registration_data['transaction_id'] ?? ''); ?>"
-                               placeholder="Enter transaction reference number">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="payment_proof">Payment Proof *</label>
-                        <input type="file" id="payment_proof" name="payment_proof" accept="image/*,application/pdf" required>
-                        <small>Upload a screenshot or scanned copy of your payment receipt (JPG, PNG, PDF)</small>
-                    </div>
-                </div>
-                
-                <!-- Submit Button -->
-                <div class="form-group" style="text-align: center;">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-paper-plane"></i> Submit Registration
-                    </button>
-                </div>
-            </form>
-        </div>
     </main>
 
     <script>

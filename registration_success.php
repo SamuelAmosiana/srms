@@ -1,40 +1,12 @@
 <?php
-session_start();
-require_once 'config.php';
-
-// Check if user is logged in
-if (!isset($_SESSION['temp_user_id'])) {
-    header('Location: student_login.php');
-    exit();
-}
-
-// Get user info
-$temp_user_id = $_SESSION['temp_user_id'];
-$stmt = $pdo->prepare("SELECT * FROM pending_students WHERE id = ?");
-$stmt->execute([$temp_user_id]);
-$user = $stmt->fetch();
-
-if (!$user) {
-    header('Location: student_login.php');
-    exit();
-}
-
-// Check if registration is approved
-if ($user['registration_status'] !== 'approved' || empty($user['student_number'])) {
-    // Redirect back to registration if not approved
-    header('Location: first_time_registration.php');
-    exit();
-}
-
-// Clear temp session
-unset($_SESSION['temp_user_id']);
+// Simple success page for first-time registration
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registration Successful - LSC SRMS</title>
+    <title>Registration Submitted - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -52,16 +24,6 @@ unset($_SESSION['temp_user_id']);
             font-size: 64px;
             color: #28a745;
             margin-bottom: 20px;
-        }
-        
-        .student-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #007bff;
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 20px 0;
         }
         
         .btn {
@@ -111,28 +73,24 @@ unset($_SESSION['temp_user_id']);
             <i class="fas fa-check-circle"></i>
         </div>
         
-        <h1>Registration Successful!</h1>
-        <p>Congratulations <?php echo htmlspecialchars($user['full_name']); ?>!</p>
-        <p>Your registration has been approved and you are now a full-time student at LSC.</p>
-        
-        <div class="student-number">
-            Your Student Number: <?php echo htmlspecialchars($user['student_number']); ?>
-        </div>
-        
-        <p>You can now login to the student dashboard using your student number and the password you created.</p>
+        <h1>Registration Submitted Successfully!</h1>
+        <p>Thank you for completing your registration.</p>
+        <p>Our admissions team will review your application and payment proof.</p>
+        <p>You will receive an email with your student number and login credentials once your registration is approved.</p>
+        <p>Please check your email (including spam/junk folder) within 2-3 business days.</p>
         
         <a href="student_login.php" class="btn btn-primary">
             <i class="fas fa-sign-in-alt"></i> Go to Student Login
         </a>
         
         <div class="instructions">
-            <h3>Next Steps:</h3>
+            <h3>What happens next:</h3>
             <ul>
-                <li>Login to the student dashboard using your student number</li>
-                <li>Check your course registration status</li>
-                <li>View your academic calendar and important dates</li>
-                <li>Access your course materials and resources</li>
-                <li>Contact your academic advisor if you have any questions</li>
+                <li>Your registration will be reviewed by our admissions team</li>
+                <li>Payment proof will be verified</li>
+                <li>You will receive an email with your student number and temporary password</li>
+                <li>Use your student number to login to the student dashboard</li>
+                <li>Change your password after first login for security</li>
             </ul>
         </div>
     </div>
