@@ -449,6 +449,47 @@ try {
         .action-bar button {
             margin-right: 10px;
         }
+        
+        /* Student Details Modal Styles */
+        .student-details .detail-row {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .student-details .detail-row strong {
+            display: inline-block;
+            width: 150px;
+            color: #333;
+        }
+        
+        .student-details h3 {
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+            margin-top: 25px;
+        }
+        
+        .course-list {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .course-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .course-item:last-child {
+            border-bottom: none;
+        }
+        
+        .course-item strong {
+            color: #333;
+            display: block;
+        }
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
@@ -671,8 +712,8 @@ try {
                                         <td><?php echo htmlspecialchars($student['payment_amount'] ?? 'N/A'); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($student['created_at'])); ?></td>
                                         <td>
-                                            <button class="btn btn-sm btn-info" onclick="viewPaymentProof(<?php echo $student['id']; ?>, '<?php echo htmlspecialchars($student['payment_proof'] ?? ''); ?>')">
-                                                <i class="fas fa-receipt"></i> View Proof
+                                            <button class="btn btn-sm btn-info" onclick="viewStudentDetails(<?php echo $student['id']; ?>)">
+                                                <i class="fas fa-eye"></i> View Details
                                             </button>
                                             <form method="POST" style="display: inline;" onsubmit="return confirm('Approve this student registration?');">
                                                 <input type="hidden" name="action" value="approve_pending_student">
@@ -952,6 +993,17 @@ try {
             </form>
         </div>
     </div>
+    
+    <!-- Student Details Modal -->
+    <div id="studentDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+            <span class="close" onclick="closeModal('studentDetailsModal')">&times;</span>
+            <h2>Student Registration Details</h2>
+            <div id="studentDetailsContent">
+                <!-- Content will be loaded via AJAX -->
+            </div>
+        </div>
+    </div>
 
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
@@ -1002,6 +1054,93 @@ try {
                 alert('No payment proof available for this student.');
             }
         }
+        
+        // Function to view student details
+        function viewStudentDetails(studentId) {
+            // Show loading message
+            const contentDiv = document.getElementById('studentDetailsContent');
+            contentDiv.innerHTML = '<p>Loading student details...</p>';
+            document.getElementById('studentDetailsModal').style.display = 'block';
+            
+            // Fetch student details via AJAX
+            fetch(`get_student_details.php?id=${studentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        contentDiv.innerHTML = `<p>Error: ${data.error}</p>`;
+                    } else {
+                        // Build the HTML for student details
+                        let html = `
+                            <div class="student-details">
+                                <h3>Personal Information</h3>
+                                <div class="detail-row">
+                                    <strong>Name:</strong> ${data.full_name}
+                                </div>
+                                <div class="detail-row">
+                                    <strong>Email:</strong> ${data.email}
+                                </div>
+                                <div class="detail-row">
+                                    <strong>Programme:</strong> ${data.programme_name || 'N/A'}
+                                </div>
+                                <div class="detail-row">
+                                    <strong>Intake:</strong> ${data.intake_name || 'N/A'}
+                                </div>
+                                
+                                <h3>Payment Information</h3>
+                                <div class="detail-row">
+                                    <strong>Method:</strong> ${data.payment_method || 'N/A'}
+                                </div>
+                                <div class="detail-row">
+                                    <strong>Amount:</strong> ${data.payment_amount || 'N/A'}
+                                </div>
+                                <div class="detail-row">
+                                    <strong>Transaction ID:</strong> ${data.transaction_id || 'N/A'}
+                                </div>
+                                <div class="detail-row">
+                                    <strong>Submitted:</strong> ${data.created_at ? new Date(data.created_at).toLocaleDateString() : 'N/A'}
+                                </div>
+                        `;
+                        
+                        if (data.payment_proof) {
+                            html += `
+                                <div class="detail-row">
+                                    <strong>Payment Proof:</strong> 
+                                    <a href="../${data.payment_proof}" target="_blank" class="btn btn-sm btn-info">
+                                        <i class="fas fa-file-download"></i> View Document
+                                    </a>
+                                </div>
+                            `;
+                        }
+                        
+                        // Add courses information
+                        html += `
+                                <h3>Courses for Selected Programme (Term 1)</h3>
+                        `;
+                        
+                        if (data.courses && data.courses.length > 0) {
+                            html += '<div class="course-list">';
+                            data.courses.forEach(course => {
+                                html += `
+                                    <div class="course-item">
+                                        <strong>${course.course_name}</strong>
+                                        <div>${course.course_code} - ${course.credits} Credits</div>
+                                    </div>
+                                `;
+                            });
+                            html += '</div>';
+                        } else {
+                            html += '<p>No courses defined for this programme yet.</p>';
+                        }
+                        
+                        html += '</div>';
+                        contentDiv.innerHTML = html;
+                    }
+                })
+                .catch(error => {
+                    contentDiv.innerHTML = `<p>Error loading student details: ${error.message}</p>`;
+                });
+        }
+
     </script>
 </body>
 </html>
