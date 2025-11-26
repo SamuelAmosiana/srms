@@ -15,28 +15,107 @@ $stmt = $pdo->prepare("SELECT sp.full_name, sp.student_number as student_id, sp.
 $stmt->execute([currentUserId()]);
 $student = $stmt->fetch();
 
-// Get current academic year (assume from config or database, here placeholder)
-$current_year = date('Y'); // Or fetch from intakes or config
+// Get current academic year and intake
+$current_year = date('Y');
+$academic_year = $current_year . '/' . ($current_year + 1);
 
-// Check if already registered for current year
+// Check if already registered for current academic year
 $stmt = $pdo->prepare("SELECT * FROM course_enrollment WHERE student_user_id = ? AND academic_year = ? LIMIT 1");
-$stmt->execute([currentUserId(), $current_year]);
+$stmt->execute([currentUserId(), $academic_year]);
 $existing_registration = $stmt->fetch();
+
+// Check if payment has been made for current academic year
+$stmt = $pdo->prepare("SELECT * FROM payments WHERE student_id = ? AND description LIKE ? AND status = 'paid' LIMIT 1");
+$stmt->execute([currentUserId(), "%$academic_year%"]);
+$payment_made = $stmt->fetch();
 
 // Handle form submission
 $message = '';
+$messageType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$existing_registration) {
-    $selected_courses = $_POST['courses'] ?? [];
-    if (empty($selected_courses)) {
-        $message = 'Please select at least one course.';
-    } else {
-        // Insert enrollments for each selected course
-        foreach ($selected_courses as $course_id) {
-            $stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, academic_year, status) VALUES (?, ?, ?, 'pending')");
-            $stmt->execute([currentUserId(), $course_id, $current_year]);
+    if (isset($_POST['action'])) {
+        switch ($_POST['action']) {
+            case 'submit_registration':
+                $selected_courses = $_POST['courses'] ?? [];
+                if (empty($selected_courses)) {
+                    $message = 'Please select at least one course.';
+                    $messageType = 'error';
+                } else {
+                    try {
+                        // Insert enrollments for each selected course
+                        foreach ($selected_courses as $course_id) {
+                            $stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, academic_year, status) VALUES (?, ?, ?, 'pending')");
+                            $stmt->execute([currentUserId(), $course_id, $academic_year]);
+                        }
+                        $message = 'Registration submitted successfully. Awaiting approval.';
+                        $messageType = 'success';
+                        $existing_registration = true; // Refresh status
+                    } catch (Exception $e) {
+                        $message = 'Error submitting registration: ' . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
+                
+            case 'submit_payment':
+                $amount = $_POST['amount'] ?? 0;
+                $payment_method = $_POST['payment_method'] ?? '';
+                $reference_number = $_POST['reference_number'] ?? '';
+                
+                // Handle file upload
+                $payment_proof = null;
+                if (isset($_FILES['payment_proof']) && $_FILES['payment_proof']['error'] == 0) {
+                    $upload_dir = '../uploads/payment_proofs/';
+                    if (!is_dir($upload_dir)) {
+                        mkdir($upload_dir, 0777, true);
+                    }
+                    
+                    $file_extension = strtolower(pathinfo($_FILES['payment_proof']['name'], PATHINFO_EXTENSION));
+                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'];
+                    
+                    if (in_array($file_extension, $allowed_extensions)) {
+                        $new_filename = uniqid() . '_' . time() . '.' . $file_extension;
+                        $target_file = $upload_dir . $new_filename;
+                        
+                        if (move_uploaded_file($_FILES['payment_proof']['tmp_name'], $target_file)) {
+                            $payment_proof = $target_file;
+                        }
+                    }
+                }
+                
+                if (empty($amount) || empty($payment_method) || empty($reference_number)) {
+                    $message = 'Please fill in all payment details.';
+                    $messageType = 'error';
+                } else {
+                    try {
+                        // Insert payment record
+                        $stmt = $pdo->prepare("INSERT INTO payments (student_id, amount, payment_date, payment_method, reference_number, status, description, created_at) VALUES (?, ?, NOW(), ?, ?, 'pending', ?, NOW())");
+                        $stmt->execute([
+                            currentUserId(),
+                            $amount,
+                            $payment_method,
+                            $reference_number,
+                            'Payment for academic year ' . $academic_year
+                        ]);
+                        
+                        $payment_id = $pdo->lastInsertId();
+                        
+                        // Update payment with proof if uploaded
+                        if ($payment_proof) {
+                            $stmt = $pdo->prepare("UPDATE payments SET description = ? WHERE id = ?");
+                            $stmt->execute([$payment_proof, $payment_id]);
+                        }
+                        
+                        $message = 'Payment submitted successfully. Awaiting verification.';
+                        $messageType = 'success';
+                        $payment_made = true; // Refresh status
+                    } catch (Exception $e) {
+                        $message = 'Error submitting payment: ' . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
         }
-        $message = 'Registration submitted successfully. Awaiting approval.';
-        $existing_registration = true; // Refresh status
     }
 }
 
@@ -45,6 +124,16 @@ $stmt = $pdo->prepare("SELECT c.id as course_id, c.code as course_code, c.name a
 $stmt->execute([$student['programme_id']]);
 $available_courses = $stmt->fetchAll();
 
+// Fetch programme fees
+$stmt = $pdo->prepare("SELECT * FROM programme_fees WHERE programme_id = ? AND is_active = 1");
+$stmt->execute([$student['programme_id']]);
+$programme_fees = $stmt->fetchAll();
+
+// Calculate total fees
+$total_fees = 0;
+foreach ($programme_fees as $fee) {
+    $total_fees += $fee['fee_amount'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,6 +144,143 @@ $available_courses = $stmt->fetchAll();
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/student-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .payment-methods {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .payment-method {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            flex: 1;
+            min-width: 120px;
+            transition: all 0.3s;
+        }
+        
+        .payment-method:hover {
+            background-color: #f0f0f0;
+            border-color: #007bff;
+        }
+        
+        .payment-method.selected {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .payment-method i {
+            font-size: 24px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        .fee-summary {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .fee-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .fee-total {
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 2px solid #007bff;
+        }
+        
+        .btn-submit {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        .btn-submit:hover {
+            background-color: #0056b3;
+        }
+        
+        .registration-step {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .step-number {
+            background-color: #007bff;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
 </head>
 <body class="student-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -142,12 +368,12 @@ $available_courses = $stmt->fetchAll();
     <main class="main-content">
         <div class="content-header">
             <h1><i class="fas fa-clipboard-check"></i> Register Courses</h1>
-            <p>Register for courses in the current academic year: <?php echo $current_year; ?></p>
+            <p>Register for courses in the academic year: <?php echo $academic_year; ?></p>
         </div>
         
         <?php if ($message): ?>
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> <?php echo htmlspecialchars($message); ?>
+            <div class="alert alert-<?php echo $messageType; ?>">
+                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i> <?php echo htmlspecialchars($message); ?>
             </div>
         <?php endif; ?>
         
@@ -158,24 +384,123 @@ $available_courses = $stmt->fetchAll();
                 <p>Your course registration is awaiting approval from the administration.</p>
             </div>
         <?php else: ?>
-            <form method="POST" class="registration-form">
-                <h2>Select Courses</h2>
-                <div class="courses-list">
-                    <?php foreach ($available_courses as $course): ?>
-                        <div class="course-item">
-                            <input type="checkbox" name="courses[]" value="<?php echo $course['course_id']; ?>" id="course_<?php echo $course['course_id']; ?>">
-                            <label for="course_<?php echo $course['course_id']; ?>">
-                                <?php echo htmlspecialchars($course['course_code'] . ' - ' . $course['course_name']); ?>
-                            </label>
-                        </div>
-                    <?php endforeach; ?>
+            <!-- Step 1: Make Payment -->
+            <div class="registration-step">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <h2>Make Payment</h2>
                 </div>
                 
-                <button type="submit" class="btn-submit">Submit Registration</button>
-            </form>
+                <?php if ($payment_made): ?>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Payment has been made for this academic year. You can now proceed with course registration.
+                    </div>
+                <?php else: ?>
+                    <form method="POST" enctype="multipart/form-data" class="payment-form">
+                        <input type="hidden" name="action" value="submit_payment">
+                        
+                        <div class="fee-summary">
+                            <h3>Fee Summary</h3>
+                            <?php foreach ($programme_fees as $fee): ?>
+                                <div class="fee-item">
+                                    <span><?php echo htmlspecialchars($fee['fee_name']); ?></span>
+                                    <span>K<?php echo number_format($fee['fee_amount'], 2); ?></span>
+                                </div>
+                            <?php endforeach; ?>
+                            <div class="fee-item fee-total">
+                                <span>Total</span>
+                                <span>K<?php echo number_format($total_fees, 2); ?></span>
+                            </div>
+                        </div>
+                        
+                        <div class="payment-methods">
+                            <div class="payment-method" onclick="selectPaymentMethod('bank_transfer')">
+                                <i class="fas fa-university"></i>
+                                <div>Bank Transfer</div>
+                            </div>
+                            <div class="payment-method" onclick="selectPaymentMethod('mobile_money')">
+                                <i class="fas fa-mobile-alt"></i>
+                                <div>Mobile Money</div>
+                            </div>
+                            <div class="payment-method" onclick="selectPaymentMethod('credit_card')">
+                                <i class="fas fa-credit-card"></i>
+                                <div>Credit Card</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payment_method">Payment Method *</label>
+                            <select id="payment_method" name="payment_method" required>
+                                <option value="">-- Select Payment Method --</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="mobile_money">Mobile Money</option>
+                                <option value="credit_card">Credit Card</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="amount">Amount (K) *</label>
+                            <input type="number" id="amount" name="amount" step="0.01" min="0" value="<?php echo $total_fees; ?>" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reference_number">Reference Number *</label>
+                            <input type="text" id="reference_number" name="reference_number" required placeholder="Enter transaction reference number">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payment_proof">Payment Proof (Receipt/Slip)</label>
+                            <input type="file" id="payment_proof" name="payment_proof" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx">
+                        </div>
+                        
+                        <button type="submit" class="btn-submit">Submit Payment</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Step 2: Register Courses (only if payment is made) -->
+            <?php if ($payment_made): ?>
+                <div class="registration-step">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <h2>Select Courses</h2>
+                    </div>
+                    
+                    <form method="POST" class="registration-form">
+                        <input type="hidden" name="action" value="submit_registration">
+                        
+                        <div class="courses-list">
+                            <?php foreach ($available_courses as $course): ?>
+                                <div class="course-item">
+                                    <input type="checkbox" name="courses[]" value="<?php echo $course['course_id']; ?>" id="course_<?php echo $course['course_id']; ?>">
+                                    <label for="course_<?php echo $course['course_id']; ?>">
+                                        <?php echo htmlspecialchars($course['course_code'] . ' - ' . $course['course_name']); ?>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        
+                        <button type="submit" class="btn-submit">Submit Registration</button>
+                    </form>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </main>
 
     <script src="../assets/js/student-dashboard.js"></script>
+    <script>
+        function selectPaymentMethod(method) {
+            // Remove selected class from all payment methods
+            document.querySelectorAll('.payment-method').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked payment method
+            event.currentTarget.classList.add('selected');
+            
+            // Set the payment method select value
+            document.getElementById('payment_method').value = method;
+        }
+    </script>
 </body>
 </html>
