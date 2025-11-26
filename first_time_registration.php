@@ -83,6 +83,9 @@ try {
 } catch (Exception $e) {
     $programmes = [];
 }
+
+// Initialize email variable from URL parameter
+$email = isset($_GET['email']) ? trim($_GET['email']) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
