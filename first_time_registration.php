@@ -357,9 +357,10 @@ try {
                         
                         <!-- Programme Courses -->
                         <div class="form-group">
-                            <label>Courses for Selected Programme</label>
+                            <label>Courses for Selected Programme (Term 1)</label>
                             <div class="course-list" id="courseList">
-                                <p>Select a programme to see available courses</p>
+                                <p id="courseListPlaceholder">Select a programme to see available courses</p>
+                                <div id="courseListContent" style="display: none;"></div>
                             </div>
                         </div>
                     </div>
@@ -437,30 +438,50 @@ try {
         document.getElementById('programme_id').addEventListener('change', function() {
             const programmeId = this.value;
             const courseList = document.getElementById('courseList');
+            const courseListPlaceholder = document.getElementById('courseListPlaceholder');
+            const courseListContent = document.getElementById('courseListContent');
             
             if (programmeId) {
-                // In a real implementation, you would fetch courses via AJAX
+                // Show loading message
+                courseListPlaceholder.style.display = 'none';
+                courseListContent.style.display = 'none';
                 courseList.innerHTML = '<p>Loading courses...</p>';
                 
-                // Simulate loading courses
-                setTimeout(() => {
-                    courseList.innerHTML = `
-                        <div class="course-item">
-                            <strong>Introduction to Computing</strong>
-                            <div>CSC101 - 3 Credits</div>
-                        </div>
-                        <div class="course-item">
-                            <strong>Mathematics for Computing</strong>
-                            <div>MAT101 - 3 Credits</div>
-                        </div>
-                        <div class="course-item">
-                            <strong>Communication Skills</strong>
-                            <div>COM101 - 2 Credits</div>
-                        </div>
-                    `;
-                }, 500);
+                // Fetch courses via AJAX
+                fetch('fetch_programme_courses.php?programme_id=' + programmeId + '&term=1')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            courseList.innerHTML = '<p>Error loading courses: ' + data.error + '</p>';
+                        } else if (data.message) {
+                            courseList.innerHTML = '<p>' + data.message + '</p>';
+                        } else if (data.courses && data.courses.length > 0) {
+                            let courseHtml = '';
+                            data.courses.forEach(course => {
+                                courseHtml += `
+                                    <div class="course-item">
+                                        <strong>${course.course_name}</strong>
+                                        <div>${course.course_code} - ${course.credits} Credits</div>
+                                    </div>
+                                `;
+                            });
+                            courseListContent.innerHTML = courseHtml;
+                            courseListContent.style.display = 'block';
+                            courseList.innerHTML = '';
+                            courseList.appendChild(courseListPlaceholder);
+                            courseList.appendChild(courseListContent);
+                        } else {
+                            courseList.innerHTML = '<p>No courses defined for this programme yet.</p>';
+                        }
+                    })
+                    .catch(error => {
+                        courseList.innerHTML = '<p>Error loading courses: ' + error.message + '</p>';
+                    });
             } else {
-                courseList.innerHTML = '<p>Select a programme to see available courses</p>';
+                courseListContent.style.display = 'none';
+                courseListPlaceholder.style.display = 'block';
+                courseList.innerHTML = '';
+                courseList.appendChild(courseListPlaceholder);
             }
         });
         
@@ -473,6 +494,12 @@ try {
                         el.classList.add('selected');
                     }
                 });
+            }
+            
+            // If programme is already selected (pre-filled), load courses
+            const programmeId = document.getElementById('programme_id').value;
+            if (programmeId) {
+                document.getElementById('programme_id').dispatchEvent(new Event('change'));
             }
         });
     </script>
