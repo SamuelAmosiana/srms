@@ -9,6 +9,24 @@ $message = '';
 $messageType = '';
 $registration_complete = false;
 
+// Initialize email variable from URL parameter
+$email = isset($_GET['email']) ? trim($_GET['email']) : '';
+
+// Get student data if email is provided in URL
+$student_data = null;
+if ($email) {
+    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'approved'");
+    $stmt->execute([$email]);
+    $student_data = $stmt->fetch();
+    
+    // If no approved record found, check for pending_approval record
+    if (!$student_data) {
+        $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'pending_approval'");
+        $stmt->execute([$email]);
+        $student_data = $stmt->fetch();
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
@@ -83,9 +101,6 @@ try {
 } catch (Exception $e) {
     $programmes = [];
 }
-
-// Initialize email variable from URL parameter
-$email = isset($_GET['email']) ? trim($_GET['email']) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -234,6 +249,11 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
             color: #28a745;
             margin-bottom: 20px;
         }
+        
+        .readonly-field {
+            background-color: #f8f9fa;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body class="student-layout">
@@ -285,14 +305,16 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
                             <label for="full_name">Full Name *</label>
                             <input type="text" id="full_name" name="full_name" required 
                                    value="<?php echo htmlspecialchars($student_data['full_name'] ?? ''); ?>"
-                                   placeholder="Enter your full name">
+                                   placeholder="Enter your full name"
+                                   <?php echo $student_data ? 'readonly class="readonly-field"' : ''; ?>>
                         </div>
                         
                         <div class="form-group">
                             <label for="email">Email Address *</label>
                             <input type="email" id="email" name="email" required 
                                    value="<?php echo htmlspecialchars($email ?? $student_data['email'] ?? ''); ?>"
-                                   placeholder="Enter your email address" <?php echo $email ? 'readonly' : ''; ?>>
+                                   placeholder="Enter your email address" 
+                                   <?php echo $email ? 'readonly class="readonly-field"' : ''; ?>>
                             <?php if ($email): ?>
                                 <small>This email was pre-filled from your invitation link.</small>
                             <?php endif; ?>
@@ -304,7 +326,7 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
                         <h3><i class="fas fa-graduation-cap"></i> Programme Information</h3>
                         <div class="form-group">
                             <label for="programme_id">Select Programme *</label>
-                            <select id="programme_id" name="programme_id" required>
+                            <select id="programme_id" name="programme_id" required <?php echo $student_data ? 'disabled' : ''; ?>>
                                 <option value="">-- Select Programme --</option>
                                 <?php foreach ($programmes as $programme): ?>
                                     <option value="<?php echo $programme['id']; ?>" <?php echo (isset($student_data['programme_id']) && $student_data['programme_id'] == $programme['id']) ? 'selected' : ''; ?>>
@@ -312,11 +334,14 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php if ($student_data): ?>
+                                <input type="hidden" name="programme_id" value="<?php echo htmlspecialchars($student_data['programme_id'] ?? ''); ?>">
+                            <?php endif; ?>
                         </div>
                         
                         <div class="form-group">
                             <label for="intake_id">Select Intake *</label>
-                            <select id="intake_id" name="intake_id" required>
+                            <select id="intake_id" name="intake_id" required <?php echo $student_data ? 'disabled' : ''; ?>>
                                 <option value="">-- Select Intake --</option>
                                 <?php foreach ($intakes as $intake): ?>
                                     <option value="<?php echo $intake['id']; ?>" <?php echo (isset($student_data['intake_id']) && $student_data['intake_id'] == $intake['id']) ? 'selected' : ''; ?>>
@@ -325,6 +350,9 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php if ($student_data): ?>
+                                <input type="hidden" name="intake_id" value="<?php echo htmlspecialchars($student_data['intake_id'] ?? ''); ?>">
+                            <?php endif; ?>
                         </div>
                         
                         <!-- Programme Courses -->

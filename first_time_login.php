@@ -6,27 +6,24 @@ $message = '';
 $messageType = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = trim($_POST['username']);
-    $password = $_POST['password'];
+    $email = trim($_POST['email']);
     
-    if (empty($username) || empty($password)) {
-        $message = "Please enter both username and password!";
+    if (empty($email)) {
+        $message = "Please enter your email address!";
         $messageType = 'error';
     } else {
         try {
-            // Check if it's a regular student user
-            $stmt = $pdo->prepare("SELECT * FROM users u JOIN student_profile sp ON u.id = sp.user_id WHERE u.username = ? AND u.is_active = 1");
-            $stmt->execute([$username]);
-            $user = $stmt->fetch();
+            // Check if student exists in pending_students with approved status
+            $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'approved'");
+            $stmt->execute([$email]);
+            $student = $stmt->fetch();
             
-            if ($user && password_verify($password, $user['password_hash'])) {
-                // Regular student login
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['role'] = 'Student';
-                header('Location: student/dashboard.php');
+            if ($student) {
+                // Redirect to first time registration form with pre-filled data
+                header('Location: first_time_registration.php?email=' . urlencode($email));
                 exit();
             } else {
-                $message = "Invalid username or password!";
+                $message = "No approved registration found for this email. Please check your email or contact admissions.";
                 $messageType = 'error';
             }
         } catch (Exception $e) {
@@ -41,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Login - LSC SRMS</title>
+    <title>First Time Student Login - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -131,34 +128,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             color: #666;
         }
         
-        .first-time-link {
+        .back-link {
             display: block;
             text-align: center;
             margin-top: 15px;
         }
         
-        .first-time-link a {
+        .back-link a {
             color: #007bff;
             text-decoration: none;
         }
         
-        .first-time-link a:hover {
-            text-decoration: underline;
-        }
-        
-        .toggle-links {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-        }
-        
-        .toggle-links a {
-            color: #007bff;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .toggle-links a:hover {
+        .back-link a:hover {
             text-decoration: underline;
         }
     </style>
@@ -168,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="logo-container">
             <img src="assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
             <span class="logo-text">LSC SRMS</span>
-            <p>Student Portal</p>
+            <p>First Time Student Portal</p>
         </div>
         
         <?php if ($message): ?>
@@ -180,27 +161,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         <form method="POST">
             <div class="form-group">
-                <label for="username">Student Number</label>
-                <input type="text" id="username" name="username" required placeholder="Enter your student number (LSC######)">
-            </div>
-            
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required placeholder="Enter your password">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required placeholder="Enter your email address">
             </div>
             
             <button type="submit" class="btn">
-                <i class="fas fa-sign-in-alt"></i> Login
+                <i class="fas fa-sign-in-alt"></i> Access Registration
             </button>
         </form>
         
-        <div class="toggle-links">
-            <a href="first_time_login.php">First time registration</a>
-            <a href="student_login.php">Regular student login</a>
+        <div class="back-link">
+            <a href="student_login.php">← Back to Student Login</a>
         </div>
         
         <div class="login-footer">
-            <p>Use your student number as username to login.</p>
+            <p>Enter the email address you used during your application.</p>
         </div>
     </div>
 </body>
