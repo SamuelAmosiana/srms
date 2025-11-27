@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $user = $stmt->fetch();
             
             if ($user && password_verify($password, $user['password_hash'])) {
-                // Regular student login
+                // Regular student login with username and password
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['role'] = 'Student';
                 header('Location: student/dashboard.php');

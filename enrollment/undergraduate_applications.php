@@ -41,89 +41,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $app_stmt->execute([$application_id]);
                     $application = $app_stmt->fetch();
                     
-                    // Update application status
+                    // Update application status to approved
                     $stmt = $pdo->prepare("UPDATE applications SET status = 'approved', processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([$current_user_id, $application_id]);
-                    
-                    // Add to pending_students for course registration approval
-                    // Set registration_status to 'pending_approval' so it appears in the admin panel
-                    $pending_stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, documents, created_at, registration_status) VALUES (?, ?, ?, ?, ?, NOW(), 'pending_approval')");
-                    $pending_stmt->execute([
-                        $application['full_name'],
-                        $application['email'],
-                        $application['programme_id'],
-                        $application['intake_id'],
-                        $application['documents']
-                    ]);
                     
                     // Generate acceptance letter in DOCX format
                     require_once '../generate_acceptance_letter_docx.php';
                     $letter_path = generateAcceptanceLetterDOCX($application, $pdo);
                     
-                    // Automatically create student user account
-                    try {
-                        $pdo->beginTransaction();
-                        
-                        // Generate student number
-                        $student_number = 'LSC' . date('Y') . str_pad($application_id, 6, '0', STR_PAD_LEFT);
-                        
-                        // Create user account
-                        $user_stmt = $pdo->prepare("INSERT INTO users (username, password_hash, email, contact, is_active) VALUES (?, ?, ?, ?, 1)");
-                        $default_password = 'LSC@' . date('Y') . $application_id; // Default password
-                        $user_stmt->execute([
-                            $student_number,
-                            password_hash($default_password, PASSWORD_DEFAULT),
-                            $application['email'],
-                            $application['phone']
-                        ]);
-                        
-                        $user_id = $pdo->lastInsertId();
-                        
-                        // Assign student role
-                        $role_stmt = $pdo->prepare("SELECT id FROM roles WHERE name = 'Student'");
-                        $role_stmt->execute();
-                        $student_role = $role_stmt->fetch();
-                        
-                        if ($student_role) {
-                            $user_role_stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
-                            $user_role_stmt->execute([$user_id, $student_role['id']]);
-                        }
-                        
-                        // Extract NRC from documents if available
-                        $nrc = null;
-                        $documents = json_decode($application['documents'], true);
-                        if (is_array($documents) && isset($documents['nrc'])) {
-                            $nrc = $documents['nrc'];
-                        }
-                        
-                        // Create student profile with more details
-                        $profile_stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, NRC, programme_id, intake_id) VALUES (?, ?, ?, ?, ?, ?)");
-                        $profile_stmt->execute([
-                            $user_id, 
-                            $application['full_name'], 
-                            $student_number,
-                            $nrc,
-                            $application['programme_id'],
-                            $application['intake_id']
-                        ]);
-                        
-                        $pdo->commit();
-                        
-                        // Add success message about student account creation
-                        $student_message = " Student account created with username: " . $student_number . " and default password: " . $default_password;
-                        
-                        // Send acceptance letter email with download link
-                        $login_details = [
-                            'username' => $student_number,
-                            'password' => $default_password
-                        ];
-                        sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo);
-                    } catch (Exception $e) {
-                        $pdo->rollBack();
-                        $student_message = " Warning: Failed to create student account automatically. Error: " . $e->getMessage();
-                    }
+                    // Send acceptance letter email with instruction to use email for first-time login
+                    $login_details = [
+                        'instruction' => 'Use your email address (' . $application['email'] . ') to login to the First Time Student Registration portal'
+                    ];
+                    sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo);
                     
-                    $message = "Application approved successfully! Acceptance letter generated and email processing completed." . ($student_message ?? '');
+                    $message = "Application approved successfully! Acceptance letter generated and email sent to applicant with instructions to login using their email address.";
                     $messageType = "success";
                     break;
                     

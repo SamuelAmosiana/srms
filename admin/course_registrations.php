@@ -20,22 +20,33 @@ $stmt = $pdo->prepare("SELECT u.*, ap.full_name, ap.staff_id FROM users u LEFT J
 $stmt->execute([currentUserId()]);
 $user = $stmt->fetch();
 
-// Handle form submissions
+// Handle form actions
 $message = '';
 $messageType = '';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'approve_registration':
                 $registration_id = $_POST['registration_id'];
                 
                 try {
-                    $stmt = $pdo->prepare("UPDATE course_registration SET status = 'approved' WHERE id = ?");
+                    // Get registration details
+                    $stmt = $pdo->prepare("SELECT cr.*, sp.full_name, sp.student_number FROM course_registration cr JOIN student_profile sp ON cr.student_id = sp.user_id WHERE cr.id = ?");
                     $stmt->execute([$registration_id]);
+                    $registration = $stmt->fetch();
                     
-                    $message = "Course registration approved successfully!";
-                    $messageType = 'success';
+                    if ($registration) {
+                        // Update registration status to approved
+                        $stmt = $pdo->prepare("UPDATE course_registration SET status = 'approved' WHERE id = ?");
+                        $stmt->execute([$registration_id]);
+                        
+                        $message = "Registration approved successfully!";
+                        $messageType = 'success';
+                    } else {
+                        $message = "Registration not found!";
+                        $messageType = 'error';
+                    }
                 } catch (Exception $e) {
                     $message = "Error: " . $e->getMessage();
                     $messageType = 'error';
@@ -51,119 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = 'error';
                 } else {
                     try {
+                        // Update registration status to rejected
                         $stmt = $pdo->prepare("UPDATE course_registration SET status = 'rejected', rejection_reason = ? WHERE id = ?");
                         $stmt->execute([$rejection_reason, $registration_id]);
                         
-                        $message = "Course registration rejected!";
+                        $message = "Registration rejected!";
                         $messageType = 'success';
                     } catch (Exception $e) {
                         $message = "Error: " . $e->getMessage();
                         $messageType = 'error';
                     }
-                }
-                break;
-                
-            case 'define_intake_courses':
-                $intake_id = $_POST['intake_id'];
-                $term = trim($_POST['term']);
-                $programme_id = $_POST['programme_id'] ?? null; // New field (optional for backward compatibility)
-                $course_ids = $_POST['course_ids'] ?? [];
-                
-                if (empty($intake_id) || empty($term)) {
-                    $message = "Please select intake and term!";
-                    $messageType = 'error';
-                } else {
-                    try {
-                        // Check if programme_id column exists
-                        $column_exists = false;
-                        try {
-                            $check_column = $pdo->query("SHOW COLUMNS FROM intake_courses LIKE 'programme_id'");
-                            $column_exists = $check_column->rowCount() > 0;
-                        } catch (Exception $e) {
-                            $column_exists = false;
-                        }
-                        
-                        if ($column_exists) {
-                            // Delete existing courses for this intake/term (and programme if provided)
-                            if (!empty($programme_id)) {
-                                $delete_stmt = $pdo->prepare("DELETE FROM intake_courses WHERE intake_id = ? AND term = ? AND programme_id = ?");
-                                $delete_stmt->execute([$intake_id, $term, $programme_id]);
-                            } else {
-                                $delete_stmt = $pdo->prepare("DELETE FROM intake_courses WHERE intake_id = ? AND term = ? AND (programme_id IS NULL OR programme_id = ?)");
-                                $delete_stmt->execute([$intake_id, $term, 0]);
-                            }
-                            
-                            // Add new courses
-                            foreach ($course_ids as $course_id) {
-                                $insert_stmt = $pdo->prepare("INSERT INTO intake_courses (intake_id, term, programme_id, course_id) VALUES (?, ?, ?, ?)");
-                                $insert_stmt->execute([$intake_id, $term, $programme_id ?: null, $course_id]);
-                            }
-                        } else {
-                            // Use old method without programme_id
-                            $delete_stmt = $pdo->prepare("DELETE FROM intake_courses WHERE intake_id = ? AND term = ?");
-                            $delete_stmt->execute([$intake_id, $term]);
-                            
-                            // Add new courses
-                            foreach ($course_ids as $course_id) {
-                                $insert_stmt = $pdo->prepare("INSERT INTO intake_courses (intake_id, term, course_id) VALUES (?, ?, ?)");
-                                $insert_stmt->execute([$intake_id, $term, $course_id]);
-                            }
-                        }
-                        
-                        $message = "Courses defined for intake and term successfully!";
-                        $messageType = 'success';
-                    } catch (Exception $e) {
-                        $message = "Error: " . $e->getMessage();
-                        $messageType = 'error';
-                    }
-                }
-                break;
-                
-            case 'delete_defined_course':
-                $defined_course_id = $_POST['defined_course_id'];
-                
-                try {
-                    $stmt = $pdo->prepare("DELETE FROM intake_courses WHERE id = ?");
-                    $stmt->execute([$defined_course_id]);
-                    
-                    $message = "Defined course deleted successfully!";
-                    $messageType = 'success';
-                } catch (Exception $e) {
-                    $message = "Error: " . $e->getMessage();
-                    $messageType = 'error';
-                }
-                break;
-                
-            case 'update_defined_course':
-                $defined_course_id = $_POST['defined_course_id'];
-                $intake_id = $_POST['edit_intake_id'];
-                $term = trim($_POST['edit_term']);
-                $programme_id = $_POST['edit_programme_id'] ?? null;
-                $course_id = $_POST['edit_course_id'];
-                
-                try {
-                    // Check if programme_id column exists
-                    $column_exists = false;
-                    try {
-                        $check_column = $pdo->query("SHOW COLUMNS FROM intake_courses LIKE 'programme_id'");
-                        $column_exists = $check_column->rowCount() > 0;
-                    } catch (Exception $e) {
-                        $column_exists = false;
-                    }
-                    
-                    if ($column_exists) {
-                        $stmt = $pdo->prepare("UPDATE intake_courses SET intake_id = ?, term = ?, programme_id = ?, course_id = ? WHERE id = ?");
-                        $stmt->execute([$intake_id, $term, $programme_id ?: null, $course_id, $defined_course_id]);
-                    } else {
-                        $stmt = $pdo->prepare("UPDATE intake_courses SET intake_id = ?, term = ?, course_id = ? WHERE id = ?");
-                        $stmt->execute([$intake_id, $term, $course_id, $defined_course_id]);
-                    }
-                    
-                    $message = "Defined course updated successfully!";
-                    $messageType = 'success';
-                } catch (Exception $e) {
-                    $message = "Error: " . $e->getMessage();
-                    $messageType = 'error';
                 }
                 break;
                 
@@ -178,12 +86,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $pending_student = $stmt->fetch();
                     
                     if ($pending_student) {
-                        // Update registration status to approved
-                        $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'approved' WHERE id = ?");
-                        $stmt->execute([$pending_student_id]);
+                        // Generate student number
+                        $student_number = 'LSC' . date('Y') . str_pad($pending_student_id, 6, '0', STR_PAD_LEFT);
                         
-                        $message = "Pending student registration approved successfully!";
-                        $messageType = 'success';
+                        // Create user account with student number as both username and password
+                        $pdo->beginTransaction();
+                        
+                        try {
+                            // Create user account - hash the student number as the password
+                            $user_stmt = $pdo->prepare("INSERT INTO users (username, password_hash, email, contact, is_active) VALUES (?, ?, ?, ?, 1)");
+                            $default_password = $student_number; // Use student number as default password
+                            $hashed_password = password_hash($default_password, PASSWORD_DEFAULT);
+                            $user_stmt->execute([
+                                $student_number,
+                                $hashed_password,
+                                $pending_student['email'],
+                                '' // Contact info not available in pending_students
+                            ]);
+                            
+                            $user_id = $pdo->lastInsertId();
+                            
+                            // Assign student role
+                            $role_stmt = $pdo->prepare("SELECT id FROM roles WHERE name = 'Student'");
+                            $role_stmt->execute();
+                            $student_role = $role_stmt->fetch();
+                            
+                            if ($student_role) {
+                                $user_role_stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)");
+                                $user_role_stmt->execute([$user_id, $student_role['id']]);
+                            }
+                            
+                            // Create student profile
+                            $profile_stmt = $pdo->prepare("INSERT INTO student_profile (user_id, full_name, student_number, programme_id, intake_id) VALUES (?, ?, ?, ?, ?)");
+                            $profile_stmt->execute([
+                                $user_id, 
+                                $pending_student['full_name'], 
+                                $student_number,
+                                $pending_student['programme_id'],
+                                $pending_student['intake_id']
+                            ]);
+                            
+                            // Update pending student with student number and approved status
+                            $update_stmt = $pdo->prepare("UPDATE pending_students SET student_number = ?, registration_status = 'approved' WHERE id = ?");
+                            $update_stmt->execute([$student_number, $pending_student_id]);
+                            
+                            $pdo->commit();
+                            
+                            $message = "Pending student registration approved successfully! Student account created with username and password: " . $student_number;
+                            $messageType = 'success';
+                        } catch (Exception $e) {
+                            $pdo->rollBack();
+                            throw $e;
+                        }
                     } else {
                         $message = "Pending student not found!";
                         $messageType = 'error';
