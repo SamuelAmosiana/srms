@@ -158,7 +158,7 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     
     // Generate download link
     $letter_filename = basename($letter_path);
-    $download_link = "https://" . $_SERVER['HTTP_HOST'] . "/srms/download_letter.php?file=" . urlencode($letter_filename);
+    $download_link = "https://" . $_SERVER['HTTP_HOST'] . "/download_letter.php?file=" . urlencode($letter_filename);
     
     // Create email content
     $subject = "Admission Acceptance - Lusaka South College";
@@ -200,9 +200,20 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     
     $body .= "LOGIN DETAILS\n";
     $body .= "=============\n";
-    $body .= "Username: " . $login_details['username'] . "\n";
-    $body .= "Password: " . $login_details['password'] . "\n";
-    $body .= "Portal URL: " . PORTAL_URL . "\n\n";
+    
+    // Handle different types of login details
+    if (isset($login_details['instruction'])) {
+        // For first-time applicants who need to use email for login
+        $body .= $login_details['instruction'] . "\n";
+        $body .= "Portal URL: " . PORTAL_URL . "/first_time_login.php\n\n";
+    } else {
+        // For existing students with username/password
+        $username = $login_details['username'] ?? 'N/A';
+        $password = $login_details['password'] ?? 'N/A';
+        $body .= "Username: " . $username . "\n";
+        $body .= "Password: " . $password . "\n";
+        $body .= "Portal URL: " . PORTAL_URL . "\n\n";
+    }
     
     $body .= "To download your acceptance letter, please click the link below:\n";
     $body .= $download_link . "\n\n";
@@ -211,7 +222,7 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     $body .= "Payment can be made at the Finance Office or through our online payment portal.\n\n";
     
     $body .= "For any queries regarding fees, please contact the Admissions Office at admissions@lsuczm.com.\n\n";
-    $body .= "We look forward to welcoming you to LSC.\n\n";
+    $body .= "We look forward to welcoming you to Lusaka South College.\n\n";
     $body .= "Best regards,\n";
     $body .= "Admissions Office\n";
     $body .= "Lusaka South College";

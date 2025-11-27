@@ -13,13 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $messageType = 'error';
     } else {
         try {
-            // Check if student exists in pending_students with pending_approval status
-            // This is the status students have after being approved by enrollment officers
-            $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'pending_approval'");
+            // Check if student has an approved application
+            $stmt = $pdo->prepare("SELECT * FROM applications WHERE email = ? AND status = 'approved'");
             $stmt->execute([$email]);
-            $student = $stmt->fetch();
+            $application = $stmt->fetch();
             
-            if ($student) {
+            if ($application) {
                 // Redirect to first time registration form with pre-filled data
                 header('Location: first_time_registration.php?email=' . urlencode($email));
                 exit();

@@ -15,15 +15,26 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
 // Get student data if email is provided in URL
 $student_data = null;
 if ($email) {
-    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'approved'");
+    // First check if they've already registered (exist in pending_students)
+    $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'pending_approval'");
     $stmt->execute([$email]);
     $student_data = $stmt->fetch();
     
-    // If no approved record found, check for pending_approval record
+    // If no record in pending_students, check if they have an approved application
     if (!$student_data) {
-        $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'pending_approval'");
+        $stmt = $pdo->prepare("SELECT * FROM applications WHERE email = ? AND status = 'approved'");
         $stmt->execute([$email]);
-        $student_data = $stmt->fetch();
+        $application_data = $stmt->fetch();
+        
+        // If they have an approved application, use that data to pre-fill the form
+        if ($application_data) {
+            $student_data = [
+                'full_name' => $application_data['full_name'],
+                'email' => $application_data['email'],
+                'programme_id' => $application_data['programme_id'],
+                'intake_id' => $application_data['intake_id']
+            ];
+        }
     }
 }
 

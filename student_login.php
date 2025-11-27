@@ -23,10 +23,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 // Regular student login with username and password
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['role'] = 'Student';
-                header('Location: student/dashboard.php');
+                // Use absolute path for redirect to avoid issues
+                header('Location: /srms/student/dashboard.php');
                 exit();
             } else {
-                $message = "Invalid username or password!";
+                // More detailed error message for debugging
+                if (!$user) {
+                    $message = "Account not found. Please check your student number.";
+                } else {
+                    $message = "Invalid password. Please try again.";
+                }
                 $messageType = 'error';
             }
         } catch (Exception $e) {
