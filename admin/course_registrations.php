@@ -239,7 +239,12 @@ try {
 // Get pending students (first-time registrations from approved applications)
 try {
     $pending_students_query = "
-        SELECT ps.*, p.name as programme_name, i.name as intake_name
+        SELECT ps.*, p.name as programme_name, i.name as intake_name,
+               CASE 
+                   WHEN ps.documents IS NOT NULL AND ps.payment_method IS NULL THEN 'Approved Application'
+                   WHEN ps.documents IS NULL AND ps.payment_method IS NOT NULL THEN 'First-Time Registration'
+                   ELSE 'Other'
+               END as source_type
         FROM pending_students ps
         LEFT JOIN programme p ON ps.programme_id = p.id
         LEFT JOIN intake i ON ps.intake_id = i.id
@@ -697,6 +702,7 @@ try {
                                     <th>Intake</th>
                                     <th>Payment Method</th>
                                     <th>Amount</th>
+                                    <th>Source</th>
                                     <th>Submitted</th>
                                     <th>Actions</th>
                                 </tr>
@@ -710,6 +716,7 @@ try {
                                         <td><?php echo htmlspecialchars($student['intake_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($student['payment_method'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($student['payment_amount'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($student['source_type'] ?? 'N/A'); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($student['created_at'])); ?></td>
                                         <td>
                                             <button class="btn btn-sm btn-info" onclick="viewStudentDetails(<?php echo $student['id']; ?>)">

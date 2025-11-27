@@ -13,8 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $messageType = 'error';
     } else {
         try {
-            // Check if student exists in pending_students with approved status
-            $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'approved'");
+            // Check if student exists in pending_students with pending_approval status
+            // This is the status students have after being approved by enrollment officers
+            $stmt = $pdo->prepare("SELECT * FROM pending_students WHERE email = ? AND registration_status = 'pending_approval'");
             $stmt->execute([$email]);
             $student = $stmt->fetch();
             
