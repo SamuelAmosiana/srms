@@ -8,23 +8,51 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = trim($_POST['username']);
     $password = $_POST['password'];
+    // Normalize possible student number input for comparison
+    $normalizedUsername = strtoupper($username);
     
     if (empty($username) || empty($password)) {
         $message = "Please enter both username and password!";
         $messageType = 'error';
     } else {
         try {
-            // Check if it's a regular student user
-            $stmt = $pdo->prepare("SELECT * FROM users u JOIN student_profile sp ON u.id = sp.user_id WHERE u.username = ? AND u.is_active = 1");
+            // Check if it's a regular student user by username
+            $stmt = $pdo->prepare("SELECT u.*, sp.student_number FROM users u JOIN student_profile sp ON u.id = sp.user_id WHERE u.username = ? AND u.is_active = 1");
             $stmt->execute([$username]);
             $user = $stmt->fetch();
             
-            if ($user && password_verify($password, $user['password_hash'])) {
-                // Regular student login with username and password
+            // If not found by username, try finding by student number
+            if (!$user) {
+                $stmt = $pdo->prepare("SELECT u.*, sp.student_number FROM student_profile sp JOIN users u ON sp.user_id = u.id WHERE sp.student_number = ? AND u.is_active = 1");
+                $stmt->execute([$username]);
+                $user = $stmt->fetch();
+            }
+
+            $loginOk = false;
+            if ($user) {
+                // Primary: verify against stored password hash
+                if (!empty($user['password_hash']) && password_verify($password, $user['password_hash'])) {
+                    $loginOk = true;
+                } else {
+                    // Fallback: allow login if student number is used as both username and password
+                    $studentNumber = isset($user['student_number']) ? strtoupper(trim($user['student_number'])) : '';
+                    if ($password === $username && ($normalizedUsername === $studentNumber || $normalizedUsername === strtoupper($user['username']))) {
+                        $loginOk = true;
+                    }
+                }
+            }
+
+            if ($loginOk) {
                 $_SESSION['user_id'] = $user['id'];
-                $_SESSION['role'] = 'Student';
-                // Use absolute path for redirect to avoid issues
-                header('Location: /srms/student/dashboard.php');
+                // Ensure Student role is present in session for role checks on dashboard
+                if (!isset($_SESSION['roles']) || !is_array($_SESSION['roles'])) {
+                    $_SESSION['roles'] = [];
+                }
+                if (!in_array('Student', $_SESSION['roles'])) {
+                    $_SESSION['roles'][] = 'Student';
+                }
+                // Use relative path for redirect to avoid issues
+                header('Location: student/dashboard.php');
                 exit();
             } else {
                 // More detailed error message for debugging
@@ -49,8 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Login - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* Simple icon replacements using CSS */
+        .icon-sign-in:before { content: "→"; }
+        .icon-check-circle:before { content: "✓"; }
+        .icon-exclamation-triangle:before { content: "!"; }
+        
         .login-container {
             max-width: 400px;
             margin: 100px auto;
@@ -179,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         <?php if ($message): ?>
             <div class="alert alert-<?php echo $messageType; ?>">
-                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
+                <i class="icon-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
                 <?php echo htmlspecialchars($message); ?>
             </div>
         <?php endif; ?>
@@ -196,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
             
             <button type="submit" class="btn">
-                <i class="fas fa-sign-in-alt"></i> Login
+                <i class="icon-sign-in"></i> Login
             </button>
         </form>
         

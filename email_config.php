@@ -1,14 +1,16 @@
+
+text/x-generic email_config.php ( PHP script, ASCII text, with CRLF line terminators )
 <?php
 /**
  * Email Configuration for Namecheap Hosting (LSUCLMS)
  */
 
 // SMTP settings for enroll@lsuclms.com
-define('SMTP_HOST', 'mail.lsuclms.com');
+define('SMTP_HOST', 'lsuclms.com'); 
 define('SMTP_USERNAME', 'enroll@lsuclms.com');
 define('SMTP_PASSWORD', '****');  // Hidden for security purposes, replace with actual password
-define('SMTP_PORT', 587);
-define('SMTP_SECURE', 'tls');
+define('SMTP_PORT', 465);          
+define('SMTP_SECURE', 'ssl');      
 
 // Email metadata
 define('EMAIL_FROM', 'enroll@lsuclms.com');

@@ -38,11 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>First Time Student Login - LSC SRMS</title>
+    <title>First Time Login - LSC SRMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .login-container {
+        /* Simple icon replacements using CSS */
+        .icon-sign-in:before { content: "→"; }
+        .icon-check-circle:before { content: "✓"; }
+        .icon-exclamation-triangle:before { content: "!"; }
+    
+    .login-container {
             max-width: 400px;
             margin: 100px auto;
             padding: 30px;
@@ -154,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         <?php if ($message): ?>
             <div class="alert alert-<?php echo $messageType; ?>">
-                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
+                <i class="icon-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
                 <?php echo htmlspecialchars($message); ?>
             </div>
         <?php endif; ?>
@@ -166,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
             
             <button type="submit" class="btn">
-                <i class="fas fa-sign-in-alt"></i> Access Registration
+                <i class="icon-sign-in"></i> Access Registration
             </button>
         </form>
         

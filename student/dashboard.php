@@ -63,7 +63,25 @@ $stats['accommodation_status'] = 'Not Applied';
     <title>Student Dashboard - LSC SRMS</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/student-dashboard.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Simple icon replacements using CSS */
+        .icon-bars:before { content: "≡"; }
+        .icon-moon:before { content: "☾"; }
+        .icon-user-circle:before { content: "👤"; }
+        .icon-chevron-down:before { content: "▼"; }
+        .icon-user:before { content: "👨"; }
+        .icon-cog:before { content: "⚙"; }
+        .icon-sign-out-alt:before { content: "🚪"; }
+        .icon-tachometer-alt:before { content: "📊"; }
+        .icon-home:before { content: "⌂"; }
+        .icon-chart-line:before { content: "📈"; }
+        .icon-clipboard-check:before { content: "📋"; }
+        .icon-file-alt:before { content: "📄"; }
+        .icon-money-bill-wave:before { content: "💰"; }
+        .icon-bed:before { content: "🛏"; }
+        .icon-book:before { content: "📚"; }
+        .icon-graduation-cap:before { content: "🎓"; }
+    </style>
 </head>
 <body class="student-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -74,7 +92,7 @@ $stats['accommodation_status'] = 'Not Applied';
                 <span class="logo-text">LSC SRMS</span>
             </div>
             <button class="sidebar-toggle" onclick="toggleSidebar()">
-                <i class="fas fa-bars"></i>
+                <i class="icon-bars"></i>
             </button>
         </div>
         
@@ -86,19 +104,19 @@ $stats['accommodation_status'] = 'Not Applied';
             
             <div class="nav-actions">
                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
-                    <i class="fas fa-moon" id="theme-icon"></i>
+                    <i class="icon-moon" id="theme-icon"></i>
                 </button>
                 
                 <div class="dropdown">
                     <button class="profile-btn" onclick="toggleDropdown()">
-                        <i class="fas fa-user-circle"></i>
-                        <i class="fas fa-chevron-down"></i>
+                        <i class="icon-user-circle"></i>
+                        <i class="icon-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile.php"><i class="fas fa-user"></i> View Profile</a>
-                        <a href="settings.php"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="profile.php"><i class="icon-user"></i> View Profile</a>
+                        <a href="settings.php"><i class="icon-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
-                        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        <a href="../logout.php"><i class="icon-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>
             </div>
@@ -108,27 +126,27 @@ $stats['accommodation_status'] = 'Not Applied';
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h3><i class="fas fa-tachometer-alt"></i> Student Panel</h3>
+            <h3><i class="icon-tachometer-alt"></i> Student Panel</h3>
         </div>
         
         <nav class="sidebar-nav">
             <a href="dashboard.php" class="nav-item active">
-                <i class="fas fa-home"></i>
+                <i class="icon-home"></i>
                 <span>Dashboard</span>
             </a>
             
             <div class="nav-section">
                 <h4>Academic</h4>
                 <a href="view_results.php" class="nav-item">
-                    <i class="fas fa-chart-line"></i>
+                    <i class="icon-chart-line"></i>
                     <span>View Results</span>
                 </a>
                 <a href="register_courses.php" class="nav-item">
-                    <i class="fas fa-clipboard-check"></i>
+                    <i class="icon-clipboard-check"></i>
                     <span>Register Courses</span>
                 </a>
                 <a href="view_docket.php" class="nav-item">
-                    <i class="fas fa-file-alt"></i>
+                    <i class="icon-file-alt"></i>
                     <span>View Docket</span>
                 </a>
             </div>
@@ -136,11 +154,11 @@ $stats['accommodation_status'] = 'Not Applied';
             <div class="nav-section">
                 <h4>Finance & Accommodation</h4>
                 <a href="view_fee_balance.php" class="nav-item">
-                    <i class="fas fa-money-bill-wave"></i>
+                    <i class="icon-money-bill-wave"></i>
                     <span>View Fee Balance</span>
                 </a>
                 <a href="accommodation.php" class="nav-item">
-                    <i class="fas fa-bed"></i>
+                    <i class="icon-bed"></i>
                     <span>Accommodation</span>
                 </a>
             </div>
@@ -150,7 +168,7 @@ $stats['accommodation_status'] = 'Not Applied';
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-tachometer-alt"></i> Dashboard Overview</h1>
+            <h1><i class="icon-tachometer-alt"></i> Dashboard Overview</h1>
             <p>Welcome to the Lusaka South College Student Records Management System</p>
         </div>
         
@@ -158,7 +176,7 @@ $stats['accommodation_status'] = 'Not Applied';
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon orange">
-                    <i class="fas fa-book"></i>
+                    <i class="icon-book"></i>
                 </div>
                 <div class="stat-info">
                     <h3><?php echo number_format($stats['enrolled_courses']); ?></h3>
@@ -168,7 +186,7 @@ $stats['accommodation_status'] = 'Not Applied';
             
             <div class="stat-card">
                 <div class="stat-icon green">
-                    <i class="fas fa-graduation-cap"></i>
+                    <i class="icon-graduation-cap"></i>
                 </div>
                 <div class="stat-info">
                     <h3><?php echo $stats['gpa']; ?></h3>
@@ -178,7 +196,7 @@ $stats['accommodation_status'] = 'Not Applied';
             
             <div class="stat-card">
                 <div class="stat-icon orange">
-                    <i class="fas fa-money-bill-wave"></i>
+                    <i class="icon-money-bill-wave"></i>
                 </div>
                 <div class="stat-info">
                     <h3>K<?php echo number_format($stats['fee_balance'], 2); ?></h3>
@@ -188,7 +206,7 @@ $stats['accommodation_status'] = 'Not Applied';
             
             <div class="stat-card">
                 <div class="stat-icon green">
-                    <i class="fas fa-bed"></i>
+                    <i class="icon-bed"></i>
                 </div>
                 <div class="stat-info">
                     <h3><?php echo htmlspecialchars($stats['accommodation_status']); ?></h3>
