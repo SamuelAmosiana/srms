@@ -15,21 +15,39 @@ $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WH
 $stmt->execute([currentUserId()]);
 $admin = $stmt->fetch();
 
+// Detect optional columns for counterparty info
+try {
+    $colsStmt = $pdo->query("SHOW COLUMNS FROM finance_transactions");
+    $cols = $colsStmt->fetchAll(PDO::FETCH_COLUMN);
+    $hasPartyColumns = in_array('party_type', $cols) && in_array('party_name', $cols);
+} catch (Exception $e) {
+    $hasPartyColumns = false;
+}
+
 // Handle report filtering
 $report_type = $_GET['type'] ?? 'combined';
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date = $_GET['end_date'] ?? date('Y-m-t');
 
 if ($report_type === 'income') {
-    $stmt = $pdo->prepare("SELECT type, description, amount, created_at as transaction_date FROM finance_transactions WHERE type = 'income' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
+    $select = $hasPartyColumns
+        ? "SELECT type, description, amount, created_at as transaction_date, party_type, party_name"
+        : "SELECT type, description, amount, created_at as transaction_date";
+    $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'income' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
     $stmt->execute([$start_date, $end_date]);
     $transactions = $stmt->fetchAll();
 } elseif ($report_type === 'expense') {
-    $stmt = $pdo->prepare("SELECT type, description, amount, created_at as transaction_date FROM finance_transactions WHERE type = 'expense' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
+    $select = $hasPartyColumns
+        ? "SELECT type, description, amount, created_at as transaction_date, party_type, party_name"
+        : "SELECT type, description, amount, created_at as transaction_date";
+    $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'expense' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
     $stmt->execute([$start_date, $end_date]);
     $transactions = $stmt->fetchAll();
 } else {
-    $stmt = $pdo->prepare("SELECT type, description, amount, created_at as transaction_date FROM finance_transactions WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC");
+    $select = $hasPartyColumns
+        ? "SELECT type, description, amount, created_at as transaction_date, party_type, party_name"
+        : "SELECT type, description, amount, created_at as transaction_date";
+    $stmt = $pdo->prepare("$select FROM finance_transactions WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC");
     $stmt->execute([$start_date, $end_date]);
     $transactions = $stmt->fetchAll();
 }
@@ -201,12 +219,14 @@ foreach ($transactions as $transaction) {
                         <th>Description</th>
                         <th>Amount (K)</th>
                         <th>Date</th>
+                        <th>Party Type</th>
+                        <th>Source/Destination</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($transactions)): ?>
                         <tr>
-                            <td colspan="4">No transactions found for the selected period.</td>
+                            <td colspan="6">No transactions found for the selected period.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($transactions as $transaction): ?>
@@ -219,23 +239,25 @@ foreach ($transactions as $transaction) {
                                 <td><?php echo htmlspecialchars($transaction['description']); ?></td>
                                 <td><?php echo number_format($transaction['amount'], 2); ?></td>
                                 <td><?php echo htmlspecialchars($transaction['transaction_date']); ?></td>
+                                <td><?php echo htmlspecialchars($transaction['party_type'] ?? ''); ?></td>
+                                <td><?php echo htmlspecialchars($transaction['party_name'] ?? ''); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="2"><strong>Total Income:</strong></td>
+                        <td colspan="4"><strong>Total Income:</strong></td>
                         <td><strong>K<?php echo number_format($total_income, 2); ?></strong></td>
                         <td></td>
                     </tr>
                     <tr>
-                        <td colspan="2"><strong>Total Expenses:</strong></td>
+                        <td colspan="4"><strong>Total Expenses:</strong></td>
                         <td><strong>K<?php echo number_format($total_expense, 2); ?></strong></td>
                         <td></td>
                     </tr>
                     <tr>
-                        <td colspan="2"><strong>Net Balance:</strong></td>
+                        <td colspan="4"><strong>Net Balance:</strong></td>
                         <td><strong>K<?php echo number_format($total_income - $total_expense, 2); ?></strong></td>
                         <td></td>
                     </tr>
