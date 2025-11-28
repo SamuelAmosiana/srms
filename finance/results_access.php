@@ -51,13 +51,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_update_access'])
 }
 
 // Fetch student data with fee balances and results access status
+// Optional search filter
+$q = isset($_GET['q']) ? trim($_GET['q']) : '';
 try {
-    $stmt = $pdo->query("SELECT sp.student_number as student_id, sp.full_name, sp.balance, sp.results_access 
-                        FROM student_profile sp");
+    if ($q !== '') {
+        $like = "%$q%";
+        $stmt = $pdo->prepare("SELECT sp.student_number as student_id, sp.full_name, sp.balance, sp.results_access 
+                               FROM student_profile sp
+                               WHERE sp.student_number LIKE ? OR sp.full_name LIKE ?");
+        $stmt->execute([$like, $like]);
+    } else {
+        $stmt = $pdo->query("SELECT sp.student_number as student_id, sp.full_name, sp.balance, sp.results_access 
+                            FROM student_profile sp");
+    }
 } catch (Exception $e) {
     // If results_access column doesn't exist, select without it
-    $stmt = $pdo->query("SELECT sp.student_number as student_id, sp.full_name, sp.balance, 1 as results_access 
-                        FROM student_profile sp");
+    if ($q !== '') {
+        $like = "%$q%";
+        $stmt = $pdo->prepare("SELECT sp.student_number as student_id, sp.full_name, sp.balance, 1 as results_access 
+                               FROM student_profile sp
+                               WHERE sp.student_number LIKE ? OR sp.full_name LIKE ?");
+        $stmt->execute([$like, $like]);
+    } else {
+        $stmt = $pdo->query("SELECT sp.student_number as student_id, sp.full_name, sp.balance, 1 as results_access 
+                            FROM student_profile sp");
+    }
 }
 $students = $stmt->fetchAll();
 ?>
@@ -193,9 +211,18 @@ $students = $stmt->fetchAll();
             </form>
         </div>
         
-        <!-- Student Results Access Table -->
+        <!-- Search & Student Results Access Table -->
         <div class="table-container">
-            <h2>Student Results Access</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                <h2 style="margin:0;">Student Results Access</h2>
+                <form method="GET" action="results_access.php" style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="Search by Student # or Name" style="min-width:260px;">
+                    <button type="submit" class="btn">Search</button>
+                    <?php if ($q !== ''): ?>
+                        <a class="btn" href="results_access.php">Clear</a>
+                    <?php endif; ?>
+                </form>
+            </div>
             <table class="data-table">
                 <thead>
                     <tr>
