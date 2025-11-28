@@ -29,6 +29,38 @@ $report_type = $_GET['type'] ?? 'combined';
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date = $_GET['end_date'] ?? date('Y-m-t');
 
+// Export CSV action (respects filters)
+if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
+    $select = $hasPartyColumns
+        ? "SELECT type, description, amount, created_at as date, party_type, party_name"
+        : "SELECT type, description, amount, created_at as date";
+    $where = '';
+    $params = [$start_date, $end_date];
+    if ($report_type === 'income') {
+        $where = "WHERE type = 'income' AND created_at BETWEEN ? AND ?";
+    } elseif ($report_type === 'expense') {
+        $where = "WHERE type = 'expense' AND created_at BETWEEN ? AND ?";
+    } else {
+        $where = "WHERE created_at BETWEEN ? AND ?";
+    }
+    $sql = "$select FROM finance_transactions $where ORDER BY created_at DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="finance_report_'. $report_type . '_' . $start_date . '_to_' . $end_date .'.csv"');
+    $out = fopen('php://output', 'w');
+    $header = $hasPartyColumns
+        ? ['type','description','amount','date','party_type','party_name']
+        : ['type','description','amount','date'];
+    fputcsv($out, $header);
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        fputcsv($out, $row);
+    }
+    fclose($out);
+    exit;
+}
+
 if ($report_type === 'income') {
     $select = $hasPartyColumns
         ? "SELECT type, description, amount, created_at as transaction_date, party_type, party_name"
@@ -196,6 +228,7 @@ foreach ($transactions as $transaction) {
                 <div class="form-actions">
                     <button type="submit" class="btn green">Generate Report</button>
                     <button type="button" class="btn orange" onclick="window.print()">Print Report</button>
+                    <a class="btn" href="finance_reports.php?action=export_csv&type=<?php echo urlencode($report_type); ?>&start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>">Export CSV</a>
                 </div>
             </form>
         </div>
