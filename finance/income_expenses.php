@@ -24,6 +24,27 @@ try {
     $hasPartyColumns = false;
 }
 
+// One-click migration to add party columns when missing
+if (isset($_GET['action']) && $_GET['action'] === 'enable_party' && !$hasPartyColumns) {
+    try {
+        // Re-check columns to avoid race conditions
+        $colsStmt = $pdo->query("SHOW COLUMNS FROM finance_transactions");
+        $cols = $colsStmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('party_type', $cols)) {
+            $pdo->exec("ALTER TABLE finance_transactions ADD COLUMN party_type VARCHAR(50) NULL AFTER description");
+        }
+        if (!in_array('party_name', $cols)) {
+            $pdo->exec("ALTER TABLE finance_transactions ADD COLUMN party_name VARCHAR(255) NULL AFTER party_type");
+        }
+        // Redirect to refresh state
+        header('Location: income_expenses.php?migrated=1');
+        exit;
+    } catch (Exception $e) {
+        $message = "Migration error: " . $e->getMessage();
+        $messageType = "error";
+    }
+}
+
 // Handle form submissions
 $message = '';
 $messageType = '';
@@ -255,6 +276,14 @@ $net_balance = $total_income - $total_expenses;
         <?php if ($message): ?>
             <div class="alert <?php echo $messageType; ?>">
                 <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($message); ?>
+            </div>
+        <?php endif; ?>
+        <?php if (!$hasPartyColumns): ?>
+            <div class="alert warning">
+                <i class="fas fa-info-circle"></i>
+                Party columns are not enabled in the database. Click
+                <a href="?action=enable_party" class="link">Enable Party Columns</a>
+                to store Source/Destination and include them in CSV exports.
             </div>
         <?php endif; ?>
         
