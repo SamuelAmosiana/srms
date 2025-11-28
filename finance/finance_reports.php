@@ -256,7 +256,7 @@ foreach ($transactions as $transaction) {
         
         <!-- Transactions Table -->
         <div class="table-container">
-            <h2 style="text-align:right;"><?php echo ucfirst($report_type); ?> Transactions</h2>
+            <h2 style="text-align:left;"><?php echo ucfirst($report_type); ?> Transactions</h2>
             <table class="data-table">
                 <thead>
                     <tr>

@@ -179,7 +179,7 @@ $students = $stmt->fetchAll();
         <!-- Bulk Access Form -->
         <div class="form-container">
             <h2>Bulk Results Access</h2>
-            <form method="POST" action="results_access.php">
+            <form id="bulkForm" method="POST" action="results_access.php">
                 <div class="form-group">
                     <label for="bulk_action">Action</label>
                     <select name="bulk_action" id="bulk_action" required>
@@ -196,45 +196,43 @@ $students = $stmt->fetchAll();
         <!-- Student Results Access Table -->
         <div class="table-container">
             <h2>Student Results Access</h2>
-            <form method="POST" action="results_access.php">
-                <table class="data-table">
-                    <thead>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                        <th>Student ID</th>
+                        <th>Full Name</th>
+                        <th>Fee Balance (K)</th>
+                        <th>Results Access</th>
+                        <th>Individual Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($students as $student): ?>
                         <tr>
-                            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
-                            <th>Student ID</th>
-                            <th>Full Name</th>
-                            <th>Fee Balance (K)</th>
-                            <th>Results Access</th>
-                            <th>Individual Action</th>
+                            <td><input type="checkbox" name="selected_students[]" form="bulkForm" value="<?php echo $student['student_id']; ?>"></td>
+                            <td><?php echo htmlspecialchars($student['student_id']); ?></td>
+                            <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                            <td><?php echo number_format($student['balance'] ?? 0, 2); ?></td>
+                            <td>
+                                <span class="status <?php echo $student['results_access'] ? 'green' : 'orange'; ?>">
+                                    <?php echo $student['results_access'] ? 'Granted' : 'Restricted'; ?>
+                                </span>
+                            </td>
+                            <td>
+                                <form method="POST" action="results_access.php">
+                                    <input type="hidden" name="student_id" value="<?php echo $student['student_id']; ?>">
+                                    <select name="results_access" onchange="this.form.submit()">
+                                        <option value="1" <?php echo $student['results_access'] ? 'selected' : ''; ?>>Grant Access</option>
+                                        <option value="0" <?php echo !$student['results_access'] ? 'selected' : ''; ?>>Restrict Access</option>
+                                    </select>
+                                    <input type="hidden" name="update_access" value="1">
+                                </form>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($students as $student): ?>
-                            <tr>
-                                <td><input type="checkbox" name="selected_students[]" value="<?php echo $student['student_id']; ?>"></td>
-                                <td><?php echo htmlspecialchars($student['student_id']); ?></td>
-                                <td><?php echo htmlspecialchars($student['full_name']); ?></td>
-                                <td><?php echo number_format($student['balance'] ?? 0, 2); ?></td>
-                                <td>
-                                    <span class="status <?php echo $student['results_access'] ? 'green' : 'orange'; ?>">
-                                        <?php echo $student['results_access'] ? 'Granted' : 'Restricted'; ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <form method="POST" action="results_access.php">
-                                        <input type="hidden" name="student_id" value="<?php echo $student['student_id']; ?>">
-                                        <select name="results_access" onchange="this.form.submit()">
-                                            <option value="1" <?php echo $student['results_access'] ? 'selected' : ''; ?>>Grant Access</option>
-                                            <option value="0" <?php echo !$student['results_access'] ? 'selected' : ''; ?>>Restrict Access</option>
-                                        </select>
-                                        <input type="hidden" name="update_access" value="1">
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </form>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </main>
 
