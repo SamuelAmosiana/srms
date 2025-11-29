@@ -82,6 +82,59 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programme_students' &&
     exit;
 }
 
+// Export courses under a specific programme
+if (isset($_GET['action']) && $_GET['action'] === 'export_programme_courses' && isset($_GET['programme_id'])) {
+    $programme_id = (int)$_GET['programme_id'];
+    $pstmt = $pdo->prepare("SELECT p.name, p.code, s.name AS school_name FROM programme p LEFT JOIN school s ON p.school_id = s.id WHERE p.id = ?");
+    $pstmt->execute([$programme_id]);
+    $pinfo = $pstmt->fetch();
+
+    header('Content-Type: text/csv');
+    $fname = 'programme_' . ($pinfo['code'] ?? $programme_id) . '_courses_' . date('Y-m-d') . '.csv';
+    header('Content-Disposition: attachment; filename="' . $fname . '"');
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['Programme', $pinfo['name'] ?? 'N/A']);
+    fputcsv($out, ['Code', $pinfo['code'] ?? 'N/A']);
+    fputcsv($out, ['School', $pinfo['school_name'] ?? 'N/A']);
+    fputcsv($out, []);
+    fputcsv($out, ['Course Code','Course Name','Credits','Enrollments']);
+    $courses_stmt = $pdo->prepare("SELECT c.code, c.name, c.credits, (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count FROM course c WHERE c.programme_id = ? ORDER BY c.name");
+    $courses_stmt->execute([$programme_id]);
+    foreach ($courses_stmt->fetchAll() as $c) {
+        fputcsv($out, [$c['code'], $c['name'], $c['credits'], $c['enrollment_count']]);
+    }
+    fclose($out);
+    exit;
+}
+
+// Export lecturers for a programme's school (if table exists)
+if (isset($_GET['action']) && $_GET['action'] === 'export_programme_lecturers' && isset($_GET['programme_id'])) {
+    $programme_id = (int)$_GET['programme_id'];
+    $pstmt = $pdo->prepare("SELECT p.name, p.code, p.school_id, s.name AS school_name FROM programme p LEFT JOIN school s ON p.school_id = s.id WHERE p.id = ?");
+    $pstmt->execute([$programme_id]);
+    $pinfo = $pstmt->fetch();
+
+    header('Content-Type: text/csv');
+    $fname = 'programme_' . ($pinfo['code'] ?? $programme_id) . '_lecturers_' . date('Y-m-d') . '.csv';
+    header('Content-Disposition: attachment; filename="' . $fname . '"');
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['Programme', $pinfo['name'] ?? 'N/A']);
+    fputcsv($out, ['Code', $pinfo['code'] ?? 'N/A']);
+    fputcsv($out, ['School', $pinfo['school_name'] ?? 'N/A']);
+    fputcsv($out, []);
+    fputcsv($out, ['Staff ID','Full Name','Email']);
+    $hasLecturerProfile = $pdo->query("SHOW TABLES LIKE 'lecturer_profile'")->rowCount() > 0;
+    if ($hasLecturerProfile && $pinfo && $pinfo['school_id']) {
+        $lecturers_stmt = $pdo->prepare("SELECT staff_id, full_name, (SELECT email FROM users u WHERE u.id = lp.user_id) AS email FROM lecturer_profile lp WHERE lp.school_id = ? ORDER BY full_name");
+        $lecturers_stmt->execute([$pinfo['school_id']]);
+        foreach ($lecturers_stmt->fetchAll() as $l) {
+            fputcsv($out, [$l['staff_id'], $l['full_name'], $l['email']]);
+        }
+    }
+    fclose($out);
+    exit;
+}
+
 // Handle form submissions
 $message = '';
 $messageType = '';
@@ -467,8 +520,14 @@ if (isset($_GET['view'])) {
         @media print {
             .no-print { display: none !important; }
             .print-header { display: block !important; }
+            /* Show only the chosen section during print */
+            .section-card { display: none !important; }
+            body.print-students #studentsSection,
+            body.print-courses #coursesSection,
+            body.print-lecturers #lecturersSection { display: block !important; }
         }
     </style>
+
 </head>
 
 <body class="admin-layout" data-theme="light">
@@ -800,12 +859,6 @@ if (isset($_GET['view'])) {
                     <a href="?edit=<?php echo $viewProgramme['id']; ?>" class="btn btn-orange no-print">
                         <i class="fas fa-edit"></i> Edit
                     </a>
-                    <a href="?action=export_programme_students&programme_id=<?php echo $viewProgramme['id']; ?>" class="btn btn-blue no-print">
-                        <i class="fas fa-file-csv"></i> Export Students CSV
-                    </a>
-                    <button class="btn btn-green no-print" onclick="window.print()">
-                        <i class="fas fa-print"></i> Print / Save as PDF
-                    </button>
                 </div>
             </div>
 
@@ -843,10 +896,16 @@ if (isset($_GET['view'])) {
             </div>
 
             <!-- Students Section -->
-            <div class="section-card">
+            <div class="section-card" id="studentsSection">
                 <div class="section-header">
                     <h3><i class="fas fa-users"></i> Students</h3>
                     <div class="section-actions">
+                        <a href="?action=export_programme_students&programme_id=<?php echo $viewProgramme['id']; ?>" class="btn btn-blue no-print">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </a>
+                        <button class="btn btn-green no-print" onclick="printSection('students')">
+                            <i class="fas fa-print"></i> Print Students
+                        </button>
                         <input type="text" class="search-input" placeholder="Search students..." onkeyup="filterTable(this, 'studentsTable')">
                     </div>
                 </div>
@@ -881,10 +940,16 @@ if (isset($_GET['view'])) {
             </div>
 
             <!-- Courses Section -->
-            <div class="section-card">
+            <div class="section-card" id="coursesSection">
                 <div class="section-header">
                     <h3><i class="fas fa-book"></i> Courses</h3>
                     <div class="section-actions">
+                        <a href="?action=export_programme_courses&programme_id=<?php echo $viewProgramme['id']; ?>" class="btn btn-blue no-print">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </a>
+                        <button class="btn btn-green no-print" onclick="printSection('courses')">
+                            <i class="fas fa-print"></i> Print Courses
+                        </button>
                         <input type="text" class="search-input" placeholder="Search courses..." onkeyup="filterTable(this, 'coursesTable')">
                     </div>
                 </div>
@@ -921,10 +986,16 @@ if (isset($_GET['view'])) {
             </div>
 
             <!-- Lecturers Section -->
-            <div class="section-card">
+            <div class="section-card" id="lecturersSection">
                 <div class="section-header">
                     <h3><i class="fas fa-chalkboard-teacher"></i> Lecturers</h3>
                     <div class="section-actions">
+                        <a href="?action=export_programme_lecturers&programme_id=<?php echo $viewProgramme['id']; ?>" class="btn btn-blue no-print">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </a>
+                        <button class="btn btn-green no-print" onclick="printSection('lecturers')">
+                            <i class="fas fa-print"></i> Print Lecturers
+                        </button>
                         <input type="text" class="search-input" placeholder="Search lecturers..." onkeyup="filterTable(this, 'lecturersTable')">
                     </div>
                 </div>
@@ -1026,6 +1097,23 @@ if (isset($_GET['view'])) {
 
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
+        function printSection(which) {
+            const map = {
+                students: 'print-students',
+                courses: 'print-courses',
+                lecturers: 'print-lecturers'
+            };
+            const cls = map[which];
+            if (!cls) { window.print(); return; }
+            document.body.classList.remove('print-students','print-courses','print-lecturers');
+            document.body.classList.add(cls);
+            setTimeout(() => {
+                window.print();
+                // Remove class shortly after print to restore view
+                setTimeout(() => document.body.classList.remove(cls), 100);
+            }, 50);
+        }
+        
         function showAddForm() {
             document.getElementById('programmeForm').style.display = 'block';
             document.getElementById('importForm').style.display = 'none';
