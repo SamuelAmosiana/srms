@@ -517,6 +517,9 @@ if (isset($_GET['view'])) {
     <style>
         .print-header { display: none; text-align: center; margin-bottom: 10px; }
         .print-header img { max-width: 140px; }
+        .print-programme-summary { display: none; font-size: 14px; margin: 10px 0 16px; text-align: center; }
+        .print-section-title { display: none; font-weight: 600; margin: 8px 0; }
+        .print-programme-summary span { margin-right: 12px; }
         @media print {
             .no-print { display: none !important; }
             .print-header { display: block !important; }
@@ -525,6 +528,11 @@ if (isset($_GET['view'])) {
             body.print-students #studentsSection,
             body.print-courses #coursesSection,
             body.print-lecturers #lecturersSection { display: block !important; }
+            /* Hide all non-essential UI in print */
+            nav.top-nav, aside.sidebar, .content-header, .action-bar, .filters-section, .school-header-card, .stats-grid, .section-header { display: none !important; }
+            .print-programme-summary { display: block !important; }
+            .print-programme-summary span { display: block; margin: 2px 0; }
+            .print-section-title { display: block !important; text-align: left; }
         }
     </style>
 
@@ -836,6 +844,14 @@ if (isset($_GET['view'])) {
             <div class="print-header">
                 <img src="../assets/images/school_logo.jpg" alt="School Logo">
             </div>
+            <div class="print-programme-summary">
+                <span><i class="fas fa-graduation-cap"></i> <?php echo htmlspecialchars($viewProgramme['name']); ?></span>
+                <span>Code: <?php echo htmlspecialchars($viewProgramme['code']); ?></span>
+                <span>School: <?php echo htmlspecialchars($viewProgramme['school_name'] ?? 'N/A'); ?></span>
+                <span>Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> Years</span>
+                <span>Category: <?php echo $viewProgramme['category'] == 'undergraduate' ? 'Undergraduate' : 'Short Course'; ?></span>
+                <span><?php echo htmlspecialchars($viewProgramme['description'] ?? 'No description available'); ?></span>
+            </div>
             <!-- Programme Details View -->
             <div class="school-header-card">
                 <div class="school-icon">
@@ -916,6 +932,7 @@ if (isset($_GET['view'])) {
                         <p>No students enrolled in this programme</p>
                     </div>
                 <?php else: ?>
+                    <div class="print-section-title">Students List</div>
                     <div class="table-responsive">
                         <table class="users-table" id="studentsTable">
                             <thead>
@@ -960,6 +977,7 @@ if (isset($_GET['view'])) {
                         <p>No courses registered under this programme</p>
                     </div>
                 <?php else: ?>
+                    <div class="print-section-title">Courses List</div>
                     <div class="table-responsive">
                         <table class="users-table" id="coursesTable">
                             <thead>
@@ -1006,6 +1024,7 @@ if (isset($_GET['view'])) {
                         <p>No lecturers found in this school</p>
                     </div>
                 <?php else: ?>
+                    <div class="print-section-title">Lecturers List</div>
                     <div class="table-responsive">
                         <table class="users-table" id="lecturersTable">
                             <thead>
