@@ -120,6 +120,10 @@ $students = $stmt->fetchAll();
             
             <div class="nav-section">
                 <h4>Financial Operations</h4>
+                <a href="manage_programme_fees.php" class="nav-item">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span>Programme Fees</span>
+                </a>
                 <a href="income_expenses.php" class="nav-item">
                     <i class="fas fa-chart-pie"></i>
                     <span>Income & Expenses</span>
@@ -164,12 +168,13 @@ $students = $stmt->fetchAll();
                         <th>Full Name</th>
                         <th>Email</th>
                         <th>Programme</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($students)): ?>
                         <tr>
-                            <td colspan="4">No students found.</td>
+                            <td colspan="5">No students found.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($students as $student): ?>
@@ -178,6 +183,11 @@ $students = $stmt->fetchAll();
                                 <td><?php echo htmlspecialchars($student['full_name']); ?></td>
                                 <td><?php echo htmlspecialchars($student['email'] ?? 'N/A'); ?></td>
                                 <td><?php echo htmlspecialchars($student['programme'] ?? 'N/A'); ?></td>
+                                <td>
+                                    <a class="btn small green" href="payment_statement.php?student_number=<?php echo urlencode($student['student_id']); ?>">
+                                        <i class="fas fa-receipt"></i> Payment Statement
+                                    </a>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>

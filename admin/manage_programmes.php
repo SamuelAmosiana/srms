@@ -54,6 +54,34 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
     exit();
 }
 
+// Export enrolled students for a specific programme
+if (isset($_GET['action']) && $_GET['action'] === 'export_programme_students' && isset($_GET['programme_id'])) {
+    $programme_id = (int)$_GET['programme_id'];
+    // Get programme info
+    $pstmt = $pdo->prepare("SELECT p.name, p.code, s.name AS school_name FROM programme p LEFT JOIN school s ON p.school_id = s.id WHERE p.id = ?");
+    $pstmt->execute([$programme_id]);
+    $pinfo = $pstmt->fetch();
+
+    header('Content-Type: text/csv');
+    $fname = 'programme_' . ($pinfo['code'] ?? $programme_id) . '_students_' . date('Y-m-d') . '.csv';
+    header('Content-Disposition: attachment; filename="' . $fname . '"');
+    $out = fopen('php://output', 'w');
+    // Header rows with programme context
+    fputcsv($out, ['Programme', $pinfo['name'] ?? 'N/A']);
+    fputcsv($out, ['Code', $pinfo['code'] ?? 'N/A']);
+    fputcsv($out, ['School', $pinfo['school_name'] ?? 'N/A']);
+    fputcsv($out, []);
+    // Table header
+    fputcsv($out, ['Student Number','Full Name','Email']);
+    $students_stmt = $pdo->prepare("SELECT sp.student_number, sp.full_name, u.email FROM student_profile sp JOIN users u ON sp.user_id = u.id WHERE sp.programme_id = ? ORDER BY sp.full_name");
+    $students_stmt->execute([$programme_id]);
+    foreach ($students_stmt->fetchAll() as $s) {
+        fputcsv($out, [$s['student_number'], $s['full_name'], $s['email']]);
+    }
+    fclose($out);
+    exit;
+}
+
 // Handle form submissions
 $message = '';
 $messageType = '';
@@ -336,6 +364,34 @@ if (isset($_GET['edit'])) {
     $editProgramme = $stmt->fetch();
 }
 
+// Ensure required schema exists BEFORE any dependent queries
+try {
+    $pdo->exec("ALTER TABLE programme DROP FOREIGN KEY IF EXISTS FK_programme_department");
+    $pdo->exec("ALTER TABLE programme DROP COLUMN IF EXISTS department_id");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS school_id INT");
+    $pdo->exec("ALTER TABLE programme ADD CONSTRAINT FK_programme_school FOREIGN KEY (school_id) REFERENCES school(id) ON DELETE SET NULL");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS description TEXT");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration INT");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS category ENUM('undergraduate', 'short_course') DEFAULT 'undergraduate'");
+    $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS programme_id INT");
+    $pdo->exec("ALTER TABLE course ADD CONSTRAINT FK_course_programme FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS lecturer_profile (
+        user_id INT PRIMARY KEY,
+        full_name VARCHAR(255),
+        staff_id VARCHAR(50),
+        school_id INT,
+        department_id INT,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (school_id) REFERENCES school(id),
+        FOREIGN KEY (department_id) REFERENCES department(id)
+    )");
+} catch (Exception $e) {
+    // Ignore if not supported; page will still function without lecturers
+}
+
 // Get programme details for viewing if specified
 $viewProgramme = null;
 $programmeStudents = [];
@@ -377,51 +433,24 @@ if (isset($_GET['view'])) {
         $courses_stmt->execute([$programme_id]);
         $programmeCourses = $courses_stmt->fetchAll();
 
-        // Get lecturers in this school (assuming lecturer_profile exists with school_id)
-        $lecturers_stmt = $pdo->prepare("
-            SELECT lp.*, u.username, u.email as user_email
-            FROM lecturer_profile lp 
-            JOIN users u ON lp.user_id = u.id
-            WHERE lp.school_id = ?
-            ORDER BY lp.full_name
-        ");
-        $lecturers_stmt->execute([$viewProgramme['school_id']]);
-        $programmeLecturers = $lecturers_stmt->fetchAll();
+        // Get lecturers in this school if lecturer_profile table exists
+        $hasLecturerProfile = $pdo->query("SHOW TABLES LIKE 'lecturer_profile'")->rowCount() > 0;
+        if ($hasLecturerProfile) {
+            $lecturers_stmt = $pdo->prepare("
+                SELECT lp.*, u.username, u.email as user_email
+                FROM lecturer_profile lp 
+                JOIN users u ON lp.user_id = u.id
+                WHERE lp.school_id = ?
+                ORDER BY lp.full_name
+            ");
+            $lecturers_stmt->execute([$viewProgramme['school_id']]);
+            $programmeLecturers = $lecturers_stmt->fetchAll();
+        } else {
+            $programmeLecturers = [];
+        }
     }
 }
 
-// Add missing columns to programme table if they don't exist
-try {
-    $pdo->exec("ALTER TABLE programme DROP FOREIGN KEY IF EXISTS FK_programme_department");
-    $pdo->exec("ALTER TABLE programme DROP COLUMN IF EXISTS department_id");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS school_id INT");
-    $pdo->exec("ALTER TABLE programme ADD CONSTRAINT FK_programme_school FOREIGN KEY (school_id) REFERENCES school(id) ON DELETE SET NULL");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS description TEXT");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration INT");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
-    // Add category column for programme type
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS category ENUM('undergraduate', 'short_course') DEFAULT 'undergraduate'");
-    
-    // Add programme_id to course
-    $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS programme_id INT");
-    $pdo->exec("ALTER TABLE course ADD CONSTRAINT FK_course_programme FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL");
-    
-    // Create lecturer_profile if not exists
-    $pdo->exec("CREATE TABLE IF NOT EXISTS lecturer_profile (
-        user_id INT PRIMARY KEY,
-        full_name VARCHAR(255),
-        staff_id VARCHAR(50),
-        school_id INT,
-        department_id INT,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (school_id) REFERENCES school(id),
-        FOREIGN KEY (department_id) REFERENCES department(id)
-    )");
-} catch (Exception $e) {
-    // Columns might already exist or other issues
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -432,7 +461,16 @@ try {
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .print-header { display: none; text-align: center; margin-bottom: 10px; }
+        .print-header img { max-width: 140px; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-header { display: block !important; }
+        }
+    </style>
 </head>
+
 <body class="admin-layout" data-theme="light">
     <!-- Top Navigation Bar -->
     <nav class="top-nav">
@@ -736,6 +774,9 @@ try {
         </div>
 
         <?php if ($viewProgramme): ?>
+            <div class="print-header">
+                <img src="../assets/images/school_logo.jpg" alt="School Logo">
+            </div>
             <!-- Programme Details View -->
             <div class="school-header-card">
                 <div class="school-icon">
@@ -756,9 +797,15 @@ try {
                     <p class="school-description"><?php echo htmlspecialchars($viewProgramme['description'] ?? 'No description available'); ?></p>
                 </div>
                 <div class="school-actions">
-                    <a href="?edit=<?php echo $viewProgramme['id']; ?>" class="btn btn-orange">
+                    <a href="?edit=<?php echo $viewProgramme['id']; ?>" class="btn btn-orange no-print">
                         <i class="fas fa-edit"></i> Edit
                     </a>
+                    <a href="?action=export_programme_students&programme_id=<?php echo $viewProgramme['id']; ?>" class="btn btn-blue no-print">
+                        <i class="fas fa-file-csv"></i> Export Students CSV
+                    </a>
+                    <button class="btn btn-green no-print" onclick="window.print()">
+                        <i class="fas fa-print"></i> Print / Save as PDF
+                    </button>
                 </div>
             </div>
 
@@ -822,9 +869,9 @@ try {
                             <tbody>
                                 <?php foreach ($programmeStudents as $student): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($student['student_id']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['full_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['user_email']); ?></td>
+                                        <td><?php echo htmlspecialchars($student['student_number'] ?? ''); ?></td>
+                                        <td><?php echo htmlspecialchars($student['full_name'] ?? ''); ?></td>
+                                        <td><?php echo htmlspecialchars($student['user_email'] ?? ''); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>

@@ -331,6 +331,10 @@ foreach ($programme_fees as $fee) {
             
             <div class="nav-section">
                 <h4>Financial Operations</h4>
+                <a href="manage_programme_fees.php" class="nav-item">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span>Programme Fees</span>
+                </a>
                 <a href="income_expenses.php" class="nav-item">
                     <i class="fas fa-chart-pie"></i>
                     <span>Income & Expenses</span>
