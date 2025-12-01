@@ -28,11 +28,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 try {
                     if ($registration_type === 'course') {
+                        // Fetch course registration details to get payment information
+                        $stmt = $pdo->prepare("
+                            SELECT cr.*, sp.full_name, sp.student_number, sp.user_id as student_user_id, c.name as course_name
+                            FROM course_registration cr
+                            JOIN student_profile sp ON cr.student_id = sp.user_id
+                            JOIN course c ON cr.course_id = c.id
+                            WHERE cr.student_id = ? AND cr.status = 'approved' AND cr.finance_cleared = 0
+                            LIMIT 1
+                        ");
+                        $stmt->execute([$student_id]);
+                        $registration_details = $stmt->fetch();
+                        
                         // Mark course registration as cleared for finance
                         $stmt = $pdo->prepare("UPDATE course_registration SET finance_cleared = 1, finance_cleared_at = NOW(), finance_cleared_by = ? WHERE student_id = ? AND status = 'approved' AND finance_cleared = 0");
                         $stmt->execute([currentUserId(), $student_id]);
                         
                         if ($stmt->rowCount() > 0) {
+                            // Automatically register payment as income if payment information exists
+                            if ($registration_details && isset($registration_details['payment_amount']) && $registration_details['payment_amount'] > 0) {
+                                $description = "School fees payment for " . $registration_details['course_name'];
+                                $amount = $registration_details['payment_amount'];
+                                $student_user_id = $registration_details['student_user_id'];
+                                
+                                // Insert into finance_transactions table
+                                $insert_stmt = $pdo->prepare("INSERT INTO finance_transactions (student_user_id, type, amount, description, created_at, party_type, party_name) VALUES (?, 'income', ?, ?, NOW(), 'Student', ?)");
+                                $insert_stmt->execute([$student_user_id, $amount, $description, $registration_details['full_name']]);
+                            }
+                            
                             $message = "Course registration cleared successfully!";
                             $messageType = 'success';
                         } else {
@@ -40,11 +63,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $messageType = 'error';
                         }
                     } else {
+                        // Fetch first-time registration details to get payment information
+                        $stmt = $pdo->prepare("
+                            SELECT ps.*, sp.user_id as student_user_id
+                            FROM pending_students ps
+                            LEFT JOIN student_profile sp ON ps.email = sp.email
+                            WHERE ps.id = ? AND ps.registration_status = 'approved' AND ps.finance_cleared = 0
+                            LIMIT 1
+                        ");
+                        $stmt->execute([$student_id]);
+                        $registration_details = $stmt->fetch();
+                        
                         // Mark first-time registration as cleared for finance
                         $stmt = $pdo->prepare("UPDATE pending_students SET finance_cleared = 1, finance_cleared_at = NOW(), finance_cleared_by = ? WHERE id = ? AND registration_status = 'approved' AND finance_cleared = 0");
                         $stmt->execute([currentUserId(), $student_id]);
                         
                         if ($stmt->rowCount() > 0) {
+                            // Automatically register payment as income if payment information exists
+                            if ($registration_details && isset($registration_details['payment_amount']) && $registration_details['payment_amount'] > 0) {
+                                $description = "School fees payment for first-time registration";
+                                $amount = $registration_details['payment_amount'];
+                                $student_user_id = $registration_details['student_user_id'] ?? null;
+                                
+                                // Insert into finance_transactions table
+                                if ($student_user_id) {
+                                    $insert_stmt = $pdo->prepare("INSERT INTO finance_transactions (student_user_id, type, amount, description, created_at, party_type, party_name) VALUES (?, 'income', ?, ?, NOW(), 'Student', ?)");
+                                    $insert_stmt->execute([$student_user_id, $amount, $description, $registration_details['full_name']]);
+                                } else {
+                                    $insert_stmt = $pdo->prepare("INSERT INTO finance_transactions (type, amount, description, created_at, party_type, party_name) VALUES ('income', ?, ?, NOW(), 'Student', ?)");
+                                    $insert_stmt->execute([$amount, $description, $registration_details['full_name']]);
+                                }
+                            }
+                            
                             $message = "First-time registration cleared successfully!";
                             $messageType = 'success';
                         } else {
