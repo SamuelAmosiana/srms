@@ -146,6 +146,7 @@ try {
     
     $pdo->exec("CREATE TABLE IF NOT EXISTS pending_students (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        student_number VARCHAR(50),
         full_name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
         contact VARCHAR(255),
@@ -155,7 +156,17 @@ try {
         intake_id INT,
         temp_password VARCHAR(255),
         status ENUM('accepted', 'declined') DEFAULT 'accepted',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        registration_status ENUM('pending','pending_approval','approved','rejected') DEFAULT 'pending',
+        rejection_reason TEXT,
+        payment_method VARCHAR(50),
+        payment_amount DECIMAL(10,2),
+        transaction_id VARCHAR(100),
+        payment_proof VARCHAR(255),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        finance_cleared TINYINT(1) DEFAULT 0,
+        finance_cleared_at TIMESTAMP NULL,
+        finance_cleared_by INT NULL
     )");
 } catch (Exception $e) {
     // Tables might already exist

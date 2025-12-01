@@ -269,6 +269,9 @@ try {
         status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
         rejection_reason TEXT,
         submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        finance_cleared TINYINT(1) DEFAULT 0,
+        finance_cleared_at TIMESTAMP NULL,
+        finance_cleared_by INT NULL,
         FOREIGN KEY (student_id) REFERENCES users(id),
         FOREIGN KEY (course_id) REFERENCES course(id)
     )");
@@ -319,7 +322,7 @@ try {
             margin: 15% auto;
             padding: 20px;
             border: 1px solid #888;
-            width: 80%;
+            width: 100%;
             max-width: 500px;
             border-radius: 5px;
         }

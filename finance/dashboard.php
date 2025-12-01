@@ -218,6 +218,10 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
                     <i class="fas fa-file-invoice"></i>
                     <span>Finance Reports</span>
                 </a>
+                <a href="registration_clearance.php" class="nav-item">
+                    <i class="fas fa-user-check"></i>
+                    <span>Registration Clearance</span>
+                </a>
             </div>
         </nav>
     </aside>

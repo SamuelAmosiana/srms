@@ -4,6 +4,23 @@
 
 require_once 'config.php';
 
+// Ensure pending_students table has all required columns
+try {
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS student_number VARCHAR(50)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS registration_status ENUM('pending','pending_approval','approved','rejected') DEFAULT 'pending'");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS rejection_reason TEXT");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS payment_amount DECIMAL(10,2)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(100)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS payment_proof VARCHAR(255)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS finance_cleared TINYINT(1) DEFAULT 0");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS finance_cleared_at TIMESTAMP NULL");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS finance_cleared_by INT NULL");
+} catch (Exception $e) {
+    // Columns might already exist
+}
+
 // Handle form submissions
 $message = '';
 $messageType = '';
