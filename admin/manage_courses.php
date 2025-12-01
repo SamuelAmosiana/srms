@@ -234,9 +234,9 @@ if (isset($_GET['view'])) {
     if ($viewCourse) {
         // Get enrollments for this course
         $enrollments_stmt = $pdo->prepare("
-            SELECT ce.*, sp.student_id, sp.full_name, u.email as user_email
+            SELECT ce.*, sp.user_id as student_id, sp.full_name, u.email as user_email
             FROM course_enrollment ce
-            JOIN student_profile sp ON ce.student_id = sp.user_id
+            JOIN student_profile sp ON ce.student_user_id = sp.user_id
             JOIN users u ON sp.user_id = u.id
             WHERE ce.course_id = ?
             ORDER BY sp.full_name
