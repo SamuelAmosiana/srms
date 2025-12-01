@@ -10,6 +10,27 @@ if (!currentUserId()) {
 
 requireRole('Enrollment Officer', $pdo);
 
+// Create registered_students table if it doesn't exist
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS registered_students (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        student_name VARCHAR(150) NOT NULL,
+        student_email VARCHAR(255) NOT NULL,
+        student_number VARCHAR(20) UNIQUE,
+        programme_name VARCHAR(255),
+        intake_name VARCHAR(255),
+        payment_amount DECIMAL(10,2),
+        registration_type ENUM('course', 'first_time') NOT NULL,
+        status ENUM('pending_notification', 'email_sent') DEFAULT 'pending_notification',
+        email_sent_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )");
+} catch (Exception $e) {
+    error_log("Error creating registered_students table: " . $e->getMessage());
+}
+
 // Handle CSV export for personal approvals
 if (isset($_GET['export']) && $_GET['export'] === 'personal') {
     // Set headers for CSV download
@@ -199,6 +220,14 @@ foreach ($rejectionsByCategory as $apps) {
             </div>
             
             <div class="nav-section">
+                <h4>Registered Students</h4>
+                <a href="registered_students.php" class="nav-item">
+                    <i class="fas fa-user-graduate"></i>
+                    <span>Registered Students</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
                 <h4>Reports</h4>
                 <a href="reports.php" class="nav-item">
                     <i class="fas fa-chart-bar"></i>
@@ -214,6 +243,13 @@ foreach ($rejectionsByCategory as $apps) {
             <h1><i class="fas fa-thumbs-up"></i> My Approvals & Rejections</h1>
             <p>View and export your processed applications</p>
         </div>
+        
+        <?php if (isset($message)): ?>
+            <div class="alert alert-<?php echo $messageType; ?>">
+                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
+                <?php echo htmlspecialchars($message); ?>
+            </div>
+        <?php endif; ?>
         
         <!-- Export Button -->
         <div class="action-bar">
@@ -349,25 +385,6 @@ foreach ($rejectionsByCategory as $apps) {
                             </table>
                         </div>
                     <?php endif; ?>
-                </div>
-            </div>
-                                        <th>Intake</th>
-                                        <th>Approved Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($approvalsByCategory['corporate'] as $app): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($app['full_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['email']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
-                                            <td><?php echo date('Y-m-d', strtotime($app['updated_at'])); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
                 </div>
             </div>
         </div>

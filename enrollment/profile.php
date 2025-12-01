@@ -151,6 +151,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             
             <div class="nav-section">
+                <h4>Registered Students</h4>
+                <a href="registered_students.php" class="nav-item">
+                    <i class="fas fa-user-graduate"></i>
+                    <span>Registered Students</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
                 <h4>Reports</h4>
                 <a href="reports.php" class="nav-item">
                     <i class="fas fa-chart-bar"></i>
