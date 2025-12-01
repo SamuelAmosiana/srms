@@ -52,11 +52,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_courses') {
     exit();
 }
 
-// Handle form submissions
+// Handle form actions
 $message = '';
 $messageType = '';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add_course':
@@ -173,6 +173,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
                 }
                 break;
+                
+            case 'assign_lecturer':
+                $course_id = $_POST['course_id'];
+                $lecturer_id = $_POST['lecturer_id'];
+                $academic_year = $_POST['academic_year'];
+                $semester = $_POST['semester'];
+                
+                try {
+                    // Check if this lecturer is already assigned to this course for the same intake/semester
+                    $check_stmt = $pdo->prepare("SELECT id FROM course_assignment WHERE course_id = ? AND lecturer_id = ? AND academic_year = ? AND semester = ? AND is_active = 1");
+                    $check_stmt->execute([$course_id, $lecturer_id, $academic_year, $semester]);
+                    
+                    if ($check_stmt->fetch()) {
+                        $message = "This lecturer is already assigned to this course for the selected intake and semester!";
+                        $messageType = 'error';
+                    } else {
+                        // Assign lecturer to course
+                        $assign_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id, academic_year, semester, is_active) VALUES (?, ?, ?, ?, 1)");
+                        $assign_stmt->execute([$course_id, $lecturer_id, $academic_year, $semester]);
+                        
+                        $message = "Lecturer assigned to course successfully!";
+                        $messageType = 'success';
+                    }
+                } catch (Exception $e) {
+                    $message = "Error assigning lecturer: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
+            case 'unassign_lecturer':
+                $assignment_id = $_POST['assignment_id'];
+                
+                try {
+                    // Deactivate the assignment
+                    $unassign_stmt = $pdo->prepare("UPDATE course_assignment SET is_active = 0 WHERE id = ?");
+                    $unassign_stmt->execute([$assignment_id]);
+                    
+                    $message = "Lecturer unassigned from course successfully!";
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = "Error unassigning lecturer: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
         }
     }
 }
@@ -219,6 +263,10 @@ if (isset($_GET['edit'])) {
 // Get course details for viewing if specified
 $viewCourse = null;
 $courseEnrollments = [];
+$courseLecturers = [];
+$availableLecturers = [];
+$intakes = [];
+
 if (isset($_GET['view'])) {
     $course_id = $_GET['view'];
     $course_stmt = $pdo->prepare("
@@ -243,6 +291,35 @@ if (isset($_GET['view'])) {
         ");
         $enrollments_stmt->execute([$course_id]);
         $courseEnrollments = $enrollments_stmt->fetchAll();
+        
+        // Get current lecturers assigned to this course
+        $lecturers_stmt = $pdo->prepare("
+            SELECT ca.*, sp.full_name, sp.staff_id, i.name as intake_name, u.email
+            FROM course_assignment ca
+            JOIN staff_profile sp ON ca.lecturer_id = sp.user_id
+            JOIN users u ON sp.user_id = u.id
+            JOIN intake i ON ca.academic_year = i.name
+            WHERE ca.course_id = ? AND ca.is_active = 1
+            ORDER BY ca.academic_year, ca.semester
+        ");
+        $lecturers_stmt->execute([$course_id]);
+        $courseLecturers = $lecturers_stmt->fetchAll();
+        
+        // Get available lecturers for this programme
+        $available_lecturers_stmt = $pdo->prepare("
+            SELECT sp.user_id, sp.full_name, sp.staff_id, u.email
+            FROM staff_profile sp
+            JOIN users u ON sp.user_id = u.id
+            WHERE sp.user_id IN (SELECT user_id FROM user_roles WHERE role_id = 2)
+            ORDER BY sp.full_name
+        ");
+        $available_lecturers_stmt->execute();
+        $availableLecturers = $available_lecturers_stmt->fetchAll();
+        
+        // Get intakes for assignment dropdown
+        $intakes_stmt = $pdo->prepare("SELECT * FROM intake ORDER BY start_date DESC");
+        $intakes_stmt->execute();
+        $intakes = $intakes_stmt->fetchAll();
     }
 }
 
@@ -266,7 +343,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Courses - LSC SRMS</title>
+    <title>Manage Courses - LSC</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -600,6 +677,113 @@ try {
                         </table>
                     </div>
                 <?php endif; ?>
+            </div>
+            
+            <!-- Current Lecturers Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="fas fa-chalkboard-teacher"></i> Current Course Lecturers</h3>
+                </div>
+                <?php if (empty($courseLecturers)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                        <h4>No Assigned Lecturers</h4>
+                        <p>No lecturers currently assigned to this course</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Lecturer Name</th>
+                                    <th>Staff ID</th>
+                                    <th>Email</th>
+                                    <th>Intake</th>
+                                    <th>Term</th>
+                                    <th>Assigned Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($courseLecturers as $lecturer): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($lecturer['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($lecturer['staff_id']); ?></td>
+                                        <td><?php echo htmlspecialchars($lecturer['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($lecturer['intake_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($lecturer['semester']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($lecturer['assigned_at'])); ?></td>
+                                        <td>
+                                            <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to unassign this lecturer from this course?');">
+                                                <input type="hidden" name="action" value="unassign_lecturer">
+                                                <input type="hidden" name="assignment_id" value="<?php echo $lecturer['id']; ?>">
+                                                <button type="submit" class="btn-icon btn-delete" title="Unassign Lecturer">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Assign Lecturer Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="fas fa-user-plus"></i> Assign Lecturer to Course</h3>
+                </div>
+                <form method="POST" class="school-form">
+                    <input type="hidden" name="action" value="assign_lecturer">
+                    <input type="hidden" name="course_id" value="<?php echo $viewCourse['id']; ?>">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="lecturer_id">Select Lecturer *</label>
+                            <select id="lecturer_id" name="lecturer_id" required>
+                                <option value="">-- Select Lecturer --</option>
+                                <?php foreach ($availableLecturers as $lecturer): ?>
+                                    <option value="<?php echo $lecturer['user_id']; ?>">
+                                        <?php echo htmlspecialchars($lecturer['full_name']); ?> 
+                                        (<?php echo htmlspecialchars($lecturer['staff_id']); ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="academic_year">Intake *</label>
+                            <select id="academic_year" name="academic_year" required>
+                                <option value="">-- Select Intake --</option>
+                                <?php foreach ($intakes as $intake): ?>
+                                    <option value="<?php echo htmlspecialchars($intake['name']); ?>">
+                                        <?php echo htmlspecialchars($intake['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="semester">Term *</label>
+                            <select id="semester" name="semester" required>
+                                <option value="">-- Select Term --</option>
+                                <option value="1">Term 1</option>
+                                <option value="2">Term 2</option>
+                                <option value="Summer">Term 3</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-green">
+                            <i class="fas fa-user-plus"></i> Assign Lecturer
+                        </button>
+                    </div>
+                </form>
             </div>
         <?php else: ?>
             <!-- Courses Table -->
