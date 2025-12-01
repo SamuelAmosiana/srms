@@ -97,11 +97,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programme_courses' && 
     fputcsv($out, ['Code', $pinfo['code'] ?? 'N/A']);
     fputcsv($out, ['School', $pinfo['school_name'] ?? 'N/A']);
     fputcsv($out, []);
-    fputcsv($out, ['Course Code','Course Name','Credits','Enrollments']);
-    $courses_stmt = $pdo->prepare("SELECT c.code, c.name, c.credits, (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count FROM course c WHERE c.programme_id = ? ORDER BY c.name");
+    // Detect if 'term' column exists
+    $hasTerm = $pdo->query("SHOW COLUMNS FROM course LIKE 'term'")->rowCount() > 0;
+    fputcsv($out, $hasTerm ? ['Course Code','Course Name','Credits','Enrollments','Term'] : ['Course Code','Course Name','Credits','Enrollments']);
+    if ($hasTerm) {
+        $courses_stmt = $pdo->prepare("SELECT c.code, c.name, c.credits, c.term, (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count FROM course c WHERE c.programme_id = ? ORDER BY COALESCE(c.term, ''), c.name");
+    } else {
+        $courses_stmt = $pdo->prepare("SELECT c.code, c.name, c.credits, (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count FROM course c WHERE c.programme_id = ? ORDER BY c.name");
+    }
     $courses_stmt->execute([$programme_id]);
     foreach ($courses_stmt->fetchAll() as $c) {
-        fputcsv($out, [$c['code'], $c['name'], $c['credits'], $c['enrollment_count']]);
+        if ($hasTerm) {
+            fputcsv($out, [$c['code'], $c['name'], $c['credits'], $c['enrollment_count'], $c['term'] ?? '']);
+        } else {
+            fputcsv($out, [$c['code'], $c['name'], $c['credits'], $c['enrollment_count']]);
+        }
     }
     fclose($out);
     exit;
@@ -430,7 +440,14 @@ try {
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS category ENUM('undergraduate', 'short_course') DEFAULT 'undergraduate'");
     $pdo->exec("ALTER TABLE course ADD COLUMN IF NOT EXISTS programme_id INT");
+    // Ensure 'term' column exists across MySQL versions
+    $hasCourseTerm = $pdo->query("SHOW COLUMNS FROM course LIKE 'term'")->rowCount() > 0;
+    if (!$hasCourseTerm) {
+        try { $pdo->exec("ALTER TABLE course ADD COLUMN term VARCHAR(50) NULL"); } catch (Exception $e) { /* ignore */ }
+    }
+    $hasCourseTerm = $pdo->query("SHOW COLUMNS FROM course LIKE 'term'")->rowCount() > 0;
     $pdo->exec("ALTER TABLE course ADD CONSTRAINT FK_course_programme FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS lecturer_profile (
         user_id INT PRIMARY KEY,
         full_name VARCHAR(255),
@@ -476,13 +493,23 @@ if (isset($_GET['view'])) {
         $programmeStudents = $students_stmt->fetchAll();
         
         // Get courses under this programme
-        $courses_stmt = $pdo->prepare("
-            SELECT c.*, 
-                   (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count
-            FROM course c 
-            WHERE c.programme_id = ?
-            ORDER BY c.name
-        ");
+        if (isset($hasCourseTerm) && $hasCourseTerm) {
+            $courses_stmt = $pdo->prepare("
+                SELECT c.*, 
+                       (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count
+                FROM course c 
+                WHERE c.programme_id = ?
+                ORDER BY COALESCE(c.term, ''), c.name
+            ");
+        } else {
+            $courses_stmt = $pdo->prepare("
+                SELECT c.*, 
+                       (SELECT COUNT(*) FROM course_enrollment ce WHERE ce.course_id = c.id) as enrollment_count
+                FROM course c 
+                WHERE c.programme_id = ?
+                ORDER BY c.name
+            ");
+        }
         $courses_stmt->execute([$programme_id]);
         $programmeCourses = $courses_stmt->fetchAll();
 
@@ -515,10 +542,19 @@ if (isset($_GET['view'])) {
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        html, body { max-width: 100%; overflow-x: auto; }
+        .table-responsive { overflow-x: auto; }
+        .users-table { width: 100%; min-width: 900px; }
+        /* Ensure complex blocks allow horizontal scroll if needed */
+        .section-card, .school-header-card, .stats-grid { overflow-x: auto; }
+        /* Use global admin-dashboard.css layout (no custom grid overrides here) */
+
         .print-header { display: none; text-align: center; margin-bottom: 10px; }
         .print-header img { max-width: 140px; }
         .print-programme-summary { display: none; font-size: 14px; margin: 10px 0 16px; text-align: center; }
         .print-section-title { display: none; font-weight: 600; margin: 8px 0; }
+        .term-title { font-weight: 600; margin: 10px 0 6px; }
+
         .print-programme-summary span { margin-right: 12px; }
         @media print {
             .no-print { display: none !important; }
@@ -530,15 +566,13 @@ if (isset($_GET['view'])) {
             body.print-lecturers #lecturersSection { display: block !important; }
             /* Hide all non-essential UI in print */
             nav.top-nav, aside.sidebar, .content-header, .action-bar, .filters-section, .school-header-card, .stats-grid, .section-header { display: none !important; }
-            .print-programme-summary { display: block !important; }
             .print-programme-summary span { display: block; margin: 2px 0; }
             .print-section-title { display: block !important; text-align: left; }
         }
     </style>
-
 </head>
-
 <body class="admin-layout" data-theme="light">
+
     <!-- Top Navigation Bar -->
     <nav class="top-nav">
         <div class="nav-left">
@@ -550,18 +584,15 @@ if (isset($_GET['view'])) {
                 <i class="fas fa-bars"></i>
             </button>
         </div>
-        
         <div class="nav-right">
             <div class="user-info">
                 <span class="welcome-text">Welcome, <?php echo htmlspecialchars($user['full_name'] ?? 'Administrator'); ?></span>
                 <span class="staff-id">(<?php echo htmlspecialchars($user['staff_id'] ?? 'N/A'); ?>)</span>
             </div>
-            
             <div class="nav-actions">
                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
                     <i class="fas fa-moon" id="theme-icon"></i>
                 </button>
-                
                 <div class="dropdown">
                     <button class="profile-btn" onclick="toggleDropdown()">
                         <i class="fas fa-user-circle"></i>
@@ -583,90 +614,41 @@ if (isset($_GET['view'])) {
         <div class="sidebar-header">
             <h3><i class="fas fa-tachometer-alt"></i> Admin Panel</h3>
         </div>
-        
         <nav class="sidebar-nav">
             <a href="dashboard.php" class="nav-item">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
-            
             <div class="nav-section">
                 <h4>Users Management!</h4>
-                <a href="manage_users.php" class="nav-item">
-                    <i class="fas fa-users"></i>
-                    <span>Manage Users</span>
-                </a>
-                <a href="manage_roles.php" class="nav-item">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Roles & Permissions</span>
-                </a>
-                <a href="upload_users.php" class="nav-item">
-                    <i class="fas fa-upload"></i>
-                    <span>Bulk Upload</span>
-                </a>
+                <a href="manage_users.php" class="nav-item"><i class="fas fa-users"></i><span>Manage Users</span></a>
+                <a href="manage_roles.php" class="nav-item"><i class="fas fa-shield-alt"></i><span>Roles & Permissions</span></a>
+                <a href="upload_users.php" class="nav-item"><i class="fas fa-upload"></i><span>Bulk Upload</span></a>
             </div>
-            
             <div class="nav-section">
                 <h4>Academic Structure</h4>
-                <a href="manage_schools.php" class="nav-item">
-                    <i class="fas fa-university"></i>
-                    <span>Schools</span>
-                </a>
-                <a href="manage_departments.php" class="nav-item">
-                    <i class="fas fa-building"></i>
-                    <span>Departments</span>
-                </a>
-                <a href="manage_programmes.php" class="nav-item active">
-                    <i class="fas fa-graduation-cap"></i>
-                    <span>Programmes</span>
-                </a>
-                <a href="manage_courses.php" class="nav-item">
-                    <i class="fas fa-book"></i>
-                    <span>Courses</span>
-                </a>
-                <a href="manage_intakes.php" class="nav-item">
-                    <i class="fas fa-calendar-alt"></i>
-                    <span>Intakes</span>
-                </a>
+                <a href="manage_schools.php" class="nav-item"><i class="fas fa-university"></i><span>Schools</span></a>
+                <a href="manage_departments.php" class="nav-item"><i class="fas fa-building"></i><span>Departments</span></a>
+                <a href="manage_programmes.php" class="nav-item active"><i class="fas fa-graduation-cap"></i><span>Programmes</span></a>
+                <a href="manage_courses.php" class="nav-item"><i class="fas fa-book"></i><span>Courses</span></a>
+                <a href="manage_intakes.php" class="nav-item"><i class="fas fa-calendar-alt"></i><span>Intakes</span></a>
             </div>
-            
             <div class="nav-section">
                 <h4>Academic Operations</h4>
-                <a href="manage_results.php" class="nav-item">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Results Management</span>
-                </a>
-                <a href="enrollment_approvals.php" class="nav-item">
-                    <i class="fas fa-user-check"></i>
-                    <span>Enrollment Approvals</span>
-                </a>
-                <a href="course_registrations.php" class="nav-item">
-                    <i class="fas fa-clipboard-check"></i>
-                    <span>Course Registrations</span>
-                </a>
+                <a href="manage_results.php" class="nav-item"><i class="fas fa-chart-line"></i><span>Results Management</span></a>
+                <a href="enrollment_approvals.php" class="nav-item"><i class="fas fa-user-check"></i><span>Enrollment Approvals</span></a>
+                <a href="course_registrations.php" class="nav-item"><i class="fas fa-clipboard-check"></i><span>Course Registrations</span></a>
             </div>
-            
             <div class="nav-section">
                 <h4>Reports & Analytics</h4>
-                <a href="reports.php" class="nav-item">
-                    <i class="fas fa-chart-bar"></i>
-                    <span>Reports</span>
-                </a>
-                <a href="analytics.php" class="nav-item">
-                    <i class="fas fa-analytics"></i>
-                    <span>Analytics</span>
-                </a>
+                <a href="reports.php" class="nav-item"><i class="fas fa-chart-bar"></i><span>Reports</span></a>
+                <a href="analytics.php" class="nav-item"><i class="fas fa-analytics"></i><span>Analytics</span></a>
             </div>
         </nav>
     </aside>
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="content-header">
-            <h1><i class="fas fa-graduation-cap"></i> Programme Management</h1>
-            <p>Create, edit, and manage academic programmes within the institution</p>
-        </div>
-
         <?php if ($message): ?>
             <div class="alert alert-<?php echo $messageType; ?>">
                 <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
@@ -684,136 +666,136 @@ if (isset($_GET['view'])) {
             </div>
         <?php endif; ?>
 
-        <!-- Navigation Actions -->
-        <div class="action-bar">
-            <div class="action-left">
-                <?php if (isset($_GET['view'])): ?>
-                    <a href="manage_programmes.php" class="btn btn-orange">
-                        <i class="fas fa-arrow-left"></i> Back to Programmes
-                    </a>
-                <?php endif; ?>
-            </div>
-            <div class="action-right">
-                <?php if (!isset($_GET['view'])): ?>
-                    <button onclick="showAddForm()" class="btn btn-green">
-                        <i class="fas fa-plus"></i> Add New Programme
+    <!-- Navigation Actions -->
+    <div class="action-bar">
+        <div class="action-left">
+            <?php if (isset($_GET['view'])): ?>
+                <a href="manage_programmes.php" class="btn btn-orange">
+                    <i class="fas fa-arrow-left"></i> Back to Programmes
+                </a>
+            <?php endif; ?>
+        </div>
+        <div class="action-right">
+            <?php if (!isset($_GET['view'])): ?>
+                <button onclick="showAddForm()" class="btn btn-green">
+                    <i class="fas fa-plus"></i> Add New Programme
+                </button>
+                <button onclick="showImportForm()" class="btn btn-blue">
+                    <i class="fas fa-file-import"></i> Import CSV
+                </button>
+                <a href="?action=export_programmes" class="btn btn-info">
+                    <i class="fas fa-download"></i> Export CSV
+                </a>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Import CSV Form -->
+    <div class="form-section" id="importForm" style="display: none;">
+        <div class="form-card">
+            <h2><i class="fas fa-file-import"></i> Import Programmes from CSV</h2>
+            <p>Upload a CSV file with programme data. The file should have columns: Code, Name, School, Duration</p>
+            <form method="POST" enctype="multipart/form-data" class="import-form">
+                <input type="hidden" name="action" value="import_programmes">
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="csv_file">CSV File *</label>
+                        <input type="file" id="csv_file" name="csv_file" accept=".csv,text/csv" required>
+                        <small class="form-text">Download the template <a href="#" onclick="downloadTemplate()">here</a></small>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-blue">
+                        <i class="fas fa-upload"></i> Import Programmes
                     </button>
-                    <button onclick="showImportForm()" class="btn btn-blue">
-                        <i class="fas fa-file-import"></i> Import CSV
+                    <button type="button" onclick="hideImportForm()" class="btn btn-orange">
+                        <i class="fas fa-times"></i> Cancel
                     </button>
-                    <a href="?action=export_programmes" class="btn btn-info">
-                        <i class="fas fa-download"></i> Export CSV
-                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="filters-section">
+        <div class="filters-card">
+            <form method="GET" class="filters-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="search">Search Programmes</label>
+                        <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or school">
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-green">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        <a href="manage_programmes.php" class="btn btn-orange">
+                            <i class="fas fa-refresh"></i> Reset
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Programme Form -->
+    <div class="form-section" id="programmeForm" style="<?php echo $editProgramme ? 'display: block;' : 'display: none;'; ?>">
+        <div class="form-card">
+            <h2>
+                <i class="fas fa-<?php echo $editProgramme ? 'edit' : 'plus'; ?>"></i>
+                <?php echo $editProgramme ? 'Edit Programme' : 'Add New Programme'; ?>
+            </h2>
+            
+            <form method="POST" class="school-form">
+                <input type="hidden" name="action" value="<?php echo $editProgramme ? 'edit_programme' : 'add_programme'; ?>">
+                <?php if ($editProgramme): ?>
+                    <input type="hidden" name="programme_id" value="<?php echo $editProgramme['id']; ?>">
                 <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Import CSV Form -->
-        <div class="form-section" id="importForm" style="display: none;">
-            <div class="form-card">
-                <h2><i class="fas fa-file-import"></i> Import Programmes from CSV</h2>
-                <p>Upload a CSV file with programme data. The file should have columns: Code, Name, School, Duration</p>
-                <form method="POST" enctype="multipart/form-data" class="import-form">
-                    <input type="hidden" name="action" value="import_programmes">
-                    <div class="form-row">
-                        <div class="form-group full-width">
-                            <label for="csv_file">CSV File *</label>
-                            <input type="file" id="csv_file" name="csv_file" accept=".csv,text/csv" required>
-                            <small class="form-text">Download the template <a href="#" onclick="downloadTemplate()">here</a></small>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-blue">
-                            <i class="fas fa-upload"></i> Import Programmes
-                        </button>
-                        <button type="button" onclick="hideImportForm()" class="btn btn-orange">
-                            <i class="fas fa-times"></i> Cancel
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Search and Filters -->
-        <div class="filters-section">
-            <div class="filters-card">
-                <form method="GET" class="filters-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="search">Search Programmes</label>
-                            <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by name, code, description or school">
-                        </div>
-                        
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-green">
-                                <i class="fas fa-search"></i> Search
-                            </button>
-                            <a href="manage_programmes.php" class="btn btn-orange">
-                                <i class="fas fa-refresh"></i> Reset
-                            </a>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Add/Edit Programme Form -->
-        <div class="form-section" id="programmeForm" style="<?php echo $editProgramme ? 'display: block;' : 'display: none;'; ?>">
-            <div class="form-card">
-                <h2>
-                    <i class="fas fa-<?php echo $editProgramme ? 'edit' : 'plus'; ?>"></i>
-                    <?php echo $editProgramme ? 'Edit Programme' : 'Add New Programme'; ?>
-                </h2>
                 
-                <form method="POST" class="school-form">
-                    <input type="hidden" name="action" value="<?php echo $editProgramme ? 'edit_programme' : 'add_programme'; ?>">
-                    <?php if ($editProgramme): ?>
-                        <input type="hidden" name="programme_id" value="<?php echo $editProgramme['id']; ?>">
-                    <?php endif; ?>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="name">Programme Name *</label>
-                            <input type="text" id="name" name="name" required maxlength="150" 
-                                   value="<?php echo htmlspecialchars($editProgramme['name'] ?? ''); ?>">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="code">Programme Code *</label>
-                            <input type="text" id="code" name="code" required maxlength="20" style="text-transform: uppercase;"
-                                   value="<?php echo htmlspecialchars($editProgramme['code'] ?? ''); ?>">
-                        </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Programme Name *</label>
+                        <input type="text" id="name" name="name" required maxlength="150" 
+                               value="<?php echo htmlspecialchars($editProgramme['name'] ?? ''); ?>">
                     </div>
                     
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="school_id">School *</label>
-                            <select id="school_id" name="school_id" required>
-                                <option value="">-- Select School --</option>
-                                <?php foreach ($schools as $school): ?>
-                                    <option value="<?php echo $school['id']; ?>" <?php echo isset($editProgramme['school_id']) && $editProgramme['school_id'] == $school['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($school['name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="duration">Duration (Years) *</label>
-                            <input type="number" id="duration" name="duration" required min="1" max="10" 
-                                   value="<?php echo htmlspecialchars($editProgramme['duration'] ?? ''); ?>">
-                        </div>
+                    <div class="form-group">
+                        <label for="code">Programme Code *</label>
+                        <input type="text" id="code" name="code" required maxlength="20" style="text-transform: uppercase;"
+                               value="<?php echo htmlspecialchars($editProgramme['code'] ?? ''); ?>">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="school_id">School *</label>
+                        <select id="school_id" name="school_id" required>
+                            <option value="">-- Select School --</option>
+                            <?php foreach ($schools as $school): ?>
+                                <option value="<?php echo $school['id']; ?>" <?php echo isset($editProgramme['school_id']) && $editProgramme['school_id'] == $school['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($school['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="category">Programme Category *</label>
-                            <select id="category" name="category" required>
-                                <option value="">-- Select Category --</option>
-                                <option value="undergraduate" <?php echo isset($editProgramme['category']) && $editProgramme['category'] == 'undergraduate' ? 'selected' : ''; ?>>Undergraduate</option>
-                                <option value="short_course" <?php echo isset($editProgramme['category']) && $editProgramme['category'] == 'short_course' ? 'selected' : ''; ?>>Short Course</option>
-                            </select>
-                        </div>
+                    <div class="form-group">
+                        <label for="duration">Duration (Years) *</label>
+                        <input type="number" id="duration" name="duration" required min="1" max="10" 
+                               value="<?php echo htmlspecialchars($editProgramme['duration'] ?? ''); ?>">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="category">Programme Category *</label>
+                        <select id="category" name="category" required>
+                            <option value="">-- Select Category --</option>
+                            <option value="undergraduate" <?php echo isset($editProgramme['category']) && $editProgramme['category'] == 'undergraduate' ? 'selected' : ''; ?>>Undergraduate</option>
+                            <option value="short_course" <?php echo isset($editProgramme['category']) && $editProgramme['category'] == 'short_course' ? 'selected' : ''; ?>>Short Course</option>
+                        </select>
+                    </div>
                         
                         <div class="form-group">
                             <!-- Empty div for spacing -->
@@ -978,28 +960,40 @@ if (isset($_GET['view'])) {
                     </div>
                 <?php else: ?>
                     <div class="print-section-title">Courses List</div>
-                    <div class="table-responsive">
-                        <table class="users-table" id="coursesTable">
-                            <thead>
-                                <tr>
-                                    <th>Code</th>
-                                    <th>Name</th>
-                                    <th>Credits</th>
-                                    <th>Enrollments</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($programmeCourses as $course): ?>
+                    <?php
+                        $coursesByTerm = [];
+                        foreach ($programmeCourses as $c) {
+                            $t = $c['term'] ?? '';
+                            if ($t === '' || $t === null) { $t = 'Unassigned Term'; }
+                            $coursesByTerm[$t][] = $c;
+                        }
+                        ksort($coursesByTerm);
+                    ?>
+                    <?php foreach ($coursesByTerm as $termLabel => $list): ?>
+                        <div class="term-title">Term: <?php echo htmlspecialchars($termLabel); ?></div>
+                        <div class="table-responsive">
+                            <table class="users-table coursesTable">
+                                <thead>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($course['code']); ?></td>
-                                        <td><?php echo htmlspecialchars($course['name']); ?></td>
-                                        <td><?php echo $course['credits']; ?></td>
-                                        <td><?php echo $course['enrollment_count']; ?></td>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Credits</th>
+                                        <th>Enrollments</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($list as $course): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($course['code']); ?></td>
+                                            <td><?php echo htmlspecialchars($course['name']); ?></td>
+                                            <td><?php echo $course['credits']; ?></td>
+                                            <td><?php echo $course['enrollment_count']; ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endforeach; ?>
                 <?php endif; ?>
             </div>
 
@@ -1195,6 +1189,7 @@ if (isset($_GET['view'])) {
         <?php endif; ?>
 
         // Auto-hide alerts
+        <?php if ($message): ?>
         document.addEventListener('DOMContentLoaded', function() {
             const alerts = document.querySelectorAll('.alert');
             alerts.forEach(alert => {
@@ -1206,6 +1201,8 @@ if (isset($_GET['view'])) {
                 }, 5000);
             });
         });
+        <?php endif; ?>
     </script>
+</main>
 </body>
 </html>
