@@ -57,7 +57,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'error';
                 }
                 break;
+                
+            case 'suspend_registration':
+                $student_id = $_POST['student_id'];
+                $registration_type = $_POST['registration_type']; // 'course' or 'first_time'
+                $reason = trim($_POST['reason']);
+                
+                if (empty($reason)) {
+                    $message = "Please provide a reason for suspension!";
+                    $messageType = 'error';
+                } else {
+                    try {
+                        if ($registration_type === 'course') {
+                            // Suspend course registration
+                            $stmt = $pdo->prepare("UPDATE course_registration SET status = 'rejected', rejection_reason = ?, finance_cleared = -1 WHERE student_id = ? AND status = 'approved' AND finance_cleared = 0");
+                            $stmt->execute([$reason, $student_id]);
+                            
+                            if ($stmt->rowCount() > 0) {
+                                $message = "Course registration suspended successfully!";
+                                $messageType = 'success';
+                            } else {
+                                $message = "No pending course registrations found for this student!";
+                                $messageType = 'error';
+                            }
+                        } else {
+                            // Suspend first-time registration
+                            $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'rejected', rejection_reason = ?, finance_cleared = -1 WHERE id = ? AND registration_status = 'approved' AND finance_cleared = 0");
+                            $stmt->execute([$reason, $student_id]);
+                            
+                            if ($stmt->rowCount() > 0) {
+                                $message = "First-time registration suspended successfully!";
+                                $messageType = 'success';
+                            } else {
+                                $message = "No pending first-time registrations found for this student!";
+                                $messageType = 'error';
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
         }
+    }
+} else if (isset($_GET['action']) && $_GET['action'] === 'view_details' && isset($_GET['student_id']) && isset($_GET['registration_type'])) {
+    // Handle view details request
+    $student_id = $_GET['student_id'];
+    $registration_type = $_GET['registration_type'];
+    
+    try {
+        if ($registration_type === 'course') {
+            // Fetch course registration details
+            $stmt = $pdo->prepare("
+                SELECT cr.*, sp.full_name, sp.student_number, sp.contact, c.name as course_name, i.name as intake_name, p.name as programme_name
+                FROM course_registration cr
+                JOIN student_profile sp ON cr.student_id = sp.user_id
+                JOIN course c ON cr.course_id = c.id
+                JOIN intake i ON sp.intake_id = i.id
+                LEFT JOIN programme p ON sp.programme_id = p.id
+                WHERE cr.student_id = ? AND cr.status = 'approved'
+                LIMIT 1
+            ");
+            $stmt->execute([$student_id]);
+            $student_details = $stmt->fetch();
+        } else {
+            // Fetch first-time registration details
+            $stmt = $pdo->prepare("
+                SELECT ps.*, p.name as programme_name, i.name as intake_name
+                FROM pending_students ps
+                LEFT JOIN programme p ON ps.programme_id = p.id
+                LEFT JOIN intake i ON ps.intake_id = i.id
+                WHERE ps.id = ? AND ps.registration_status = 'approved'
+                LIMIT 1
+            ");
+            $stmt->execute([$student_id]);
+            $student_details = $stmt->fetch();
+        }
+    } catch (Exception $e) {
+        $student_details = null;
+        error_log("Error fetching student details: " . $e->getMessage());
     }
 }
 
@@ -67,6 +146,12 @@ try {
     $pdo->exec("ALTER TABLE course_registration ADD COLUMN IF NOT EXISTS finance_cleared TINYINT(1) DEFAULT 0");
     $pdo->exec("ALTER TABLE course_registration ADD COLUMN IF NOT EXISTS finance_cleared_at TIMESTAMP NULL");
     $pdo->exec("ALTER TABLE course_registration ADD COLUMN IF NOT EXISTS finance_cleared_by INT NULL");
+    
+    // Add payment-related columns to course_registration table if they don't exist
+    $pdo->exec("ALTER TABLE course_registration ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)");
+    $pdo->exec("ALTER TABLE course_registration ADD COLUMN IF NOT EXISTS payment_amount DECIMAL(10,2)");
+    $pdo->exec("ALTER TABLE course_registration ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(100)");
+    $pdo->exec("ALTER TABLE course_registration ADD COLUMN IF NOT EXISTS payment_proof VARCHAR(255)");
     
     // Add finance clearance columns to pending_students table if they don't exist
     $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS finance_cleared TINYINT(1) DEFAULT 0");
@@ -78,6 +163,12 @@ try {
     
     // Add student_number column to pending_students if it doesn't exist
     $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS student_number VARCHAR(50)");
+    
+    // Add payment-related columns to pending_students if they don't exist
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS payment_amount DECIMAL(10,2)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(100)");
+    $pdo->exec("ALTER TABLE pending_students ADD COLUMN IF NOT EXISTS payment_proof VARCHAR(255)");
 } catch (Exception $e) {
     // Columns might already exist or there might be a permissions issue
     error_log("Error adding finance clearance columns: " . $e->getMessage());
@@ -126,6 +217,100 @@ try {
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Custom button styles for blue and red buttons */
+        .btn-blue {
+            background: #007bff;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-blue:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        
+        .btn-red {
+            background: #dc3545;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-red:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+        
+        /* Modal styles for viewing details */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        .payment-proof {
+            max-width: 100%;
+            height: auto;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body class="admin-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -235,6 +420,65 @@ try {
             </div>
         <?php endif; ?>
         
+        <?php if (isset($student_details)): ?>
+            <!-- Student Details Modal -->
+            <div class="modal" style="display: block;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Student Registration Details</h2>
+                        <span class="close" onclick="window.location.href='?'">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <?php if ($student_details): ?>
+                            <div class="student-details">
+                                <h3>Student Information</h3>
+                                <p><strong>Name:</strong> <?php echo htmlspecialchars($student_details['full_name']); ?></p>
+                                <p><strong><?php echo isset($student_details['student_number']) ? 'Student ID' : 'Email'; ?>:</strong> 
+                                   <?php echo htmlspecialchars($student_details['student_number'] ?? $student_details['email']); ?></p>
+                                
+                                <?php if (isset($student_details['contact'])): ?>
+                                    <p><strong>Contact:</strong> <?php echo htmlspecialchars($student_details['contact']); ?></p>
+                                <?php endif; ?>
+                                
+                                <h3>Registration Information</h3>
+                                <p><strong>Programme:</strong> <?php echo htmlspecialchars($student_details['programme_name'] ?? 'N/A'); ?></p>
+                                <p><strong>Intake:</strong> <?php echo htmlspecialchars($student_details['intake_name'] ?? 'N/A'); ?></p>
+                                
+                                <?php if (isset($student_details['course_name'])): ?>
+                                    <p><strong>Course:</strong> <?php echo htmlspecialchars($student_details['course_name']); ?></p>
+                                    <p><strong>Term:</strong> <?php echo htmlspecialchars($student_details['term']); ?></p>
+                                <?php endif; ?>
+                                
+                                <h3>Payment Information</h3>
+                                <?php if (isset($student_details['payment_method']) && $student_details['payment_method']): ?>
+                                    <p><strong>Payment Method:</strong> <?php echo htmlspecialchars($student_details['payment_method']); ?></p>
+                                    <p><strong>Amount:</strong> K<?php echo number_format($student_details['payment_amount'] ?? 0, 2); ?></p>
+                                    <?php if (!empty($student_details['transaction_id'])): ?>
+                                        <p><strong>Transaction ID:</strong> <?php echo htmlspecialchars($student_details['transaction_id']); ?></p>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($student_details['payment_proof'])): ?>
+                                        <p><strong>Payment Proof:</strong></p>
+                                        <?php if (file_exists('../' . $student_details['payment_proof'])): ?>
+                                            <img src="../<?php echo htmlspecialchars($student_details['payment_proof']); ?>" alt="Payment Proof" class="payment-proof">
+                                        <?php else: ?>
+                                            <p>Payment proof file not found.</p>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <p>No payment proof uploaded.</p>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <p>Payment information not available.</p>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <p>Unable to fetch student details.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+        
         <!-- Tab Navigation -->
         <div class="tab-navigation">
             <button class="tab-item active" onclick="showTab('course-registrations')">Course Registrations</button>
@@ -282,6 +526,12 @@ try {
                                             <td><?php echo htmlspecialchars($registration['term']); ?></td>
                                             <td><?php echo date('M j, Y g:i A', strtotime($registration['submitted_at'])); ?></td>
                                             <td>
+                                                <!-- View Button -->
+                                                <button class="btn btn-blue btn-sm" title="View Details" onclick="viewRegistrationDetails(<?php echo $registration['student_id']; ?>, 'course')">
+                                                    <i class="fas fa-eye"></i> View
+                                                </button>
+                                                
+                                                <!-- Clear Button -->
                                                 <form method="POST" style="display: inline;">
                                                     <input type="hidden" name="action" value="clear_registration">
                                                     <input type="hidden" name="student_id" value="<?php echo $registration['student_id']; ?>">
@@ -290,6 +540,11 @@ try {
                                                         <i class="fas fa-check"></i> Clear
                                                     </button>
                                                 </form>
+                                                
+                                                <!-- Suspend Button -->
+                                                <button class="btn btn-red btn-sm" title="Suspend Registration" onclick="suspendRegistration(<?php echo $registration['student_id']; ?>, 'course')">
+                                                    <i class="fas fa-ban"></i> Suspend
+                                                </button>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -340,6 +595,12 @@ try {
                                             <td><?php echo htmlspecialchars($registration['student_number'] ?? 'Not Assigned'); ?></td>
                                             <td><?php echo date('M j, Y g:i A', strtotime($registration['updated_at'])); ?></td>
                                             <td>
+                                                <!-- View Button -->
+                                                <button class="btn btn-blue btn-sm" title="View Details" onclick="viewRegistrationDetails(<?php echo $registration['id']; ?>, 'first_time')">
+                                                    <i class="fas fa-eye"></i> View
+                                                </button>
+                                                
+                                                <!-- Clear Button -->
                                                 <form method="POST" style="display: inline;">
                                                     <input type="hidden" name="action" value="clear_registration">
                                                     <input type="hidden" name="student_id" value="<?php echo $registration['id']; ?>">
@@ -348,6 +609,11 @@ try {
                                                         <i class="fas fa-check"></i> Clear
                                                     </button>
                                                 </form>
+                                                
+                                                <!-- Suspend Button -->
+                                                <button class="btn btn-red btn-sm" title="Suspend Registration" onclick="suspendRegistration(<?php echo $registration['id']; ?>, 'first_time')">
+                                                    <i class="fas fa-ban"></i> Suspend
+                                                </button>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -378,6 +644,74 @@ try {
             event.target.classList.add('active');
         }
         
+        // Function to view registration details
+        function viewRegistrationDetails(studentId, registrationType) {
+            // Redirect to the same page with parameters to fetch details
+            window.location.href = `?action=view_details&student_id=${studentId}&registration_type=${registrationType}`;
+        }
+        
+        // Function to suspend a registration
+        function suspendRegistration(studentId, registrationType) {
+            const reason = prompt('Please provide a reason for suspending this registration:');
+            if (reason !== null && reason.trim() !== '') {
+                if (confirm('Are you sure you want to suspend this registration? This action cannot be undone.')) {
+                    // Create a form dynamically and submit it
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.style.display = 'none';
+                    
+                    const actionInput = document.createElement('input');
+                    actionInput.type = 'hidden';
+                    actionInput.name = 'action';
+                    actionInput.value = 'suspend_registration';
+                    form.appendChild(actionInput);
+                    
+                    const studentIdInput = document.createElement('input');
+                    studentIdInput.type = 'hidden';
+                    studentIdInput.name = 'student_id';
+                    studentIdInput.value = studentId;
+                    form.appendChild(studentIdInput);
+                    
+                    const registrationTypeInput = document.createElement('input');
+                    registrationTypeInput.type = 'hidden';
+                    registrationTypeInput.name = 'registration_type';
+                    registrationTypeInput.value = registrationType;
+                    form.appendChild(registrationTypeInput);
+                    
+                    const reasonInput = document.createElement('input');
+                    reasonInput.type = 'hidden';
+                    reasonInput.name = 'reason';
+                    reasonInput.value = reason.trim();
+                    form.appendChild(reasonInput);
+                    
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            } else if (reason !== null) {
+                alert('Please provide a reason for suspension.');
+            }
+        }
+        
+        // Function to close modal
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                modal.remove();
+            }
+        }
+        
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                    modal.remove();
+                }
+            });
+        }
+        
         // Auto-hide alerts
         document.addEventListener('DOMContentLoaded', function() {
             const alerts = document.querySelectorAll('.alert');
@@ -391,5 +725,8 @@ try {
             });
         });
     </script>
+    
+    <!-- Modal Container -->
+    <div id="modalContainer"></div>
 </body>
 </html>

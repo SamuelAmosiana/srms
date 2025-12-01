@@ -272,6 +272,10 @@ try {
         finance_cleared TINYINT(1) DEFAULT 0,
         finance_cleared_at TIMESTAMP NULL,
         finance_cleared_by INT NULL,
+        payment_method VARCHAR(50),
+        payment_amount DECIMAL(10,2),
+        transaction_id VARCHAR(100),
+        payment_proof VARCHAR(255),
         FOREIGN KEY (student_id) REFERENCES users(id),
         FOREIGN KEY (course_id) REFERENCES course(id)
     )");
