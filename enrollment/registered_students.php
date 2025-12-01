@@ -22,12 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         if ($student) {
             // Generate student number if not already generated
-            if (empty($student['student_number'])) {
+            if (empty($student['student_number']) || $student['student_number'] === 'Not Generated') {
                 // Generate a unique student number
                 $prefix = 'LSC';
                 $year = date('Y');
                 // Get the last student number to increment
-                $last_stmt = $pdo->query("SELECT student_number FROM registered_students WHERE student_number LIKE 'LSC{$year}%' ORDER BY id DESC LIMIT 1");
+                $last_stmt = $pdo->query("SELECT student_number FROM registered_students WHERE student_number LIKE 'LSC{$year}%' AND student_number IS NOT NULL AND student_number != '' AND student_number != 'Not Generated' ORDER BY id DESC LIMIT 1");
                 $last_record = $last_stmt->fetch();
                 
                 if ($last_record) {

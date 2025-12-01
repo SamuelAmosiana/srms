@@ -54,19 +54,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $amount = $registration_details['payment_amount'];
                                 $student_user_id = $registration_details['student_user_id'];
                                 $student_email = $registration_details['student_email'] ?? '';
+                                $student_number = $registration_details['student_number'] ?? '';
+                                $programme_name = $registration_details['programme_name'] ?? '';
+                                $intake_name = $registration_details['intake_name'] ?? '';
                                 
                                 // Insert into finance_transactions table
                                 $insert_stmt = $pdo->prepare("INSERT INTO finance_transactions (student_user_id, type, amount, description, created_at, party_type, party_name) VALUES (?, 'income', ?, ?, NOW(), 'Student', ?)");
                                 $insert_stmt->execute([$student_user_id, $amount, $description, $registration_details['full_name']]);
                                 
                                 // Insert into registered_students table for enrollment officer notification
-                                $insert_registered_stmt = $pdo->prepare("INSERT INTO registered_students (student_id, student_name, student_email, programme_name, intake_name, payment_amount, registration_type, status) VALUES (?, ?, ?, ?, ?, ?, 'course', 'pending_notification')");
+                                $insert_registered_stmt = $pdo->prepare("INSERT INTO registered_students (student_id, student_name, student_email, student_number, programme_name, intake_name, payment_amount, registration_type, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'course', 'pending_notification')");
                                 $insert_registered_stmt->execute([
                                     $student_user_id,
                                     $registration_details['full_name'],
                                     $student_email,
-                                    $registration_details['programme_name'] ?? '',
-                                    $registration_details['intake_name'] ?? '',
+                                    $student_number,
+                                    $programme_name,
+                                    $intake_name,
                                     $amount
                                 ]);
                             }
@@ -80,9 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         // Fetch first-time registration details to get payment information
                         $stmt = $pdo->prepare("
-                            SELECT ps.*, u.email as student_email
+                            SELECT ps.*, u.email as student_email, p.name as programme_name, i.name as intake_name
                             FROM pending_students ps
                             LEFT JOIN users u ON ps.email = u.email
+                            LEFT JOIN programme p ON ps.programme_id = p.id
+                            LEFT JOIN intake i ON ps.intake_id = i.id
                             WHERE ps.id = ? AND ps.registration_status = 'approved' AND ps.finance_cleared = 0
                             LIMIT 1
                         ");
@@ -99,19 +105,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $description = "School fees payment for first-time registration";
                                 $amount = $registration_details['payment_amount'];
                                 $student_email = $registration_details['student_email'] ?? $registration_details['email'] ?? '';
+                                $programme_name = $registration_details['programme_name'] ?? '';
+                                $intake_name = $registration_details['intake_name'] ?? '';
+                                $student_full_name = $registration_details['full_name'] ?? '';
                                 
                                 // Insert into finance_transactions table
                                 $insert_stmt = $pdo->prepare("INSERT INTO finance_transactions (type, amount, description, created_at, party_type, party_name) VALUES ('income', ?, ?, NOW(), 'Student', ?)");
-                                $insert_stmt->execute([$amount, $description, $registration_details['full_name']]);
+                                $insert_stmt->execute([$amount, $description, $student_full_name]);
                                 
                                 // Insert into registered_students table for enrollment officer notification
                                 $insert_registered_stmt = $pdo->prepare("INSERT INTO registered_students (student_id, student_name, student_email, programme_name, intake_name, payment_amount, registration_type, status) VALUES (?, ?, ?, ?, ?, ?, 'first_time', 'pending_notification')");
                                 $insert_registered_stmt->execute([
                                     0, // No student_id yet for first-time registrations
-                                    $registration_details['full_name'],
+                                    $student_full_name,
                                     $student_email,
-                                    $registration_details['programme_name'] ?? '',
-                                    $registration_details['intake_name'] ?? '',
+                                    $programme_name,
+                                    $intake_name,
                                     $amount
                                 ]);
                             }
