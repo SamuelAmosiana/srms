@@ -75,5 +75,3 @@ Manage system configurations
 | Hosting             | Namecheap cPanel / Apache         |
 
 Note: This is a sample README file for the LSC SRMS. It provides an overview of the system's features, technology stack, and setup instructions. For more detailed information, please refer to the project documentation or contact the project administrator.
-
-Display Preference: When viewing this README in a browser, it should be displayed using Arial font for optimal readability.
