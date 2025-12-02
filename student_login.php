@@ -205,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="login-container">
         <div class="logo-container">
             <img src="assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
-            <span class="logo-text">LSC SRMS</span>
+            <span class="logo-text">Lusaka South College</span>
             <p>Student Portal</p>
         </div>
         
@@ -219,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <form method="POST">
             <div class="form-group">
                 <label for="username">Student Number</label>
-                <input type="text" id="username" name="username" required placeholder="Enter your student number (LSC######)">
+                <input type="text" id="username" name="username" required placeholder="Enter your student number ">
             </div>
             
             <div class="form-group">

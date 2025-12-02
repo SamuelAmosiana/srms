@@ -152,8 +152,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="login-container">
         <div class="logo-container">
             <img src="assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
-            <span class="logo-text">LSC SRMS</span>
-            <p>First Time Student Portal</p>
+            <span class="logo-text">Lusaka South College</span>
+            <p>First Time Registration Portal</p>
         </div>
         
         <?php if ($message): ?>

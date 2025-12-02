@@ -12,9 +12,9 @@
     <div class="container">
         <div class="school-header">
             <h1>Lusaka South College</h1>
-            <div class="subtitle">Student Records Management System</div>
+            <div class="subtitle">Dream, Explore, Acquire</div>
         </div>
-        <h2>Welcome to LSC SRMS</h2>
+        <h2>Student and Staff Portal</h2>
         <p>Please select your login type to access the system:</p>
         <div class="login-options">
             <a href="login.php">👨‍💼 Staff Login</a>

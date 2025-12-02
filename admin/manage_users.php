@@ -715,7 +715,6 @@ try {
                                 <option value="">Select Gender</option>
                                 <option value="Male" <?php echo (($editUser['student_gender'] ?? $editUser['staff_gender']) == 'Male') ? 'selected' : ''; ?>>Male</option>
                                 <option value="Female" <?php echo (($editUser['student_gender'] ?? $editUser['staff_gender']) == 'Female') ? 'selected' : ''; ?>>Female</option>
-                                <option value="Other" <?php echo (($editUser['student_gender'] ?? $editUser['staff_gender']) == 'Other') ? 'selected' : ''; ?>>Other</option>
                             </select>
                         </div>
                         
