@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $address = trim($_POST['address']);
     $program = $_POST['program'];
     $intake = $_POST['intake'];
+    $mode_of_learning = $_POST['mode_of_learning'];
     $guardian_name = trim($_POST['guardianname']);
     $guardian_phone = trim($_POST['guardianphone']);
     $relationship = $_POST['relationship'];
@@ -66,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $intake_id = $intake_data ? $intake_data['id'] : null;
         
         // Insert application into database
-        $stmt = $pdo->prepare("INSERT INTO applications (full_name, email, phone, application_type, programme_id, intake_id, documents) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO applications (full_name, email, phone, application_type, programme_id, intake_id, mode_of_learning, documents) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $firstname . ' ' . $lastname,
             $email,
@@ -74,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'undergraduate',
             $programme_id,
             $intake_id,
+            $mode_of_learning,
             json_encode(array_merge($documents, ['recommended_by' => $recommended_by])) // Include recommended by in documents
         ]);
         
@@ -302,6 +304,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="July">July</option>
                             <option value="October">October</option>
                         </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-mode-of-learning">Mode of Learning *</label>
+                        <select id="ug-mode-of-learning" name="mode_of_learning" required>
+                            <option value="">Select Mode of Learning</option>
+                            <option value="physical">Physical (Full Time)</option>
+                            <option value="online">Online (Distance)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <!-- Empty div for spacing -->
                     </div>
                 </div>
                 
