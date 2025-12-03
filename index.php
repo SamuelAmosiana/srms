@@ -1,6 +1,6 @@
 <?php
 // Landing page - choose login type
-echo "Auto-deployment: " . date("Y-m-d H:i:s"); // Auto-deployment timestamp
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
