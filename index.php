@@ -1,5 +1,6 @@
 <?php
 // Landing page - choose login type
+echo "<!-- Test auto-deployment: " . date("Y-m-d H:i:s") . " -->";
 ?>
 <!DOCTYPE html>
 <html lang="en">
