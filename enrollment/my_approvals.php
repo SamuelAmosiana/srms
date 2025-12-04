@@ -39,7 +39,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'personal') {
     
     // Get all applications processed by current enrollment officer
     $stmt = $pdo->prepare("
-        SELECT a.*, p.name as programme_name, i.name as intake_name, 
+        SELECT a.*, a.phone, a.mode_of_learning, p.name as programme_name, i.name as intake_name, 
                CASE 
                    WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'Undergraduate'
                    WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'Short Course'
@@ -61,7 +61,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'personal') {
     
     // Output CSV headers
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['ID', 'Full Name', 'Email', 'Phone', 'Category', 'Programme', 'Intake', 'Status', 'Submitted Date', 'Processed Date', 'Rejection Reason']);
+    fputcsv($output, ['ID', 'Full Name', 'Email', 'Phone', 'Mode of Learning', 'Category', 'Programme', 'Intake', 'Status', 'Submitted Date', 'Processed Date', 'Rejection Reason']);
     
     // Output data
     foreach ($personalApplications as $app) {
@@ -70,6 +70,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'personal') {
             $app['full_name'],
             $app['email'],
             $app['phone'] ?? '',
+            $app['mode_of_learning'] ?? '',
             $app['category'],
             $app['programme_name'],
             $app['intake_name'],
@@ -92,7 +93,7 @@ $enrollmentOfficer = $stmt->fetch();
 // Get current user's approvals and rejections
 // Get all applications processed by current enrollment officer
 $stmt = $pdo->prepare("
-    SELECT a.*, p.name as programme_name, i.name as intake_name, 
+    SELECT a.*, a.phone, a.mode_of_learning, p.name as programme_name, i.name as intake_name, 
            CASE 
                WHEN p.name LIKE '%Business%' OR p.name LIKE '%Admin%' OR p.name LIKE '%Diploma%' THEN 'undergraduate'
                WHEN p.name LIKE '%Computer%' OR p.name LIKE '%IT%' OR p.name LIKE '%Certificate%' THEN 'short_course'
@@ -136,6 +137,25 @@ foreach ($approvalsByCategory as $apps) {
 }
 foreach ($rejectionsByCategory as $apps) {
     $totalRejections += count($apps);
+}
+
+// Function to check if acceptance letter exists
+function checkAcceptanceLetterExists($application_id) {
+    $letter_filename = 'acceptance_letter_' . $application_id . '.docx';
+    $letter_path = __DIR__ . '/../letters/' . $letter_filename;
+    return file_exists($letter_path);
+}
+
+// Function to format mode of learning
+function formatModeOfLearning($mode) {
+    switch ($mode) {
+        case 'online':
+            return 'Online';
+        case 'physical':
+            return 'Physical';
+        default:
+            return 'Not specified';
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -300,6 +320,73 @@ foreach ($rejectionsByCategory as $apps) {
                 <div class="stat-info">
                     <h3><?php echo number_format(count($approvalsByCategory['short_course']) + count($rejectionsByCategory['short_course'])); ?></h3>
                     <p>Short Courses</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Acceptance Letters Section -->
+        <div class="applications-section">
+            <h2><i class="fas fa-file-pdf"></i> Acceptance Letters</h2>
+            
+            <div class="data-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-envelope-open-text"></i> Generated Acceptance Letters</h3>
+                </div>
+                <div class="panel-content">
+                    <?php 
+                    // Get all approved applications for this enrollment officer
+                    $approvedApps = array_merge(
+                        $approvalsByCategory['undergraduate'],
+                        $approvalsByCategory['short_course'],
+                        $approvalsByCategory['other']
+                    );
+                    
+                    if (empty($approvedApps)): ?>
+                        <div class="empty-state">
+                            <i class="fas fa-file-pdf"></i>
+                            <p>No acceptance letters generated</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Applicant Name</th>
+                                        <th>Programme</th>
+                                        <th>Intake</th>
+                                        <th>Mode of Study</th>
+                                        <th>Phone Number</th>
+                                        <th>Acceptance Letter</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($approvedApps as $app): 
+                                        $letterExists = checkAcceptanceLetterExists($app['id']);
+                                        $phoneNumber = $app['phone'] ?? 'N/A';
+                                        $modeOfStudy = formatModeOfLearning($app['mode_of_learning']);
+                                    ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($app['full_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($modeOfStudy); ?></td>
+                                            <td><?php echo htmlspecialchars($phoneNumber); ?></td>
+                                            <td>
+                                                <?php if ($letterExists): ?>
+                                                    <a href="../download_letter.php?file=<?php echo urlencode('acceptance_letter_' . $app['id'] . '.docx'); ?>" 
+                                                       class="btn blue small" target="_blank">
+                                                        <i class="fas fa-download"></i> Download
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span class="status-badge yellow">Not Available</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
