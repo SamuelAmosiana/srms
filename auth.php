@@ -1,6 +1,23 @@
 <?php
 require 'config.php';
 
+// Create emergency access table if it doesn't exist
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS maintenance_emergency_access (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        granted_by INT NOT NULL,
+        granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NULL,
+        reason TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_access (user_id)
+    )");
+} catch (Exception $e) {
+    // Table might already exist
+}
+
 // Function to check if maintenance mode is enabled
 function isMaintenanceModeEnabled($pdo) {
     try {
@@ -8,6 +25,21 @@ function isMaintenanceModeEnabled($pdo) {
         $stmt->execute();
         $result = $stmt->fetch();
         return $result && $result['setting_value'] === '1';
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// Function to check if current user has emergency access during maintenance
+function hasEmergencyAccess($pdo, $userId) {
+    if (!$userId) {
+        return false;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("SELECT id FROM maintenance_emergency_access WHERE user_id = ? AND (expires_at IS NULL OR expires_at > NOW())");
+        $stmt->execute([$userId]);
+        return $stmt->fetch() !== false;
     } catch (Exception $e) {
         return false;
     }
@@ -35,9 +67,12 @@ function isCurrentUserAdmin($pdo) {
 function checkMaintenanceMode($pdo) {
     // If maintenance mode is enabled and user is not admin, show maintenance page
     if (isMaintenanceModeEnabled($pdo) && !isCurrentUserAdmin($pdo)) {
-        // Show maintenance mode page
-        http_response_code(503);
-        echo '<!DOCTYPE html>
+        // Check if user has emergency access
+        $userId = $_SESSION['user_id'] ?? null;
+        if (!hasEmergencyAccess($pdo, $userId)) {
+            // Show maintenance mode page
+            http_response_code(503);
+            echo '<!DOCTYPE html>
 <html>
 <head>
     <title>Maintenance Mode - LSC SRMS</title>
@@ -82,7 +117,8 @@ function checkMaintenanceMode($pdo) {
     </div>
 </body>
 </html>';
-        exit();
+            exit();
+        }
     }
 }
 

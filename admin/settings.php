@@ -107,6 +107,77 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_email'])) {
     $message = "Email settings saved successfully!";
     $messageType = 'success';
 }
+
+// Handle emergency access grants
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['grant_emergency_access'])) {
+    $user_id = $_POST['user_id'];
+    $reason = $_POST['reason'];
+    $expires_at = !empty($_POST['expires_at']) ? $_POST['expires_at'] : null;
+    
+    try {
+        $stmt = $pdo->prepare("INSERT INTO maintenance_emergency_access (user_id, granted_by, reason, expires_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE reason = ?, expires_at = ?, granted_by = ?, granted_at = NOW()");
+        $stmt->execute([$user_id, currentUserId(), $reason, $expires_at, $reason, $expires_at, currentUserId()]);
+        
+        $message = "Emergency access granted successfully!";
+        $messageType = 'success';
+    } catch (Exception $e) {
+        $message = "Error granting emergency access: " . $e->getMessage();
+        $messageType = 'error';
+    }
+}
+
+// Handle emergency access revocation
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['revoke_emergency_access'])) {
+    $user_id = $_POST['user_id'];
+    
+    try {
+        $stmt = $pdo->prepare("DELETE FROM maintenance_emergency_access WHERE user_id = ?");
+        $stmt->execute([$user_id]);
+        
+        $message = "Emergency access revoked successfully!";
+        $messageType = 'success';
+    } catch (Exception $e) {
+        $message = "Error revoking emergency access: " . $e->getMessage();
+        $messageType = 'error';
+    }
+}
+
+// Get list of users for emergency access management
+$users = [];
+try {
+    $stmt = $pdo->query("SELECT u.id, u.username, u.email, r.name as role_name, ap.full_name 
+                         FROM users u 
+                         LEFT JOIN user_roles ur ON u.id = ur.user_id 
+                         LEFT JOIN roles r ON ur.role_id = r.id 
+                         LEFT JOIN admin_profile ap ON u.id = ap.user_id 
+                         LEFT JOIN staff_profile sp ON u.id = sp.user_id 
+                         LEFT JOIN student_profile stp ON u.id = stp.user_id 
+                         WHERE u.is_active = 1 
+                         ORDER BY u.username");
+    $users = $stmt->fetchAll();
+} catch (Exception $e) {
+    $users = [];
+}
+
+// Get current emergency access grants
+$emergency_access_users = [];
+try {
+    $stmt = $pdo->query("SELECT mea.*, u.username, u.email, 
+                         COALESCE(ap.full_name, sp.full_name, stp.full_name, u.username) as full_name,
+                         CONCAT(r.name, ' (Granted by: ', admin_ap.full_name, ')') as role_info
+                         FROM maintenance_emergency_access mea
+                         JOIN users u ON mea.user_id = u.id
+                         LEFT JOIN admin_profile ap ON u.id = ap.user_id
+                         LEFT JOIN staff_profile sp ON u.id = sp.user_id
+                         LEFT JOIN student_profile stp ON u.id = stp.user_id
+                         LEFT JOIN user_roles ur ON u.id = ur.user_id
+                         LEFT JOIN roles r ON ur.role_id = r.id
+                         LEFT JOIN admin_profile admin_ap ON mea.granted_by = admin_ap.user_id
+                         ORDER BY mea.granted_at DESC");
+    $emergency_access_users = $stmt->fetchAll();
+} catch (Exception $e) {
+    $emergency_access_users = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -364,6 +435,90 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_email'])) {
                 </div>
             </div>
         </div>
+
+        <!-- Emergency Access Management -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-user-shield"></i> Emergency Access Management</h3>
+            </div>
+            <div class="panel-content">
+                <p>Grant temporary access to specific users during maintenance mode.</p>
+                
+                <!-- Grant Emergency Access Form -->
+                <form method="POST" class="mb-4">
+                    <input type="hidden" name="grant_emergency_access" value="1">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="user_id">Select User</label>
+                            <select id="user_id" name="user_id" class="form-control" required>
+                                <option value="">-- Select a User --</option>
+                                <?php foreach ($users as $user): ?>
+                                    <option value="<?php echo $user['id']; ?>">
+                                        <?php echo htmlspecialchars($user['full_name'] ?? $user['username']); ?> 
+                                        (<?php echo htmlspecialchars($user['role_name'] ?? 'N/A'); ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reason">Reason for Access</label>
+                            <input type="text" id="reason" name="reason" class="form-control" placeholder="e.g., Critical bug fix, urgent report generation" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="expires_at">Expiration Date (Optional)</label>
+                            <input type="datetime-local" id="expires_at" name="expires_at" class="form-control">
+                            <small class="form-text">Leave blank for indefinite access</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-warning"><i class="fas fa-user-plus"></i> Grant Emergency Access</button>
+                </form>
+                
+                <!-- Current Emergency Access Grants -->
+                <h4><i class="fas fa-list"></i> Current Emergency Access Grants</h4>
+                <?php if (empty($emergency_access_users)): ?>
+                    <p>No users currently have emergency access.</p>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Role</th>
+                                    <th>Granted By</th>
+                                    <th>Reason</th>
+                                    <th>Granted At</th>
+                                    <th>Expires At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($emergency_access_users as $access): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($access['full_name'] ?? $access['username']); ?></td>
+                                        <td><?php echo htmlspecialchars($access['role_info'] ?? 'N/A'); ?></td>
+                                        <td><?php echo date('Y-m-d H:i', strtotime($access['granted_at'])); ?></td>
+                                        <td><?php echo htmlspecialchars($access['reason']); ?></td>
+                                        <td><?php echo $access['expires_at'] ? date('Y-m-d H:i', strtotime($access['expires_at'])) : 'Never'; ?></td>
+                                        <td>
+                                            <form method="POST" style="display: inline;">
+                                                <input type="hidden" name="revoke_emergency_access" value="1">
+                                                <input type="hidden" name="user_id" value="<?php echo $access['user_id']; ?>">
+                                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to revoke emergency access for this user?')">
+                                                    <i class="fas fa-user-times"></i> Revoke
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
     </main>
 
     <style>
@@ -417,6 +572,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_email'])) {
         
         .info-item span {
             color: var(--text-dark);
+        }
+        
+        .mb-4 {
+            margin-bottom: 1.5rem;
         }
         
         @media (max-width: 768px) {
