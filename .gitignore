@@ -1,0 +1,22 @@
+# Configuration files that should not be committed to the repository
+config.php
+db_conn.php
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Composer
+vendor/
+composer.lock
