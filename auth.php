@@ -1,6 +1,97 @@
 <?php
 require 'config.php';
 
+// Function to check if maintenance mode is enabled
+function isMaintenanceModeEnabled($pdo) {
+    try {
+        $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
+        $stmt->execute();
+        $result = $stmt->fetch();
+        return $result && $result['setting_value'] === '1';
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// Function to check if current user is an administrator
+function isCurrentUserAdmin($pdo) {
+    if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+        return false;
+    }
+    
+    // Check for user-specific permission override first (if table exists)
+    try {
+        $stmt = $pdo->prepare("SELECT r.name FROM roles r JOIN user_roles ur ON r.id = ur.role_id WHERE ur.user_id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $roles = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        return in_array('Super Admin', $roles);
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// Check maintenance mode and restrict access if needed
+function checkMaintenanceMode($pdo) {
+    // If maintenance mode is enabled and user is not admin, show maintenance page
+    if (isMaintenanceModeEnabled($pdo) && !isCurrentUserAdmin($pdo)) {
+        // Show maintenance mode page
+        http_response_code(503);
+        echo '<!DOCTYPE html>
+<html>
+<head>
+    <title>Maintenance Mode - LSC SRMS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background-color: #f5f5f5;
+        }
+        .maintenance-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+        .icon {
+            font-size: 64px;
+            color: #ff9800;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="maintenance-container">
+        <div class="icon">⚙️</div>
+        <h1>System Maintenance in Progress</h1>
+        <p>The Student Records Management System is currently undergoing maintenance. We apologize for any inconvenience.</p>
+        <p>Please try again later.</p>
+        <p><em>- Lusaka South College IT Team</em></p>
+    </div>
+</body>
+</html>';
+        exit();
+    }
+}
+
+// Run maintenance mode check on every page load (except for login and settings pages)
+$currentScript = basename($_SERVER['SCRIPT_NAME']);
+if (!in_array($currentScript, ['login.php', 'settings.php'])) {
+    checkMaintenanceMode($pdo);
+}
+
 function currentUserId() {
     return $_SESSION['user_id'] ?? null;
 }

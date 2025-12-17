@@ -15,35 +15,78 @@ if (!currentUserHasRole('Super Admin', $pdo) && !currentUserHasPermission('profi
     exit();
 }
 
+// Create settings table if it doesn't exist
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )");
+} catch (Exception $e) {
+    // Table might already exist
+}
+
 // Get admin profile
 $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WHERE ap.user_id = ?");
 $stmt->execute([currentUserId()]);
 $admin = $stmt->fetch();
+
+// Get current settings from database
+function getSetting($key, $default = null) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
+        $stmt->execute([$key]);
+        $result = $stmt->fetch();
+        return $result ? $result['setting_value'] : $default;
+    } catch (Exception $e) {
+        return $default;
+    }
+}
+
+// Save setting to database
+function saveSetting($key, $value) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+        $stmt->execute([$key, $value, $value]);
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
 
 // Handle form submissions
 $message = '';
 $messageType = '';
 
 // System settings variables
-$system_name = 'Lusaka South College SRMS';
-$system_email = 'admin@lsc.ac.zm';
-$timezone = 'Africa/Lusaka';
-$maintenance_mode = false;
+$system_name = getSetting('system_name', 'Lusaka South College SRMS');
+$system_email = getSetting('system_email', 'admin@lsc.ac.zm');
+$timezone = getSetting('timezone', 'Africa/Lusaka');
+$maintenance_mode = getSetting('maintenance_mode', '0') === '1';
 
 // Email settings variables
-$email_host = 'smtp.gmail.com';
-$email_port = 587;
-$email_username = 'noreply@lsc.ac.zm';
-$email_password = '********';
+$email_host = getSetting('email_host', 'smtp.gmail.com');
+$email_port = getSetting('email_port', '587');
+$email_username = getSetting('email_username', 'noreply@lsc.ac.zm');
+$email_password = '********'; // We don't retrieve passwords for security
 
 // Handle form submission for general settings
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_general'])) {
     $system_name = $_POST['system_name'];
     $system_email = $_POST['system_email'];
     $timezone = $_POST['timezone'];
-    $maintenance_mode = isset($_POST['maintenance_mode']) ? 1 : 0;
+    $maintenance_mode = isset($_POST['maintenance_mode']) ? '1' : '0';
     
-    // In a real implementation, you would save these settings to a database
+    // Save settings to database
+    saveSetting('system_name', $system_name);
+    saveSetting('system_email', $system_email);
+    saveSetting('timezone', $timezone);
+    saveSetting('maintenance_mode', $maintenance_mode);
+    
     $message = "General settings saved successfully!";
     $messageType = 'success';
 }
@@ -55,6 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_email'])) {
     $email_username = $_POST['email_username'];
     // Note: In a real implementation, you would encrypt the password before saving
     // $email_password = encrypt($_POST['email_password']);
+    
+    // Save settings to database
+    saveSetting('email_host', $email_host);
+    saveSetting('email_port', $email_port);
+    saveSetting('email_username', $email_username);
     
     $message = "Email settings saved successfully!";
     $messageType = 'success';
