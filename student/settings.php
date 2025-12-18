@@ -93,27 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/student-dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Simple icon replacements using CSS */
-        .icon-bars:before { content: "≡"; }
-        .icon-moon:before { content: "☾"; }
-        .icon-user-circle:before { content: "👤"; }
-        .icon-chevron-down:before { content: "▼"; }
-        .icon-user:before { content: "👨"; }
-        .icon-cog:before { content: "⚙"; }
-        .icon-sign-out-alt:before { content: "🚪"; }
-        .icon-tachometer-alt:before { content: "📊"; }
-        .icon-home:before { content: "⌂"; }
-        .icon-chart-line:before { content: "📈"; }
-        .icon-clipboard-check:before { content: "📋"; }
-        .icon-file-alt:before { content: "📄"; }
-        .icon-money-bill-wave:before { content: "💰"; }
-        .icon-bed:before { content: "🛏"; }
-        .icon-book:before { content: "📚"; }
-        .icon-graduation-cap:before { content: "🎓"; }
-        .icon-lock:before { content: "🔒"; }
-        .icon-save:before { content: "💾"; }
-        .icon-key:before { content: "🔑"; }
+        /* Font Awesome icons are now used throughout the application */
         
         .form-grid {
             display: grid;
@@ -178,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
                 <span class="logo-text">LSC SRMS</span>
             </div>
             <button class="sidebar-toggle" onclick="toggleSidebar()">
-                <i class="icon-bars"></i>
+                <i class="fas fa-bars"></i>
             </button>
         </div>
         
@@ -190,19 +172,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
             
             <div class="nav-actions">
                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
-                    <i class="icon-moon" id="theme-icon"></i>
+                    <i class="fas fa-moon" id="theme-icon"></i>
                 </button>
                 
                 <div class="dropdown">
                     <button class="profile-btn" onclick="toggleDropdown()">
-                        <i class="icon-user-circle"></i>
-                        <i class="icon-chevron-down"></i>
+                        <i class="fas fa-user-circle"></i>
+                        <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile.php"><i class="icon-user"></i> View Profile</a>
-                        <a href="settings.php" class="active"><i class="icon-cog"></i> Settings</a>
+                        <a href="profile.php"><i class="fas fa-user"></i> View Profile</a>
+                        <a href="settings.php" class="active"><i class="fas fa-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
-                        <a href="../logout.php"><i class="icon-sign-out-alt"></i> Logout</a>
+                        <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>
             </div>
@@ -212,27 +194,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h3><i class="icon-tachometer-alt"></i> Student Panel</h3>
+            <h3><i class="fas fa-tachometer-alt"></i> Student Panel</h3>
         </div>
         
         <nav class="sidebar-nav">
             <a href="dashboard.php" class="nav-item">
-                <i class="icon-home"></i>
+                <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
             
             <div class="nav-section">
                 <h4>Academic</h4>
                 <a href="view_results.php" class="nav-item">
-                    <i class="icon-chart-line"></i>
+                    <i class="fas fa-chart-line"></i>
                     <span>View Results</span>
                 </a>
                 <a href="register_courses.php" class="nav-item">
-                    <i class="icon-clipboard-check"></i>
+                    <i class="fas fa-clipboard-check"></i>
                     <span>Register Courses</span>
                 </a>
                 <a href="view_docket.php" class="nav-item">
-                    <i class="icon-file-alt"></i>
+                    <i class="fas fa-file-alt"></i>
                     <span>View Docket</span>
                 </a>
             </div>
@@ -240,11 +222,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
             <div class="nav-section">
                 <h4>Finance & Accommodation</h4>
                 <a href="view_fee_balance.php" class="nav-item">
-                    <i class="icon-money-bill-wave"></i>
+                    <i class="fas fa-money-bill-wave"></i>
                     <span>View Fee Balance</span>
                 </a>
                 <a href="accommodation.php" class="nav-item">
-                    <i class="icon-bed"></i>
+                    <i class="fas fa-bed"></i>
                     <span>Accommodation</span>
                 </a>
             </div>
@@ -254,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="icon-cog"></i> Account Settings</h1>
+            <h1><i class="fas fa-cog"></i> Account Settings</h1>
             <p>Manage your account preferences and security settings</p>
         </div>
 
@@ -267,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
         <!-- Profile Settings -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="icon-user"></i> Profile Information</h3>
+                <h3><i class="fas fa-user"></i> Profile Information</h3>
             </div>
             <div class="panel-content">
                 <form method="POST">
@@ -294,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary"><i class="icon-save"></i> Save Profile Changes</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Profile Changes</button>
                 </form>
             </div>
         </div>
@@ -302,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
         <!-- Change Password -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="icon-lock"></i> Change Password</h3>
+                <h3><i class="fas fa-lock"></i> Change Password</h3>
             </div>
             <div class="panel-content">
                 <div class="password-requirements">
@@ -333,7 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-warning"><i class="icon-key"></i> Change Password</button>
+                    <button type="submit" class="btn btn-warning"><i class="fas fa-key"></i> Change Password</button>
                 </form>
             </div>
         </div>
@@ -341,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
         <!-- Account Information -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="icon-user"></i> Account Information</h3>
+                <h3><i class="fas fa-user"></i> Account Information</h3>
             </div>
             <div class="panel-content">
                 <div class="info-grid">
