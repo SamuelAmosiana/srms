@@ -6,6 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Enroll - LSC SRMS</title>
+    <link rel="icon" type="image/jpeg" href="assets/images/school_logo.jpg">
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
         .container {
