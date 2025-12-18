@@ -971,4 +971,8 @@ function SetY($y, $resetX=true)
 function SetXY($x, $y)
 {
     // Set x and y positions
-    $
+    $this->SetX($x);
+    $this->SetY($y);
+}
+
+}
