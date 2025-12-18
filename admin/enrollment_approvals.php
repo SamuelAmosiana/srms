@@ -40,6 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $application = $stmt->fetch();
                     
                     if ($application) {
+                        // Update application with processing info
+                        $stmt = $pdo->prepare("UPDATE applications SET status = 'approved', processed_by = ?, processed_at = NOW() WHERE id = ?");
+                        $stmt->execute([currentUserId(), $application_id]);
+                        
                         // Move application to pending_students table without temp password
                         $stmt = $pdo->prepare("INSERT INTO pending_students 
                             (full_name, email, contact, NRC, gender, programme_id, intake_id, status, created_at) 
@@ -79,9 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = 'error';
                 } else {
                     try {
-                        // Update application status and reason
-                        $stmt = $pdo->prepare("UPDATE applications SET status = 'rejected', rejection_reason = ? WHERE id = ?");
-                        $stmt->execute([$rejection_reason, $application_id]);
+                        // Update application status, reason, and processing info
+                        $stmt = $pdo->prepare("UPDATE applications SET status = 'rejected', rejection_reason = ?, processed_by = ?, processed_at = NOW() WHERE id = ?");
+                        $stmt->execute([$rejection_reason, currentUserId(), $application_id]);
                         
                         // Get application details
                         $stmt = $pdo->prepare("SELECT * FROM applications WHERE id = ?");
@@ -115,19 +119,52 @@ LSC SRMS Admissions";
 }
 
 // Get pending applications
-$stmt = $pdo->prepare("
-    SELECT a.*, p.name as programme_name, i.name as intake_name
-    FROM applications a
-    LEFT JOIN programme p ON a.programme_id = p.id
-    LEFT JOIN intake i ON a.intake_id = i.id
-    WHERE a.status = 'pending'
-    ORDER BY a.created_at DESC
-");
+try {
+    $stmt = $pdo->prepare("
+        SELECT a.*, p.name as programme_name, i.name as intake_name, u.username as processed_by_username, ap.full_name as processed_by_name
+        FROM applications a
+        LEFT JOIN programme p ON a.programme_id = p.id
+        LEFT JOIN intake i ON a.intake_id = i.id
+        LEFT JOIN users u ON a.processed_by = u.id
+        LEFT JOIN admin_profile ap ON u.id = ap.user_id
+        WHERE a.status = 'pending'
+        ORDER BY a.created_at DESC
+    ");
+} catch (Exception $e) {
+    // Fallback if processed columns don't exist yet
+    $stmt = $pdo->prepare("
+        SELECT a.*, p.name as programme_name, i.name as intake_name
+        FROM applications a
+        LEFT JOIN programme p ON a.programme_id = p.id
+        LEFT JOIN intake i ON a.intake_id = i.id
+        WHERE a.status = 'pending'
+        ORDER BY a.created_at DESC
+    ");
+}
 $stmt->execute();
 $pending_applications = $stmt->fetchAll();
 
 // Create necessary tables if not exist
 try {
+    // Add columns to existing applications table if they don't exist
+    try {
+        $pdo->exec("ALTER TABLE applications ADD COLUMN IF NOT EXISTS processed_by INT NULL");
+    } catch (Exception $e) {
+        // Column might already exist
+    }
+    
+    try {
+        $pdo->exec("ALTER TABLE applications ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP NULL DEFAULT NULL");
+    } catch (Exception $e) {
+        // Column might already exist
+    }
+    
+    try {
+        $pdo->exec("ALTER TABLE applications ADD CONSTRAINT IF NOT EXISTS FK_applications_processed_by FOREIGN KEY (processed_by) REFERENCES users(id) ON DELETE SET NULL");
+    } catch (Exception $e) {
+        // Constraint might already exist
+    }
+    
     $pdo->exec("CREATE TABLE IF NOT EXISTS applications (
         id INT AUTO_INCREMENT PRIMARY KEY,
         full_name VARCHAR(255) NOT NULL,
@@ -139,9 +176,12 @@ try {
         intake_id INT,
         status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
         rejection_reason TEXT,
+        processed_by INT NULL,
+        processed_at TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL,
-        FOREIGN KEY (intake_id) REFERENCES intake(id) ON DELETE SET NULL
+        FOREIGN KEY (intake_id) REFERENCES intake(id) ON DELETE SET NULL,
+        FOREIGN KEY (processed_by) REFERENCES users(id) ON DELETE SET NULL
     )");
     
     $pdo->exec("CREATE TABLE IF NOT EXISTS pending_students (
@@ -374,6 +414,100 @@ function generateTemporaryPassword($length = 8) {
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td>
                                             <button class="btn btn-sm btn-info" onclick="openViewModal(<?php echo htmlspecialchars(json_encode($app)); ?>)"><i class="fas fa-eye"></i> View</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Processed Applications -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-history"></i> Processed Applications</h3>
+            </div>
+            <div class="panel-content">
+                <?php 
+                // Get processed applications
+                try {
+                    $processed_stmt = $pdo->prepare("
+                        SELECT a.*, p.name as programme_name, i.name as intake_name, u.username as processed_by_username, ap.full_name as processed_by_name
+                        FROM applications a
+                        LEFT JOIN programme p ON a.programme_id = p.id
+                        LEFT JOIN intake i ON a.intake_id = i.id
+                        LEFT JOIN users u ON a.processed_by = u.id
+                        LEFT JOIN admin_profile ap ON u.id = ap.user_id
+                        WHERE a.status IN ('approved', 'rejected')
+                        ORDER BY a.processed_at DESC
+                        LIMIT 50
+                    ");
+                } catch (Exception $e) {
+                    // Fallback if processed_at column doesn't exist yet
+                    $processed_stmt = $pdo->prepare("
+                        SELECT a.*, p.name as programme_name, i.name as intake_name, u.username as processed_by_username, ap.full_name as processed_by_name
+                        FROM applications a
+                        LEFT JOIN programme p ON a.programme_id = p.id
+                        LEFT JOIN intake i ON a.intake_id = i.id
+                        LEFT JOIN users u ON a.processed_by = u.id
+                        LEFT JOIN admin_profile ap ON u.id = ap.user_id
+                        WHERE a.status IN ('approved', 'rejected')
+                        ORDER BY a.created_at DESC
+                        LIMIT 50
+                    ");
+                }
+                $processed_stmt->execute();
+                $processed_applications = $processed_stmt->fetchAll();
+                ?>
+                
+                <?php if (empty($processed_applications)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-history"></i>
+                        <p>No processed applications</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Programme</th>
+                                    <th>Intake</th>
+                                    <th>Status</th>
+                                    <th>Processed By</th>
+                                    <th>Processed At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($processed_applications as $app): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($app['full_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
+                                        <td>
+                                            <span class="status-badge status-<?php echo $app['status']; ?>">
+                                                <?php echo ucfirst($app['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?php if ($app['processed_by']): ?>
+                                                <?php echo htmlspecialchars($app['processed_by_name'] ?? $app['processed_by_username'] ?? 'Unknown'); ?>
+                                            <?php else: ?>
+                                                <span class="text-muted">System</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if (!empty($app['processed_at'])): ?>
+                                                <?php echo date('Y-m-d H:i', strtotime($app['processed_at'])); ?>
+                                            <?php elseif (!empty($app['created_at'])): ?>
+                                                <?php echo date('Y-m-d H:i', strtotime($app['created_at'])); ?> (Created)
+                                            <?php else: ?>
+                                                <span class="text-muted">N/A</span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
