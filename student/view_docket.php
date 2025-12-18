@@ -1,7 +1,7 @@
 <?php
 require '../config.php';
 require '../auth.php';
-require '../lib/fpdf/fpdf.php'; // Use FPDF instead of Dompdf
+require '../lib/fpdf/fpdf.php';
 
 // Check if user is logged in and has student role
 if (!currentUserId()) {
@@ -11,33 +11,30 @@ if (!currentUserId()) {
 
 requireRole('Student', $pdo);
 
-// Get student profile (using only existing columns)
-$stmt = $pdo->prepare("SELECT sp.full_name, sp.student_number as student_id, sp.NRC as nrc_number, sp.gender, sp.intake_id FROM student_profile sp WHERE sp.user_id = ?");
+// Get student profile with balance information
+$stmt = $pdo->prepare("
+    SELECT sp.*, u.email, u.contact, p.name as programme_name 
+    FROM student_profile sp 
+    JOIN users u ON sp.user_id = u.id 
+    LEFT JOIN programme p ON sp.programme_id = p.id
+    WHERE sp.user_id = ?
+");
 $stmt->execute([currentUserId()]);
 $student = $stmt->fetch();
 
-// Get programme name
-$stmt = $pdo->prepare("SELECT name FROM programme WHERE id = ?");
-$stmt->execute([$student['programme_id'] ?? null]);
-$programme = $stmt->fetch()['name'] ?? 'N/A';
-
-// Get intake details (assuming intake table has 'name' or 'date')
-$intake = 'N/A';
-if (!empty($student['intake_id'])) {
-    try {
-        $stmt = $pdo->prepare("SELECT name FROM intake WHERE id = ?");
-        $stmt->execute([$student['intake_id']]);
-        $intake = $stmt->fetch()['name'] ?? 'N/A';
-    } catch (Exception $e) {
-        // Intake table might not exist yet
-        $intake = 'N/A';
-    }
+if (!$student) {
+    // Student profile not found
+    header('Location: ../student_login.php');
+    exit();
 }
+
+// Check if student has outstanding balance
+$hasBalance = ($student['balance'] ?? 0) > 0;
 
 // Get current academic year
 $current_year = date('Y');
 
-// Get enrollment details (using course_enrollment table instead of course_registration)
+// Get enrollment details
 $stmt = $pdo->prepare("SELECT status FROM course_enrollment WHERE student_user_id = ? AND academic_year = ? LIMIT 1");
 $stmt->execute([currentUserId(), $current_year]);
 $enrollment = $stmt->fetch();
@@ -55,48 +52,67 @@ $stmt->execute([currentUserId(), $current_year]);
 $courses = $stmt->fetchAll();
 
 // Handle PDF download
-if (isset($_GET['download'])) {
+if (isset($_GET['download']) && !$hasBalance) {
     // Create new PDF document
     $pdf = new FPDF();
     $pdf->AddPage();
-    $pdf->SetFont('Arial', 'B', 16);
     
-    // Title
-    $pdf->Cell(0, 10, 'LSC SRMS Student Docket', 0, 1, 'C');
-    $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, 'Exam Pass', 0, 1, 'C');
+    // Add logo
+    $logo_path = '../assets/images/lsc-logo.png';
+    if (file_exists($logo_path)) {
+        $pdf->Image($logo_path, 85, 10, 40);
+    }
+    
+    $pdf->Ln(30);
+    
+    // Header
+    $pdf->SetFont('Arial', 'B', 16);
+    $pdf->Cell(0, 10, 'LUSAKA SOUTH COLLEGE', 0, 1, 'C');
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 10, 'OFFICE OF THE REGISTRAR', 0, 1, 'C');
+    $pdf->Cell(0, 10, 'STUDENT EXAMINATION DOCKET', 0, 1, 'C');
     $pdf->Ln(10);
     
     // Student Information
     $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(40, 10, 'Student Number:', 0, 0);
+    $pdf->Cell(45, 10, 'Student Number:', 1);
     $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, htmlspecialchars_decode($student['student_id']), 0, 1);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($student['student_number'] ?? 'N/A'), 1, 1);
     
     $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(40, 10, 'NRC Number:', 0, 0);
+    $pdf->Cell(45, 10, 'Full Name:', 1);
     $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, htmlspecialchars_decode($student['nrc_number'] ?? 'N/A'), 0, 1);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($student['full_name'] ?? 'N/A'), 1, 1);
     
     $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(40, 10, 'Gender:', 0, 0);
+    $pdf->Cell(45, 10, 'NRC Number:', 1);
     $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, htmlspecialchars_decode($student['gender'] ?? 'N/A'), 0, 1);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($student['NRC'] ?? 'N/A'), 1, 1);
     
     $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(40, 10, 'Current Programme:', 0, 0);
+    $pdf->Cell(45, 10, 'Gender:', 1);
     $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, htmlspecialchars_decode($programme), 0, 1);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($student['gender'] ?? 'N/A'), 1, 1);
     
     $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(40, 10, 'Intake:', 0, 0);
+    $pdf->Cell(45, 10, 'Email:', 1);
     $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, htmlspecialchars_decode($intake), 0, 1);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($student['email'] ?? 'N/A'), 1, 1);
     
     $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(40, 10, 'Registration Status:', 0, 0);
+    $pdf->Cell(45, 10, 'Contact:', 1);
     $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, htmlspecialchars_decode($registration_status), 0, 1);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($student['contact'] ?? 'N/A'), 1, 1);
+    
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(45, 10, 'Programme:', 1);
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($student['programme_name'] ?? 'N/A'), 1, 1);
+    
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(45, 10, 'Registration Status:', 1);
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(0, 10, htmlspecialchars_decode($registration_status), 1, 1);
     
     // Registered Courses Section
     $pdf->Ln(5);
@@ -108,27 +124,153 @@ if (isset($_GET['download'])) {
     $pdf->Ln();
     $pdf->SetFont('Arial', '', 12);
     
-    foreach ($courses as $course) {
-        $pdf->Cell(40, 10, htmlspecialchars_decode($course['course_code']), 1);
-        $pdf->Cell(0, 10, htmlspecialchars_decode($course['course_name']), 1);
-        $pdf->Ln();
+    if (!empty($courses)) {
+        foreach ($courses as $course) {
+            $pdf->Cell(40, 10, htmlspecialchars_decode($course['course_code']), 1);
+            $pdf->Cell(0, 10, htmlspecialchars_decode($course['course_name']), 1);
+            $pdf->Ln();
+        }
+    } else {
+        $pdf->Cell(0, 10, 'No courses registered yet.', 1, 1);
     }
     
+    // Footer
+    $pdf->Ln(10);
+    $pdf->SetFont('Arial', 'I', 10);
+    $pdf->Cell(0, 10, 'Generated on: ' . date('Y-m-d H:i:s'), 0, 1, 'R');
+    
     // Output PDF
-    $pdf->Output('D', "student_docket_" . $student['student_id'] . ".pdf");
+    $pdf->Output('D', "student_docket_" . ($student['student_number'] ?? 'unknown') . ".pdf");
     exit;
 }
-
 ?>
+
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Docket - LSC SRMS</title>
+    <title>Student Examination Docket - LSC SRMS</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/student-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Add this new style for the logo */
+        .college-logo {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .college-logo img {
+            height: 80px; /* Adjust as needed */
+            width: auto;
+        }
+        
+        body { 
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.5;
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+        .header h2 { 
+            margin: 0; 
+            font-size: 22px;
+            font-weight: bold;
+        }
+        .header h3 { 
+            margin: 5px 0 0 0; 
+            font-size: 18px;
+        }
+        .info-section {
+            margin-bottom: 30px;
+        }
+        .info-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .info-table td { 
+            padding: 8px; 
+            border: 1px solid #000; 
+            vertical-align: top;
+        }
+        .info-table td:first-child {
+            width: 25%;
+            font-weight: bold;
+            background-color: #f2f2f2;
+        }
+        .courses-table { 
+            width: 100%; 
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .courses-table th, .courses-table td { 
+            border: 1px solid #000; 
+            padding: 8px; 
+            text-align: left;
+        }
+        .courses-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .footer { 
+            margin-top: 40px;
+            text-align: right;
+        }
+        .student-photo {
+            float: right;
+            width: 120px;
+            height: 150px;
+            border: 1px solid #000;
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+        .clearfix {
+            clear: both;
+        }
+        /* Download button styling */
+        .download-btn {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .download-btn a {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .download-btn a:hover {
+            background-color: #45a049;
+        }
+        .balance-error {
+            color: #d9534f;
+            text-align: center;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #d9534f;
+            border-radius: 4px;
+            background-color: #f2dede;
+        }
+        .no-balance {
+            color: #5cb85c;
+            text-align: center;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #5cb85c;
+            border-radius: 4px;
+            background-color: #dff0d8;
+        }
+    </style>
 </head>
 <body class="student-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -146,7 +288,7 @@ if (isset($_GET['download'])) {
         <div class="nav-right">
             <div class="user-info">
                 <span class="welcome-text">Welcome, <?php echo htmlspecialchars($student['full_name'] ?? 'Student'); ?></span>
-                <span class="staff-id">(<?php echo htmlspecialchars($student['student_id'] ?? 'N/A'); ?>)</span>
+                <span class="staff-id">(<?php echo htmlspecialchars($student['student_number'] ?? 'N/A'); ?>)</span>
             </div>
             
             <div class="nav-actions">
@@ -215,51 +357,109 @@ if (isset($_GET['download'])) {
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-file-alt"></i> View Docket</h1>
-            <p>Your student docket for exam access</p>
+            <h1><i class="fas fa-file-alt"></i> Student Examination Docket</h1>
+            <p>Your official examination docket</p>
         </div>
         
-        <?php if ($registration_status !== 'approved'): ?>
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i> Your registration is <?php echo htmlspecialchars($registration_status); ?>. Docket may not be complete.
+        <!-- School Logo -->
+        <div class="college-logo">
+            <img src="../assets/images/lsc-logo.png" alt="Lusaka South College Logo" onerror="this.style.display='none'">
+        </div>
+
+        <div class="header">
+            <h2>LUSAKA SOUTH COLLEGE</h2>
+            <h3>OFFICE OF THE REGISTRAR</h3>
+            <h3>STUDENT EXAMINATION DOCKET</h3>
+        </div>
+        
+        <!-- Balance Check -->
+        <?php if($hasBalance): ?>
+            <div class="balance-error">
+                You have an outstanding balance of K<?php echo number_format($student['balance'], 2); ?>. Please clear your fees to download the docket.
+            </div>
+        <?php else: ?>
+            <div class="no-balance">
+                Your account is clear. You may download your docket.
+            </div>
+            
+            <div class="download-btn">
+                <a href="?download=1"><i class="fas fa-download"></i> Download Docket as PDF</a>
             </div>
         <?php endif; ?>
         
-        <div class="docket-preview">
-            <div class="info"><strong>Student Number:</strong> <?php echo htmlspecialchars($student['student_id']); ?></div>
-            <div class="info"><strong>NRC Number:</strong> <?php echo htmlspecialchars($student['nrc_number'] ?? 'N/A'); ?></div>
-            <div class="info"><strong>Gender:</strong> <?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></div>
-            <div class="info"><strong>Current Programme:</strong> <?php echo htmlspecialchars($programme); ?></div>
-            <div class="info"><strong>Intake:</strong> <?php echo htmlspecialchars($intake); ?></div>
-            <div class="info"><strong>Registration Status:</strong> <?php echo htmlspecialchars($registration_status); ?></div>
-            
-            <h2>Registered Courses</h2>
-            <?php if (!empty($courses)): ?>
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Course Code</th>
-                            <th>Course Name</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($courses as $course): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($course['course_code']); ?></td>
-                                <td><?php echo htmlspecialchars($course['course_name']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p>No courses registered yet.</p>
-            <?php endif; ?>
+        <!-- Student Photo Placeholder -->
+        <div class="student-photo" style="text-align: center; line-height: 150px;">
+            Photo<br>Not<br>Available
         </div>
         
-        <a href="?download=1" class="action-card green" style="display: inline-block; margin-top: 20px; text-decoration: none;">
-            <i class="fas fa-download"></i>
-            <h3>Download as PDF</h3>
-        </a>
+        <!-- Student Information -->
+        <div class="info-section">
+            <table class="info-table">
+                <tr>
+                    <td>Student Number:</td>
+                    <td><?php echo htmlspecialchars($student['student_number'] ?? 'N/A'); ?></td>
+                </tr>
+                <tr>
+                    <td>Full Name:</td>
+                    <td><?php echo htmlspecialchars($student['full_name'] ?? 'N/A'); ?></td>
+                </tr>
+                <tr>
+                    <td>NRC Number:</td>
+                    <td><?php echo htmlspecialchars($student['NRC'] ?? 'N/A'); ?></td>
+                </tr>
+                <tr>
+                    <td>Gender:</td>
+                    <td><?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></td>
+                </tr>
+                <tr>
+                    <td>Email:</td>
+                    <td><?php echo htmlspecialchars($student['email'] ?? 'N/A'); ?></td>
+                </tr>
+                <tr>
+                    <td>Contact:</td>
+                    <td><?php echo htmlspecialchars($student['contact'] ?? 'N/A'); ?></td>
+                </tr>
+                <tr>
+                    <td>Programme:</td>
+                    <td><?php echo htmlspecialchars($student['programme_name'] ?? 'N/A'); ?></td>
+                </tr>
+                <tr>
+                    <td>Registration Status:</td>
+                    <td><?php echo htmlspecialchars($registration_status); ?></td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Registered Courses -->
+        <h3>Registered Courses</h3>
+        <table class="courses-table">
+            <thead>
+                <tr>
+                    <th>Course Code</th>
+                    <th>Course Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($courses)): ?>
+                    <?php foreach ($courses as $course): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($course['course_code']); ?></td>
+                            <td><?php echo htmlspecialchars($course['course_name']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="2">No courses registered yet.</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            Generated on: <?php echo date('Y-m-d H:i:s'); ?>
+        </div>
+        
+        <div class="clearfix"></div>
     </main>
 
     <script src="../assets/js/student-dashboard.js"></script>
