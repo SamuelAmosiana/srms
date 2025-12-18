@@ -713,8 +713,8 @@ try {
                             <label for="gender">Gender (Optional)</label>
                             <select id="gender" name="gender">
                                 <option value="">Select Gender</option>
-                                <option value="Male" <?php echo (($editUser['student_gender'] ?? $editUser['staff_gender']) == 'Male') ? 'selected' : ''; ?>>Male</option>
-                                <option value="Female" <?php echo (($editUser['student_gender'] ?? $editUser['staff_gender']) == 'Female') ? 'selected' : ''; ?>>Female</option>
+                                <option value="Male" <?php echo (($editUser && ($editUser['student_gender'] ?? $editUser['staff_gender']) == 'Male') ? 'selected' : ''); ?>>Male</option>
+                                <option value="Female" <?php echo (($editUser && ($editUser['student_gender'] ?? $editUser['staff_gender']) == 'Female') ? 'selected' : ''); ?>>Female</option>
                             </select>
                         </div>
                         
