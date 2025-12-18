@@ -488,7 +488,7 @@ try {
                                 <thead>
                                     <tr>
                                         <th>Transaction ID</th>
-                                        <th>Description</th>
+                                        <th>Currency</th>
                                         <th>Date & Time</th>
                                         <th>Amount</th>
                                         <th>Method</th>
@@ -499,7 +499,7 @@ try {
                                     <?php foreach ($data['payments'] as $payment): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($payment['reference_number'] ?? 'N/A'); ?></td>
-                                            <td><?php echo htmlspecialchars($payment['description'] ?? 'Payment'); ?></td>
+                                            <td>ZMW</td>
                                             <td><?php echo date('Y-m-d H:i:s', strtotime($payment['payment_date'])); ?></td>
                                             <td>K<?php echo number_format($payment['amount'], 2); ?></td>
                                             <td><?php echo htmlspecialchars($payment['payment_method']); ?></td>
@@ -521,9 +521,8 @@ try {
                                 <thead>
                                     <tr>
                                         <th>Fee Type</th>
-                                        <th>Description</th>
-                                        <th>Due Date</th>
                                         <th>Currency</th>
+                                        <th>Due Date</th>
                                         <th>Amount</th>
                                         <th>Paid</th>
                                         <th>Balance</th>
@@ -545,9 +544,8 @@ try {
                                     ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($fee_detail['fee_type']); ?></td>
-                                            <td><?php echo htmlspecialchars($fee_detail['description'] ?? 'N/A'); ?></td>
-                                            <td><?php echo date('M j, Y', strtotime($fee_detail['due_date'])); ?></td>
                                             <td>ZMW</td>
+                                            <td><?php echo date('M j, Y', strtotime($fee_detail['due_date'])); ?></td>
                                             <td><?php echo number_format($fee_detail['amount_due'], 2); ?></td>
                                             <td><?php echo number_format($fee_detail['amount_paid'], 2); ?></td>
                                             <td><?php echo number_format($fee_detail['balance'], 2); ?></td>
@@ -564,7 +562,7 @@ try {
                                         // If no fees are defined by finance officer, show a message
                                     ?>
                                         <tr>
-                                            <td colspan="9" class="no-data-message">
+                                            <td colspan="8" class="no-data-message">
                                                 No fees have been defined for this period by the finance officer.
                                             </td>
                                         </tr>
@@ -574,7 +572,7 @@ try {
                                     
                                     <?php if (!empty($data['fee_details'])): ?>
                                     <tr style="background-color: #f8f9fa; font-weight: bold;">
-                                        <td colspan="4">Totals</td>
+                                        <td colspan="3">Totals</td>
                                         <td>K<?php echo number_format($total_amount, 2); ?></td>
                                         <td>K<?php echo number_format($total_paid, 2); ?></td>
                                         <td>K<?php echo number_format($total_amount - $total_paid, 2); ?></td>
@@ -582,7 +580,7 @@ try {
                                     </tr>
                                     
                                     <tr style="background-color: #e9ecef; font-weight: bold;">
-                                        <td colspan="6">Balance</td>
+                                        <td colspan="5">Balance</td>
                                         <td colspan="3">K<?php echo number_format($total_amount - $total_paid, 2); ?></td>
                                     </tr>
                                     <?php endif; ?>
