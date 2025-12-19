@@ -238,7 +238,7 @@ if (isset($_GET['download']) && !$hasBalance) {
             text-align: center;
             margin: 20px 0;
         }
-        .download-btn a {
+        .download-btn a, .print-btn {
             display: inline-block;
             padding: 10px 20px;
             background-color: #4CAF50;
@@ -246,8 +246,11 @@ if (isset($_GET['download']) && !$hasBalance) {
             text-decoration: none;
             border-radius: 4px;
             font-weight: bold;
+            margin: 0 5px;
+            border: none;
+            cursor: pointer;
         }
-        .download-btn a:hover {
+        .download-btn a:hover, .print-btn:hover {
             background-color: #45a049;
         }
         .balance-error {
@@ -269,6 +272,31 @@ if (isset($_GET['download']) && !$hasBalance) {
             border: 1px solid #5cb85c;
             border-radius: 4px;
             background-color: #dff0d8;
+        }
+
+        /* Print-specific styles */
+        @media print {
+            .sidebar, .top-nav, .download-btn, .footer {
+                display: none;
+            }
+            
+            body {
+                margin: 0;
+                padding: 20px;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .student-photo {
+                float: right;
+                width: 120px;
+                height: 150px;
+                border: 1px solid #000;
+                margin-left: 20px;
+                margin-bottom: 20px;
+            }
         }
     </style>
 </head>
@@ -384,6 +412,7 @@ if (isset($_GET['download']) && !$hasBalance) {
             
             <div class="download-btn">
                 <a href="?download=1"><i class="fas fa-download"></i> Download Docket as PDF</a>
+                <button onclick="window.print()" class="print-btn"><i class="fas fa-print"></i> Print Docket</button>
             </div>
         <?php endif; ?>
         
