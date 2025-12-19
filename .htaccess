@@ -1,0 +1,32 @@
+# Enable rewrite engine
+RewriteEngine On
+
+# Remove .php extension from URLs
+# This rule internally rewrites URLs without .php to the actual .php files
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+
+# Redirect URLs with .php extension to clean URLs (SEO friendly)
+RewriteCond %{THE_REQUEST} /([^.]+)\.php [NC]
+RewriteRule ^ /%1? [NC,L,R=301]
+
+# Handle specific exceptions for directories that should not be rewritten
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [NC,L]
+
+# Security rules to prevent access to sensitive files
+<Files ~ "^.*\.(inc|tpl|sql|log)">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Prevent access to .env files
+<Files .env>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Prevent directory listing
+Options -Indexes

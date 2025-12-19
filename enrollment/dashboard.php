@@ -213,7 +213,7 @@ foreach ($pendingApplications as $application) {
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile.php"><i class="fas fa-user"></i> View Profile</a>
+                        <a href="profile"><i class="fas fa-user"></i> View Profile</a>
                         <div class="dropdown-divider"></div>
                         <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
@@ -229,18 +229,18 @@ foreach ($pendingApplications as $application) {
         </div>
         
         <nav class="sidebar-nav">
-            <a href="dashboard.php" class="nav-item active">
+            <a href="dashboard" class="nav-item active">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
             
             <div class="nav-section">
                 <h4>Applications</h4>
-                <a href="undergraduate_applications.php" class="nav-item">
+                <a href="undergraduate_applications" class="nav-item">
                     <i class="fas fa-graduation-cap"></i>
                     <span>Undergraduate</span>
                 </a>
-                <a href="short_courses_applications.php" class="nav-item">
+                <a href="short_courses_applications" class="nav-item">
                     <i class="fas fa-book"></i>
                     <span>Short Courses</span>
                 </a>
@@ -248,7 +248,7 @@ foreach ($pendingApplications as $application) {
             
             <div class="nav-section">
                 <h4>My Approvals</h4>
-                <a href="my_approvals.php" class="nav-item">
+                <a href="my_approvals" class="nav-item">
                     <i class="fas fa-thumbs-up"></i>
                     <span>My Approvals</span>
                 </a>
@@ -256,7 +256,7 @@ foreach ($pendingApplications as $application) {
             
             <div class="nav-section">
                 <h4>Registered Students</h4>
-                <a href="registered_students.php" class="nav-item">
+                <a href="registered_students" class="nav-item">
                     <i class="fas fa-user-graduate"></i>
                     <span>Registered Students</span>
                 </a>
@@ -264,7 +264,7 @@ foreach ($pendingApplications as $application) {
             
             <div class="nav-section">
                 <h4>Reports</h4>
-                <a href="reports.php" class="nav-item">
+                <a href="reports" class="nav-item">
                     <i class="fas fa-chart-bar"></i>
                     <span>Enrollment Reports</span>
                 </a>

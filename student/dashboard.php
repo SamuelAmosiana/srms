@@ -99,8 +99,8 @@ $stats['accommodation_status'] = 'Not Applied';
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile.php"><i class="fas fa-user"></i> View Profile</a>
-                        <a href="settings.php"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="profile"><i class="fas fa-user"></i> View Profile</a>
+                        <a href="settings"><i class="fas fa-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
                         <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
@@ -116,22 +116,22 @@ $stats['accommodation_status'] = 'Not Applied';
         </div>
         
         <nav class="sidebar-nav">
-            <a href="dashboard.php" class="nav-item active">
+            <a href="dashboard" class="nav-item active">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
             
             <div class="nav-section">
                 <h4>Academic</h4>
-                <a href="view_results.php" class="nav-item">
+                <a href="view_results" class="nav-item">
                     <i class="fas fa-chart-line"></i>
                     <span>View Results</span>
                 </a>
-                <a href="register_courses.php" class="nav-item">
+                <a href="register_courses" class="nav-item">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Register Courses</span>
                 </a>
-                <a href="view_docket.php" class="nav-item">
+                <a href="view_docket" class="nav-item">
                     <i class="fas fa-file-alt"></i>
                     <span>View Docket</span>
                 </a>
@@ -139,11 +139,11 @@ $stats['accommodation_status'] = 'Not Applied';
             
             <div class="nav-section">
                 <h4>Finance & Accommodation</h4>
-                <a href="view_fee_balance.php" class="nav-item">
+                <a href="view_fee_balance" class="nav-item">
                     <i class="fas fa-money-bill-wave"></i>
                     <span>View Fee Balance</span>
                 </a>
-                <a href="accommodation.php" class="nav-item">
+                <a href="accommodation" class="nav-item">
                     <i class="fas fa-bed"></i>
                     <span>Accommodation</span>
                 </a>
@@ -205,31 +205,31 @@ $stats['accommodation_status'] = 'Not Applied';
         <div class="quick-actions">
             <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
             <div class="actions-grid">
-                <a href="view_results.php" class="action-card orange">
+                <a href="view_results" class="action-card orange">
                     <i class="fas fa-chart-line"></i>
                     <h3>View Results</h3>
                     <p>Check your CA and exam results</p>
                 </a>
                 
-                <a href="view_fee_balance.php" class="action-card green">
+                <a href="view_fee_balance" class="action-card green">
                     <i class="fas fa-money-bill-wave"></i>
                     <h3>View Fee Balance</h3>
                     <p>Check your outstanding fees</p>
                 </a>
                 
-                <a href="view_docket.php" class="action-card orange">
+                <a href="view_docket" class="action-card orange">
                     <i class="fas fa-file-alt"></i>
                     <h3>View Docket</h3>
                     <p>Access your academic docket</p>
                 </a>
                 
-                <a href="register_courses.php" class="action-card green">
+                <a href="register_courses" class="action-card green">
                     <i class="fas fa-clipboard-check"></i>
                     <h3>Register Courses</h3>
                     <p>Register for your courses</p>
                 </a>
                 
-                <a href="accommodation.php" class="action-card orange">
+                <a href="accommodation" class="action-card orange">
                     <i class="fas fa-bed"></i>
                     <h3>Accommodation</h3>
                     <p>Apply or view status</p>

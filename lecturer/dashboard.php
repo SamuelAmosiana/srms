@@ -85,8 +85,8 @@ $stats['pending_results'] = $stmt->fetch()['count'];
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile.php"><i class="fas fa-user"></i> View Profile</a>
-                        <a href="settings.php"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="profile"><i class="fas fa-user"></i> View Profile</a>
+                        <a href="settings"><i class="fas fa-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
                         <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
@@ -102,14 +102,14 @@ $stats['pending_results'] = $stmt->fetch()['count'];
         </div>
         
         <nav class="sidebar-nav">
-            <a href="dashboard.php" class="nav-item active">
+            <a href="dashboard" class="nav-item active">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
             
             <div class="nav-section">
                 <h4>Results Management</h4>
-                <a href="upload_results.php" class="nav-item">
+                <a href="upload_results" class="nav-item">
                     <i class="fas fa-upload"></i>
                     <span>Upload Results</span>
                 </a>
@@ -117,7 +117,7 @@ $stats['pending_results'] = $stmt->fetch()['count'];
             
             <div class="nav-section">
                 <h4>Student Management</h4>
-                <a href="view_students.php" class="nav-item">
+                <a href="view_students" class="nav-item">
                     <i class="fas fa-users"></i>
                     <span>View Students</span>
                 </a>
@@ -125,7 +125,7 @@ $stats['pending_results'] = $stmt->fetch()['count'];
             
             <div class="nav-section">
                 <h4>Reports</h4>
-                <a href="manage_reports.php" class="nav-item">
+                <a href="manage_reports" class="nav-item">
                     <i class="fas fa-chart-bar"></i>
                     <span>Manage Reports</span>
                 </a>
@@ -133,7 +133,7 @@ $stats['pending_results'] = $stmt->fetch()['count'];
             
             <div class="nav-section">
                 <h4>Profile</h4>
-                <a href="profile.php" class="nav-item">
+                <a href="profile" class="nav-item">
                     <i class="fas fa-user"></i>
                     <span>View Profile</span>
                 </a>
@@ -185,25 +185,25 @@ $stats['pending_results'] = $stmt->fetch()['count'];
         <div class="quick-actions">
             <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
             <div class="actions-grid">
-                <a href="upload_results.php" class="action-card orange">
+                <a href="upload_results" class="action-card orange">
                     <i class="fas fa-upload"></i>
                     <h3>Upload Results</h3>
                     <p>Upload CA and Exam results via Excel</p>
                 </a>
                 
-                <a href="view_students.php" class="action-card green">
+                <a href="view_students" class="action-card green">
                     <i class="fas fa-users"></i>
                     <h3>View Students</h3>
                     <p>View students enrolled in your courses</p>
                 </a>
                 
-                <a href="manage_reports.php" class="action-card orange">
+                <a href="manage_reports" class="action-card orange">
                     <i class="fas fa-chart-line"></i>
                     <h3>Manage Reports</h3>
                     <p>Generate and print student performance reports</p>
                 </a>
                 
-                <a href="profile.php" class="action-card green">
+                <a href="profile" class="action-card green">
                     <i class="fas fa-user"></i>
                     <h3>View Profile</h3>
                     <p>View and update your profile information</p>
