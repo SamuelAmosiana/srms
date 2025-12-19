@@ -11,7 +11,7 @@ if (!currentUserId()) {
 
 requireRole('Student', $pdo);
 
-// Get student profile with balance information
+// Get student profile with balance information and profile photo
 $stmt = $pdo->prepare("
     SELECT sp.*, u.email, u.contact, p.name as programme_name 
     FROM student_profile sp 
@@ -72,6 +72,13 @@ if (isset($_GET['download']) && !$hasBalance) {
     $pdf->Cell(0, 10, 'OFFICE OF THE REGISTRAR', 0, 1, 'C');
     $pdf->Cell(0, 10, 'STUDENT EXAMINATION DOCKET', 0, 1, 'C');
     $pdf->Ln(10);
+    
+    // Add student photo if available
+    $photo_path = $student['profile_photo'] ?? '';
+    if (!empty($photo_path) && file_exists($photo_path)) {
+        // Position the photo on the right side
+        $pdf->Image($photo_path, 150, 50, 40, 50); // x, y, width, height
+    }
     
     // Student Information
     $pdf->SetFont('Arial', 'B', 12);
@@ -297,6 +304,12 @@ if (isset($_GET['download']) && !$hasBalance) {
                 margin-left: 20px;
                 margin-bottom: 20px;
             }
+            
+            .student-photo img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
         }
     </style>
 </head>
@@ -384,10 +397,7 @@ if (isset($_GET['download']) && !$hasBalance) {
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="content-header">
-            <h1><i class="fas fa-file-alt"></i> Student Examination Docket</h1>
-            <p>Your official examination docket</p>
-        </div>
+        
         
         <!-- School Logo -->
         <div class="college-logo">
@@ -399,6 +409,10 @@ if (isset($_GET['download']) && !$hasBalance) {
             <h3>OFFICE OF THE REGISTRAR</h3>
             <h3>STUDENT EXAMINATION DOCKET</h3>
         </div>
+        <div class="content-header">
+            
+            <p>Your official examination docket</p>
+        </div>
         
         <!-- Balance Check -->
         <?php if($hasBalance): ?>
@@ -407,7 +421,7 @@ if (isset($_GET['download']) && !$hasBalance) {
             </div>
         <?php else: ?>
             <div class="no-balance">
-                Your account is clear. You may download your docket.
+                Your account is cleared.
             </div>
             
             <div class="download-btn">
@@ -416,9 +430,13 @@ if (isset($_GET['download']) && !$hasBalance) {
             </div>
         <?php endif; ?>
         
-        <!-- Student Photo Placeholder -->
+        <!-- Student Photo -->
         <div class="student-photo" style="text-align: center; line-height: 150px;">
-            Photo<br>Not<br>Available
+            <?php if (!empty($student['profile_photo']) && file_exists($student['profile_photo'])): ?>
+                <img src="<?php echo htmlspecialchars($student['profile_photo']); ?>" alt="Student Photo" style="width: 100%; height: 100%; object-fit: cover;">
+            <?php else: ?>
+                Photo<br>Not<br>Available
+            <?php endif; ?>
         </div>
         
         <!-- Student Information -->
