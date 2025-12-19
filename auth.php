@@ -169,40 +169,6 @@ function requireRole($roleName, $pdo) {
 }
 
 // Enhanced permission checking functions
-function currentUserHasPermission($permissionName, $pdo) {
-    if (!currentUserId()) return false;
-    
-    // Check for user-specific permission override first (if table exists)
-    try {
-        $stmt = $pdo->prepare("SELECT granted FROM user_permissions WHERE user_id = ? AND permission_id = (SELECT id FROM permissions WHERE name = ?)");
-        $stmt->execute([currentUserId(), $permissionName]);
-        $userPermission = $stmt->fetchColumn();
-        
-        if ($userPermission !== false) {
-            return (bool)$userPermission;
-        }
-    } catch (Exception $e) {
-        // Table doesn't exist, continue with role-based permissions
-    }
-    
-    // Fall back to role-based permissions
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) FROM role_permissions rp 
-        JOIN user_roles ur ON rp.role_id = ur.role_id 
-        JOIN permissions p ON rp.permission_id = p.id 
-        WHERE ur.user_id = ? AND p.name = ?
-    ");
-    $stmt->execute([currentUserId(), $permissionName]);
-    
-    return $stmt->fetchColumn() > 0;
-}
-
-function requirePermission($permissionName, $pdo) {
-    if (!currentUserHasPermission($permissionName, $pdo)) {
-        http_response_code(403);
-        die('Forbidden - insufficient permissions to access this resource');
-    }
-}
 
 // Get all permissions for current user
 function getCurrentUserPermissions($pdo) {
@@ -229,29 +195,40 @@ function getCurrentUserPermissions($pdo) {
         $stmt->execute([currentUserId()]);
         $userOverrides = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     } catch (Exception $e) {
-        // Table doesn't exist, continue without user overrides
+        // user_permissions table might not exist, ignore error
     }
     
-    // Apply user overrides to role permissions
+    // Merge role permissions with user overrides
     $finalPermissions = [];
-    foreach ($rolePermissions as $permission) {
-        if (isset($userOverrides[$permission])) {
-            if ($userOverrides[$permission]) {
-                $finalPermissions[] = $permission;
-            }
-        } else {
-            $finalPermissions[] = $permission;
+    foreach ($rolePermissions as $perm) {
+        // If user override exists and it's denied (0), skip this permission
+        if (isset($userOverrides[$perm]) && $userOverrides[$perm] == 0) {
+            continue;
+        }
+        $finalPermissions[] = $perm;
+    }
+    
+    // Add any additional permissions that were explicitly granted to the user
+    foreach ($userOverrides as $perm => $granted) {
+        if ($granted == 1 && !in_array($perm, $rolePermissions)) {
+            $finalPermissions[] = $perm;
         }
     }
     
-    // Add user-specific granted permissions
-    foreach ($userOverrides as $permission => $granted) {
-        if ($granted && !in_array($permission, $finalPermissions)) {
-            $finalPermissions[] = $permission;
-        }
+    return array_unique($finalPermissions);
+}
+
+// Check if current user has a specific permission
+function currentUserHasPermission($permissionName, $pdo) {
+    $permissions = getCurrentUserPermissions($pdo);
+    return in_array($permissionName, $permissions);
+}
+
+function requirePermission($permissionName, $pdo) {
+    if (!currentUserHasPermission($permissionName, $pdo)) {
+        http_response_code(403);
+        die('Forbidden - insufficient permissions to access this resource');
     }
-    
-    return $finalPermissions;
 }
 
 // Check if current user can manage a specific user (for part-time/intern restrictions)

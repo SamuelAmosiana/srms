@@ -294,13 +294,24 @@ if (isset($_GET['view'])) {
         
         // Get current lecturers assigned to this course
         $lecturers_stmt = $pdo->prepare("
-            SELECT ca.*, sp.full_name, sp.staff_id, i.name as intake_name, u.email
+            SELECT ca.*, sp.full_name, sp.staff_id, u.email,
+                   CASE 
+                       WHEN ca.academic_year REGEXP '^[0-9]{4}$' THEN CONCAT(ca.academic_year, '/', ca.academic_year + 1)
+                       WHEN ca.academic_year IS NOT NULL AND ca.academic_year != '' THEN ca.academic_year
+                       ELSE 'Not specified'
+                   END as intake_name,
+                   CASE 
+                       WHEN ca.semester = '1' THEN 'Term 1'
+                       WHEN ca.semester = '2' THEN 'Term 2'
+                       WHEN ca.semester = 'Summer' THEN 'Term 3'
+                       WHEN ca.semester IS NOT NULL AND ca.semester != '' THEN ca.semester
+                       ELSE 'Not specified'
+                   END as semester
             FROM course_assignment ca
             JOIN staff_profile sp ON ca.lecturer_id = sp.user_id
             JOIN users u ON sp.user_id = u.id
-            JOIN intake i ON ca.academic_year = i.name
             WHERE ca.course_id = ? AND ca.is_active = 1
-            ORDER BY ca.academic_year, ca.semester
+            ORDER BY ca.assigned_at DESC
         ");
         $lecturers_stmt->execute([$course_id]);
         $courseLecturers = $lecturers_stmt->fetchAll();

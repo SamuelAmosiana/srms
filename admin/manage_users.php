@@ -98,8 +98,9 @@ if ($_POST) {
                                 $courseCheckStmt->execute([$course_id]);
                                 if ($courseCheckStmt->fetch()) {
                                     // Course exists, so we can assign it to the lecturer
-                                    $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id) VALUES (?, ?)");
-                                    $course_stmt->execute([$course_id, $userId]);
+                                    // Use default values for academic_year and semester to ensure the record is created
+                                    $course_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id, academic_year, semester) VALUES (?, ?, ?, ?)");
+                                    $course_stmt->execute([$course_id, $userId, date('Y'), '1']);
                                 }
                             }
                         }

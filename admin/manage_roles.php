@@ -226,18 +226,36 @@ if ($activeTab === 'user_permissions') {
 // Get user permissions if managing specific user
 $userPermissions = [];
 if (isset($_GET['manage_user'])) {
-    $stmt = $pdo->prepare("SELECT p.id, p.name, p.description, 
-                           CASE WHEN rp.permission_id IS NOT NULL THEN 1 ELSE 0 END as role_has,
-                           COALESCE(up.granted, 
-                               CASE WHEN rp.permission_id IS NOT NULL THEN 1 ELSE 0 END
-                           ) as user_has
-                           FROM permissions p
-                           LEFT JOIN role_permissions rp ON p.id = rp.permission_id 
-                           AND rp.role_id = (SELECT role_id FROM user_roles WHERE user_id = ?)
-                           LEFT JOIN user_permissions up ON p.id = up.permission_id AND up.user_id = ?
-                           ORDER BY p.name");
-    $stmt->execute([$_GET['manage_user'], $_GET['manage_user']]);
-    $userPermissions = $stmt->fetchAll();
+    try {
+        $stmt = $pdo->prepare("SELECT p.id, p.name, p.description, 
+                               CASE WHEN rp.permission_id IS NOT NULL THEN 1 ELSE 0 END as role_has,
+                               COALESCE(up.granted, 
+                                   CASE WHEN rp.permission_id IS NOT NULL THEN 1 ELSE 0 END
+                               ) as user_has
+                               FROM permissions p
+                               LEFT JOIN role_permissions rp ON p.id = rp.permission_id 
+                               AND rp.role_id = (SELECT role_id FROM user_roles WHERE user_id = ?)
+                               LEFT JOIN user_permissions up ON p.id = up.permission_id AND up.user_id = ?
+                               ORDER BY p.name");
+        $stmt->execute([$_GET['manage_user'], $_GET['manage_user']]);
+        $userPermissions = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        // Handle case where user_permissions table doesn't exist
+        if (strpos($e->getMessage(), 'user_permissions') !== false) {
+            // Fallback query without user_permissions table
+            $stmt = $pdo->prepare("SELECT p.id, p.name, p.description, 
+                                   CASE WHEN rp.permission_id IS NOT NULL THEN 1 ELSE 0 END as role_has,
+                                   CASE WHEN rp.permission_id IS NOT NULL THEN 1 ELSE 0 END as user_has
+                                   FROM permissions p
+                                   LEFT JOIN role_permissions rp ON p.id = rp.permission_id 
+                                   AND rp.role_id = (SELECT role_id FROM user_roles WHERE user_id = ?)
+                                   ORDER BY p.name");
+            $stmt->execute([$_GET['manage_user']]);
+            $userPermissions = $stmt->fetchAll();
+        } else {
+            throw $e; // Re-throw if it's a different error
+        }
+    }
 }
 
 // Seed default roles and permissions
