@@ -10,8 +10,8 @@ if (!currentUserId()) {
 
 requireRole('Student', $pdo);
 
-// Get student profile
-$stmt = $pdo->prepare("SELECT sp.full_name, sp.student_number as student_id, sp.programme_id FROM student_profile sp WHERE sp.user_id = ?");
+// Get student profile with intake information
+$stmt = $pdo->prepare("SELECT sp.full_name, sp.student_number as student_id, sp.programme_id, sp.intake_id FROM student_profile sp WHERE sp.user_id = ?");
 $stmt->execute([currentUserId()]);
 $student = $stmt->fetch();
 
@@ -119,10 +119,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$existing_registration) {
     }
 }
 
-// Fetch available courses for student's programme
-$stmt = $pdo->prepare("SELECT c.id as course_id, c.code as course_code, c.name as course_name FROM course c WHERE c.programme_id = ?");
-$stmt->execute([$student['programme_id']]);
-$available_courses = $stmt->fetchAll();
+// Fetch available courses for student's programme and intake
+// First, get all terms defined for this intake
+$terms = [];
+$courses_by_term = [];
+
+if ($student['intake_id']) {
+    // Get distinct terms for this intake
+    $stmt = $pdo->prepare("SELECT DISTINCT term FROM intake_courses WHERE intake_id = ? ORDER BY term");
+    $stmt->execute([$student['intake_id']]);
+    $terms = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    // For each term, get the courses defined for this intake and programme
+    foreach ($terms as $term) {
+        $stmt = $pdo->prepare("
+            SELECT c.id as course_id, c.code as course_code, c.name as course_name, c.credits
+            FROM intake_courses ic
+            JOIN course c ON ic.course_id = c.id
+            WHERE ic.intake_id = ? AND ic.term = ?
+            AND (ic.programme_id = ? OR ic.programme_id IS NULL)
+            ORDER BY c.name
+        ");
+        $stmt->execute([$student['intake_id'], $term, $student['programme_id']]);
+        $courses_by_term[$term] = $stmt->fetchAll();
+    }
+} else {
+    // Fallback to old method if no intake is set
+    $stmt = $pdo->prepare("SELECT c.id as course_id, c.code as course_code, c.name as course_name, c.credits FROM course c WHERE c.programme_id = ?");
+    $stmt->execute([$student['programme_id']]);
+    $courses_by_term['General'] = $stmt->fetchAll();
+    $terms = ['General'];
+}
 
 // Fetch programme fees
 $stmt = $pdo->prepare("SELECT * FROM programme_fees WHERE programme_id = ? AND is_active = 1");
@@ -279,6 +306,69 @@ foreach ($programme_fees as $fee) {
             background-color: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
+        }
+        
+        /* Term tabs styling */
+        .term-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .term-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        
+        .term-tab.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .term-content {
+            display: none;
+        }
+        
+        .term-content.active {
+            display: block;
+        }
+        
+        .course-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+        }
+        
+        .course-item label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .course-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        
+        .course-details {
+            flex-grow: 1;
+        }
+        
+        .course-code {
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .course-credits {
+            font-size: 0.9em;
+            color: #666;
         }
     </style>
 </head>
@@ -469,16 +559,43 @@ foreach ($programme_fees as $fee) {
                     <form method="POST" class="registration-form">
                         <input type="hidden" name="action" value="submit_registration">
                         
-                        <div class="courses-list">
-                            <?php foreach ($available_courses as $course): ?>
-                                <div class="course-item">
-                                    <input type="checkbox" name="courses[]" value="<?php echo $course['course_id']; ?>" id="course_<?php echo $course['course_id']; ?>">
-                                    <label for="course_<?php echo $course['course_id']; ?>">
-                                        <?php echo htmlspecialchars($course['course_code'] . ' - ' . $course['course_name']); ?>
-                                    </label>
+                        <?php if (!empty($terms)): ?>
+                            <div class="term-tabs">
+                                <?php foreach ($terms as $index => $term): ?>
+                                    <div class="term-tab <?php echo $index === 0 ? 'active' : ''; ?>" onclick="showTermTab('<?php echo $term; ?>')">
+                                        <?php echo htmlspecialchars($term); ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            
+                            <?php foreach ($terms as $index => $term): ?>
+                                <div id="term-<?php echo $term; ?>" class="term-content <?php echo $index === 0 ? 'active' : ''; ?>">
+                                    <h3><?php echo htmlspecialchars($term); ?> Courses</h3>
+                                    
+                                    <?php if (empty($courses_by_term[$term])): ?>
+                                        <p>No courses defined for this term.</p>
+                                    <?php else: ?>
+                                        <div class="courses-list">
+                                            <?php foreach ($courses_by_term[$term] as $course): ?>
+                                                <div class="course-item">
+                                                    <label>
+                                                        <input type="checkbox" name="courses[]" value="<?php echo $course['course_id']; ?>">
+                                                        <div class="course-details">
+                                                            <span class="course-code"><?php echo htmlspecialchars($course['course_code']); ?></span> - 
+                                                            <span class="course-name"><?php echo htmlspecialchars($course['course_name']); ?></span>
+                                                            <br>
+                                                            <span class="course-credits"><?php echo htmlspecialchars($course['credits']); ?> Credits</span>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
-                        </div>
+                        <?php else: ?>
+                            <p>No terms defined for your intake. Please contact the administrator.</p>
+                        <?php endif; ?>
                         
                         <button type="submit" class="btn-submit">Submit Registration</button>
                     </form>
@@ -500,6 +617,24 @@ foreach ($programme_fees as $fee) {
             
             // Set the payment method select value
             document.getElementById('payment_method').value = method;
+        }
+        
+        function showTermTab(term) {
+            // Hide all term content
+            document.querySelectorAll('.term-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.term-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected term content
+            document.getElementById('term-' + term).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.currentTarget.classList.add('active');
         }
     </script>
 </body>
