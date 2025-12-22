@@ -11,7 +11,7 @@ if (!currentUserId()) {
 requireRole('Student', $pdo);
 
 // Get student profile
-$stmt = $pdo->prepare("SELECT sp.full_name, sp.student_number as student_id, sp.programme_id FROM student_profile sp WHERE sp.user_id = ?");
+$stmt = $pdo->prepare("SELECT sp.full_name, sp.student_number as student_id, sp.programme_id, sp.gender FROM student_profile sp WHERE sp.user_id = ?");
 $stmt->execute([currentUserId()]);
 $student = $stmt->fetch();
 
@@ -27,11 +27,11 @@ $fees = $stmt->fetch();
 $balance = $fees['balance'] ?? 0;
 $access_granted = ($balance == 0); // Grant access if balance is zero
 
-// Fetch all results grouped by academic year
+// Fetch all results grouped by academic year with course credits
 $results_by_year = [];
 $stmt = $pdo->prepare("
     SELECT r.ca_score, r.exam_score, r.grade,
-           c.code as course_code, c.name as course_name,
+           c.code as course_code, c.name as course_name, c.credits,
            ce.academic_year
     FROM results r
     JOIN course_enrollment ce ON r.enrollment_id = ce.id
@@ -50,48 +50,66 @@ foreach ($results as $result) {
     $results_by_year[$year][] = $result;
 }
 
-// For each year, compute GPA, failed courses, comment
+// For each year, compute GPA, total credits, failed courses, comment
 $year_data = [];
+$gpa_data = [];
 foreach ($results_by_year as $year => $courses) {
     $total_courses = count($courses);
     $failed = 0;
     $total_grade_points = 0;
+    $total_credits = 0;
     
     foreach ($courses as $course) {
-        // Convert grade to grade points (assuming A=4, B=3, C=2, D=1, F=0)
+        // Convert grade to grade points (assuming A=4, B+=3.5, B=3, C=2, D=1, F=0)
         $grade_points = 0;
         $grade = $course['grade'] ?? '';
         switch (strtoupper($grade)) {
             case 'A': $grade_points = 4; break;
+            case 'B+': $grade_points = 3.5; break;
             case 'B': $grade_points = 3; break;
             case 'C': $grade_points = 2; break;
             case 'D': $grade_points = 1; break;
             case 'F': $grade_points = 0; break;
         }
         
-        $total_grade_points += $grade_points;
+        $credits = $course['credits'] ?? 0;
+        $total_grade_points += $grade_points * $credits;
+        $total_credits += $credits;
+        
         if ($grade_points == 0) { // Assume fail for F grade
             $failed++;
         }
     }
     
-    $gpa = $total_courses > 0 ? number_format($total_grade_points / $total_courses, 2) : 0;
+    // Calculate GPA using weighted average: (Sum of credits * grade points) / Sum of credits
+    $gpa = $total_credits > 0 ? round($total_grade_points / $total_credits, 2) : 0;
 
     if ($failed == 0) {
-        $comment = 'Clear Pass';
+        $comment = 'CLEAR PASS';
     } elseif ($failed / $total_courses >= 0.5) {
-        $comment = 'Repeat Year';
+        $comment = 'REPEAT YEAR';
     } else {
-        $comment = 'Repeat Course(s)';
+        $comment = 'REPEAT COURSE(S)';
+    }
+    
+    // For students with no credits, set GPA to 0
+    if ($total_credits == 0) {
+        $gpa = 0;
     }
 
     $year_data[$year] = [
         'gpa' => $gpa,
+        'credits' => $total_credits,
         'comment' => $comment,
         'courses' => $courses
     ];
+    
+    $gpa_data[] = [
+        'year' => $year,
+        'credits' => $total_credits,
+        'gpa' => $gpa
+    ];
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -103,47 +121,175 @@ foreach ($results_by_year as $year => $courses) {
     <link rel="stylesheet" href="../assets/css/student-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .results-section {
+        .student-info {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px var(--shadow);
             margin-bottom: 30px;
+        }
+        
+        .student-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        
+        .info-item {
+            display: flex;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            width: 200px;
+            color: var(--text-dark);
+        }
+        
+        .info-value {
+            flex: 1;
+            color: var(--text-dark);
+        }
+        
+        .section-title {
+            color: var(--primary-green);
+            margin: 25px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-green);
+        }
+        
+        .gpa-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: var(--white);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        
+        .gpa-table th,
+        .gpa-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .gpa-table th {
+            background-color: var(--light-gray);
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        
+        .gpa-table tbody tr:hover {
+            background-color: rgba(34, 139, 34, 0.05);
+        }
+        
+        .results-section {
+            margin-bottom: 40px;
             background: var(--white);
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 8px var(--shadow);
         }
         
-        .results-section h2 {
+        .results-section h3 {
             color: var(--primary-green);
             margin-bottom: 15px;
+        }
+        
+        .year-info {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .year-info-item {
+            display: flex;
+        }
+        
+        .year-info-label {
+            font-weight: bold;
+            margin-right: 10px;
         }
         
         /* Adjust column widths for results table */
         .results-table {
             table-layout: fixed;
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: var(--white);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        
+        .results-table th,
+        .results-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .results-table th {
+            background-color: var(--light-gray);
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        
+        .results-table tbody tr:hover {
+            background-color: rgba(34, 139, 34, 0.05);
         }
         
         .results-table th:nth-child(1),
-        .results-table td:nth-child(1) { /* Course Code */
+        .results-table td:nth-child(1) { /* Academic Year */
             width: 15%;
         }
         
         .results-table th:nth-child(2),
-        .results-table td:nth-child(2) { /* Course Name */
-            width: 45%;
+        .results-table td:nth-child(2) { /* Programme */
+            width: 25%;
         }
         
         .results-table th:nth-child(3),
-        .results-table td:nth-child(3) { /* CA Score */
-            width: 15%;
+        .results-table td:nth-child(3) { /* Year of Study */
+            width: 10%;
         }
         
         .results-table th:nth-child(4),
-        .results-table td:nth-child(4) { /* Exam Score */
-            width: 15%;
+        .results-table td:nth-child(4) { /* Course */
+            width: 25%;
         }
         
         .results-table th:nth-child(5),
-        .results-table td:nth-child(5) { /* Final Grade */
-            width: 10%;
+        .results-table td:nth-child(5) { /* Credits */
+            width: 8%;
+        }
+        
+        .results-table th:nth-child(6),
+        .results-table td:nth-child(6) { /* Grade */
+            width: 8%;
+        }
+        
+        .results-table th:nth-child(7),
+        .results-table td:nth-child(7) { /* Comment */
+            width: 9%;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-light);
+        }
+        
+        .note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
         }
     </style>
 </head>
@@ -241,44 +387,134 @@ foreach ($results_by_year as $year => $courses) {
                 <i class="fas fa-exclamation-triangle"></i> Your fee balance is K<?php echo number_format($balance, 2); ?>. Access to exam results is restricted. You can only view CA results. Please contact finance to settle your balance.
             </div>
         <?php endif; ?>
-
-        <?php foreach ($year_data as $year => $data): ?>
-            <div class="results-section">
-                <h2>Academic Year: <?php echo htmlspecialchars($year); ?></h2>
-                <p>Programme: <?php echo htmlspecialchars($programme); ?></p>
-                <p>GPA: <?php echo $data['gpa']; ?></p>
-                <p>Comment: <?php echo htmlspecialchars($data['comment']); ?></p>
-                
-                <table class="results-table data-table">
-                    <thead>
-                        <tr>
-                            <th>Course Code</th>
-                            <th>Course Name</th>
-                            <th>CA Score</th>
-                            <?php if ($access_granted): ?>
-                                <th>Exam Score</th>
-                                <th>Final Grade</th>
-                            <?php endif; ?>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($data['courses'] as $course): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($course['course_code']); ?></td>
-                                <td><?php echo htmlspecialchars($course['course_name']); ?></td>
-                                <td><?php echo htmlspecialchars($course['ca_score'] ?? 'N/A'); ?></td>
-                                <?php if ($access_granted): ?>
-                                    <td><?php echo htmlspecialchars($course['exam_score'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($course['grade'] ?? 'N/A'); ?></td>
-                                <?php endif; ?>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endforeach; ?>
         
-        <?php if (empty($year_data)): ?>
+        <!-- Student Information -->
+        <div class="student-info">
+            <div class="student-info-grid">
+                <div class="info-item">
+                    <div class="info-label">Computer Number:</div>
+                    <div class="info-value"><?php echo htmlspecialchars($student['student_id'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Names:</div>
+                    <div class="info-value"><?php echo htmlspecialchars($student['full_name'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Gender:</div>
+                    <div class="info-value"><?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Continuous Assessment Results -->
+        <h2 class="section-title">Continuous Assessment Results [Current Academic Year]</h2>
+        <div class="no-results">
+            There are no Continuous Assessment Results available for now
+        </div>
+        
+        <!-- Examination Results & GPA Computation -->
+        <h2 class="section-title">Examination Results & GPA Computation</h2>
+        
+        <div class="note">
+            <i class="fas fa-info-circle"></i> Note: GPA per Academic Year is computed by ((Course Credits * grade points)/sum of credits)
+        </div>
+        
+        <table class="gpa-table">
+            <thead>
+                <tr>
+                    <th>Session</th>
+                    <th>Credits</th>
+                    <th>GPA</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($gpa_data)): ?>
+                    <?php foreach ($gpa_data as $gpa_entry): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($gpa_entry['year']); ?></td>
+                            <td><?php echo htmlspecialchars($gpa_entry['credits']); ?></td>
+                            <td><?php echo htmlspecialchars($gpa_entry['gpa']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="3" class="no-results">No GPA data available</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+        
+        <!-- Detailed Results by Academic Year -->
+        <?php if (!empty($year_data)): ?>
+            <?php foreach ($year_data as $year => $data): ?>
+                <div class="results-section">
+                    <h3>Academic Year: <?php echo htmlspecialchars($year); ?></h3>
+                    
+                    <div class="year-info">
+                        <div class="year-info-item">
+                            <div class="year-info-label">Programme:</div>
+                            <div><?php echo htmlspecialchars($programme); ?></div>
+                        </div>
+                        <div class="year-info-item">
+                            <div class="year-info-label">Year of Study:</div>
+                            <div><?php 
+                                // Extract year from academic year (e.g., 2024/2025 -> 1st Year, 2nd Year, etc.)
+                                $year_parts = explode('/', $year);
+                                $start_year = intval($year_parts[0]);
+                                $current_year = date('Y');
+                                $study_year = $current_year - $start_year + 1;
+                                echo $study_year . ordinal($study_year) . ' Year';
+                            ?></div>
+                        </div>
+                        <div class="year-info-item">
+                            <div class="year-info-label">Credits:</div>
+                            <div><?php echo htmlspecialchars($data['credits']); ?></div>
+                        </div>
+                        <div class="year-info-item">
+                            <div class="year-info-label">GPA:</div>
+                            <div><?php echo htmlspecialchars($data['gpa']); ?></div>
+                        </div>
+                        <div class="year-info-item">
+                            <div class="year-info-label">Comment:</div>
+                            <div><?php echo htmlspecialchars($data['comment']); ?></div>
+                        </div>
+                    </div>
+                    
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Session</th>
+                                <th>Programme</th>
+                                <th>Year of study</th>
+                                <th>Course</th>
+                                <th>Credits</th>
+                                <th>Grade</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($data['courses'] as $course): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($year); ?></td>
+                                    <td><?php echo htmlspecialchars($programme); ?></td>
+                                    <td><?php 
+                                        $year_parts = explode('/', $year);
+                                        $start_year = intval($year_parts[0]);
+                                        $current_year = date('Y');
+                                        $study_year = $current_year - $start_year + 1;
+                                        echo $study_year . ordinal($study_year) . ' Year';
+                                    ?></td>
+                                    <td><?php echo htmlspecialchars($course['course_code'] . ' - ' . $course['course_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($course['credits'] ?? 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars($course['grade'] ?? 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars($data['comment']); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i> No results available yet.
             </div>
@@ -286,5 +522,16 @@ foreach ($results_by_year as $year => $courses) {
     </main>
 
     <script src="../assets/js/student-dashboard.js"></script>
+    
+    <?php
+    // Helper function to add ordinal suffix to numbers
+    function ordinal($number) {
+        $ends = array('th','st','nd','rd','th','th','th','th','th','th');
+        if ((($number % 100) >= 11) && (($number%100) <= 13))
+            return 'th';
+        else
+            return $ends[$number % 10];
+    }
+    ?>
 </body>
 </html>
