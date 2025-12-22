@@ -27,61 +27,227 @@ $admin = $stmt->fetch();
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .feature-card {
+        /* Dashboard Stats */
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
             background: var(--white);
             border-radius: 8px;
             padding: 20px;
-            margin-bottom: 20px;
             box-shadow: 0 2px 8px var(--shadow);
+            display: flex;
+            align-items: center;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         
-        .feature-card:hover {
+        .stat-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 4px 16px var(--shadow);
         }
         
-        .feature-card h3 {
-            color: var(--primary-green);
-            margin-bottom: 10px;
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 24px;
+            color: white;
         }
         
-        .feature-card p {
+        .stat-content h3 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 5px;
             color: var(--text-dark);
-            margin-bottom: 15px;
-            line-height: 1.6;
         }
         
-        .btn-primary {
+        .stat-content p {
+            color: var(--text-light);
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        /* Card Styles */
+        .card {
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px var(--shadow);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
             background-color: var(--primary-green);
             color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
+        }
+        
+        .card-header h3 {
+            margin: 0;
+            font-size: 18px;
             font-weight: 500;
-            transition: background-color 0.3s ease;
         }
         
-        .btn-primary:hover {
-            background-color: var(--dark-green);
+        .card-body {
+            padding: 20px;
         }
         
-        .grid-container {
+        /* Menu Grid */
+        .menu-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .menu-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+        
+        .menu-item:hover {
+            background-color: var(--background-light);
+            border-color: var(--primary-green);
+        }
+        
+        .menu-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 18px;
+            color: white;
+            flex-shrink: 0;
+        }
+        
+        .menu-text h4 {
+            margin: 0 0 5px 0;
+            font-size: 15px;
+            color: var(--text-dark);
+        }
+        
+        .menu-text p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-light);
+            line-height: 1.4;
+        }
+        
+        /* Activity List */
+        .activity-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .activity-list li {
+            display: flex;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .activity-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 14px;
+            color: white;
+            flex-shrink: 0;
+        }
+        
+        .activity-content p {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            color: var(--text-dark);
+        }
+        
+        .activity-content small {
+            color: var(--text-light);
+        }
+        
+        /* Utility Classes */
+        .mt-4 {
             margin-top: 20px;
         }
         
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -10px;
+        }
+        
+        .col-6 {
+            flex: 0 0 50%;
+            max-width: 50%;
+            padding: 0 10px;
+        }
+        
+        /* Background Colors */
+        .bg-blue { background-color: #4285f4; }
+        .bg-green { background-color: #34a853; }
+        .bg-orange { background-color: #fbbc05; }
+        .bg-purple { background-color: #673ab7; }
+        .bg-red { background-color: #ea4335; }
+        .bg-teal { background-color: #00acc1; }
+        .bg-indigo { background-color: #5c6bc0; }
+        .bg-pink { background-color: #e91e63; }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .col-6 {
+                flex: 0 0 100%;
+                max-width: 100%;
+                margin-bottom: 20px;
+            }
+        }
+        
         @media (max-width: 768px) {
-            .grid-container {
+            .menu-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            .dashboard-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .dashboard-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .stat-icon {
+                margin-right: 0;
+                margin-bottom: 10px;
             }
         }
     </style>
@@ -191,45 +357,185 @@ $admin = $stmt->fetch();
             <p>Welcome to the Academics Coordinator Panel</p>
         </div>
         
-        <div class="feature-overview">
-            <h2>Academic Management Features</h2>
-            <p>As an Academics Coordinator, you have access to the following modules:</p>
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <div class="stat-icon bg-blue">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>12</h3>
+                    <p>Active Programs</p>
+                </div>
+            </div>
             
-            <div class="grid-container">
-                <div class="feature-card">
-                    <h3><i class="fas fa-calendar-alt"></i> Academic Calendars</h3>
-                    <p>Formulate and manage academic calendars, define semesters, holidays, and key dates.</p>
-                    <a href="#" class="btn-primary">Access Module</a>
+            <div class="stat-card">
+                <div class="stat-icon bg-green">
+                    <i class="fas fa-book"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>142</h3>
+                    <p>Courses Managed</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon bg-orange">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>8</h3>
+                    <p>Lecturers</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon bg-purple">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>89%</h3>
+                    <p>Results Processed</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-tasks"></i> Academic Operations</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="menu-grid">
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-blue">
+                                    <i class="fas fa-calendar-alt"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Create Academic Calendars</h4>
+                                    <p>Define semesters, holidays, and key dates</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-green">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Generate Timetables</h4>
+                                    <p>Automated schedule creation</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-orange">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Schedule Programs & Exams</h4>
+                                    <p>Plan events and examinations</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-purple">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Publish Results</h4>
+                                    <p>Upload and verify student results</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cogs"></i> Administrative Functions</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="menu-grid">
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-red">
+                                    <i class="fas fa-user-clock"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Track Lecturer Attendance</h4>
+                                    <p>Monitor attendance and generate reports</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-teal">
+                                    <i class="fas fa-clipboard-check"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Approve Course Registration</h4>
+                                    <p>Review student registrations</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-indigo">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Academic Reports</h4>
+                                    <p>Generate performance reports</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="menu-item">
+                                <div class="menu-icon bg-pink">
+                                    <i class="fas fa-chart-bar"></i>
+                                </div>
+                                <div class="menu-text">
+                                    <h4>Performance Analytics</h4>
+                                    <p>Analyze academic trends</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="feature-card">
-                    <h3><i class="fas fa-clock"></i> Timetable Generation</h3>
-                    <p>Automated timetable creation with conflict detection and manual adjustments.</p>
-                    <a href="#" class="btn-primary">Access Module</a>
-                </div>
-                
-                <div class="feature-card">
-                    <h3><i class="fas fa-calendar-check"></i> Program Scheduling</h3>
-                    <p>Plan examinations, practicals, and events with venue and invigilator assignment.</p>
-                    <a href="#" class="btn-primary">Access Module</a>
-                </div>
-                
-                <div class="feature-card">
-                    <h3><i class="fas fa-chart-line"></i> Results Publishing</h3>
-                    <p>Secure upload, verification, and publishing of student results.</p>
-                    <a href="#" class="btn-primary">Access Module</a>
-                </div>
-                
-                <div class="feature-card">
-                    <h3><i class="fas fa-user-clock"></i> Lecturer Attendance</h3>
-                    <p>Monitor lecturer attendance and generate reports/alerts.</p>
-                    <a href="#" class="btn-primary">Access Module</a>
-                </div>
-                
-                <div class="feature-card">
-                    <h3><i class="fas fa-clipboard-check"></i> Course Registration</h3>
-                    <p>Review and approve/reject student course registrations.</p>
-                    <a href="#" class="btn-primary">Access Module</a>
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-bell"></i> Recent Activities</h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="activity-list">
+                            <li>
+                                <div class="activity-icon bg-green">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p>Approved 15 course registrations</p>
+                                    <small class="text-muted">2 hours ago</small>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="activity-icon bg-blue">
+                                    <i class="fas fa-calendar-plus"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p>Updated academic calendar for 2024</p>
+                                    <small class="text-muted">1 day ago</small>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="activity-icon bg-orange">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p>Published semester results</p>
+                                    <small class="text-muted">2 days ago</small>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
