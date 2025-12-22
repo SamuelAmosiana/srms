@@ -82,6 +82,28 @@ try {
     if ($column_check->rowCount() == 0) {
         $pdo->exec("ALTER TABLE course_enrollment ADD COLUMN published TINYINT(1) DEFAULT 0");
     }
+    
+    // Add admin_comment column to results table
+    $column_check = $pdo->query("SHOW COLUMNS FROM results LIKE 'admin_comment'");
+    if ($column_check->rowCount() == 0) {
+        $pdo->exec("ALTER TABLE results ADD COLUMN admin_comment TEXT NULL AFTER grade");
+    }
+    
+    // Create academic_year_comments table
+    $table_check = $pdo->query("SHOW TABLES LIKE 'academic_year_comments'");
+    if ($table_check->rowCount() == 0) {
+        $pdo->exec("CREATE TABLE academic_year_comments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            student_user_id INT NOT NULL,
+            academic_year VARCHAR(20) NOT NULL,
+            comment TEXT NOT NULL,
+            added_by_user_id INT NOT NULL,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (added_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE KEY unique_student_year_comment (student_user_id, academic_year)
+        )");
+    }
 } catch (Exception $e) {
     // Log error but continue
     error_log("Result tables creation error: " . $e->getMessage());
@@ -339,6 +361,69 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $message = "{$published} results published successfully!";
                 $messageType = 'success';
                 break;
+                
+            case 'add_academic_year_comment':
+                $student_user_id = $_POST['student_user_id'];
+                $academic_year = $_POST['academic_year'];
+                $comment = trim($_POST['comment']);
+                
+                if (empty($student_user_id) || empty($academic_year) || empty($comment)) {
+                    $message = "Please fill in all required fields!";
+                    $messageType = 'error';
+                } else {
+                    try {
+                        // Check if comment already exists for this student and year
+                        $check_stmt = $pdo->prepare("SELECT id FROM academic_year_comments WHERE student_user_id = ? AND academic_year = ?");
+                        $check_stmt->execute([$student_user_id, $academic_year]);
+                        
+                        if ($check_stmt->rowCount() > 0) {
+                            // Update existing comment
+                            $stmt = $pdo->prepare("UPDATE academic_year_comments SET comment = ?, added_by_user_id = ?, added_at = NOW() WHERE student_user_id = ? AND academic_year = ?");
+                            $result = $stmt->execute([$comment, currentUserId(), $student_user_id, $academic_year]);
+                        } else {
+                            // Insert new comment
+                            $stmt = $pdo->prepare("INSERT INTO academic_year_comments (student_user_id, academic_year, comment, added_by_user_id) VALUES (?, ?, ?, ?)");
+                            $result = $stmt->execute([$student_user_id, $academic_year, $comment, currentUserId()]);
+                        }
+                        
+                        if ($result) {
+                            $message = "Academic year comment saved successfully!";
+                            $messageType = 'success';
+                        } else {
+                            $message = "Failed to save academic year comment!";
+                            $messageType = 'error';
+                        }
+                    } catch (Exception $e) {
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
+                
+            case 'add_course_comment':
+                $enrollment_id = $_POST['enrollment_id'];
+                $comment = trim($_POST['comment']);
+                
+                if (empty($enrollment_id) || empty($comment)) {
+                    $message = "Please fill in all required fields!";
+                    $messageType = 'error';
+                } else {
+                    try {
+                        // Update the result with the admin comment
+                        $stmt = $pdo->prepare("UPDATE results SET admin_comment = ? WHERE enrollment_id = ?");
+                        if ($stmt->execute([$comment, $enrollment_id])) {
+                            $message = "Course comment saved successfully!";
+                            $messageType = 'success';
+                        } else {
+                            $message = "Failed to save course comment!";
+                            $messageType = 'error';
+                        }
+                    } catch (Exception $e) {
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
         }
     }
 }
@@ -351,40 +436,6 @@ $grades = $pdo->query("SELECT * FROM grading_scale ORDER BY min_score DESC")->fe
 
 // Get courses for publication
 $courses = $pdo->query("SELECT c.id, c.name, c.code, COUNT(ce.id) as enrollment_count FROM course c LEFT JOIN course_enrollment ce ON c.id = ce.course_id GROUP BY c.id ORDER BY c.name")->fetchAll();
-
-// Create necessary tables if not exist
-try {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS result_type (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(50) NOT NULL,
-        weight DECIMAL(5,2) NOT NULL
-    )");
-    
-    $pdo->exec("CREATE TABLE IF NOT EXISTS grading_scale (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        min_score DECIMAL(5,2) NOT NULL,
-        max_score DECIMAL(5,2) NOT NULL,
-        grade VARCHAR(5) NOT NULL,
-        points DECIMAL(3,1) NOT NULL
-    )");
-    
-    $pdo->exec("CREATE TABLE IF NOT EXISTS student_result (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        enrollment_id INT NOT NULL,
-        type_id INT NOT NULL,
-        score DECIMAL(5,2) NOT NULL,
-        FOREIGN KEY (enrollment_id) REFERENCES course_enrollment(id),
-        FOREIGN KEY (type_id) REFERENCES result_type(id)
-    )");
-    
-    // Add columns to course_enrollment
-    $pdo->exec("ALTER TABLE course_enrollment ADD COLUMN IF NOT EXISTS total_score DECIMAL(5,2)");
-    $pdo->exec("ALTER TABLE course_enrollment ADD COLUMN IF NOT EXISTS grade VARCHAR(5)");
-    $pdo->exec("ALTER TABLE course_enrollment ADD COLUMN IF NOT EXISTS status VARCHAR(50)");
-    $pdo->exec("ALTER TABLE course_enrollment ADD COLUMN IF NOT EXISTS published TINYINT DEFAULT 0");
-} catch (Exception $e) {
-    // Tables might already exist
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -657,6 +708,82 @@ try {
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Add Comment Section -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-comment"></i> Add Student Comments</h3>
+            </div>
+            <div class="panel-content">
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_academic_year_comment">
+                    <div class="form-group">
+                        <label for="student_user_id">Student:</label>
+                        <select id="student_user_id" name="student_user_id" required>
+                            <option value="">Select Student</option>
+                            <?php
+                            $students = $pdo->query("SELECT sp.user_id, sp.full_name, sp.student_number FROM student_profile sp ORDER BY sp.full_name");
+                            foreach ($students as $student) {
+                                echo '<option value="' . $student['user_id'] . '">' . htmlspecialchars($student['full_name']) . ' (' . htmlspecialchars($student['student_number']) . ')</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="academic_year">Academic Year:</label>
+                        <input type="text" id="academic_year" name="academic_year" placeholder="e.g., 2024/2025" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="comment">Comment:</label>
+                        <textarea id="comment" name="comment" rows="3" placeholder="Enter academic year comment" required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Comment</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Add Course Comment Section -->
+        <div class="data-panel">
+            <div class="panel-header">
+                <h3><i class="fas fa-book"></i> Add Course Comments</h3>
+            </div>
+            <div class="panel-content">
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_course_comment">
+                    <div class="form-group">
+                        <label for="enrollment_id">Enrollment:</label>
+                        <select id="enrollment_id" name="enrollment_id" required>
+                            <option value="">Select Enrollment</option>
+                            <?php
+                            $enrollments = $pdo->query("
+                                SELECT ce.id, sp.full_name, sp.student_number, c.code, c.name, ce.academic_year 
+                                FROM course_enrollment ce 
+                                JOIN student_profile sp ON ce.student_user_id = sp.user_id 
+                                JOIN course c ON ce.course_id = c.id 
+                                ORDER BY sp.full_name, ce.academic_year, c.code
+                            ");
+                            foreach ($enrollments as $enrollment) {
+                                echo '<option value="' . $enrollment['id'] . '">' . 
+                                     htmlspecialchars($enrollment['full_name']) . ' (' . htmlspecialchars($enrollment['student_number']) . ') - ' .
+                                     htmlspecialchars($enrollment['code']) . ' - ' . 
+                                     htmlspecialchars($enrollment['name']) . ' (' . htmlspecialchars($enrollment['academic_year']) . ')</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="course_comment">Comment:</label>
+                        <textarea id="course_comment" name="comment" rows="3" placeholder="Enter course comment" required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Comment</button>
+                </form>
             </div>
         </div>
     </main>

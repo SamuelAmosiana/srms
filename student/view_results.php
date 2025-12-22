@@ -27,10 +27,10 @@ $fees = $stmt->fetch();
 $balance = $fees['balance'] ?? 0;
 $access_granted = ($balance == 0); // Grant access if balance is zero
 
-// Fetch all results grouped by academic year with course credits
+// Fetch all results grouped by academic year with course credits and admin comments
 $results_by_year = [];
 $stmt = $pdo->prepare("
-    SELECT r.ca_score, r.exam_score, r.grade,
+    SELECT r.ca_score, r.exam_score, r.grade, r.admin_comment,
            c.code as course_code, c.name as course_name, c.credits,
            ce.academic_year
     FROM results r
@@ -48,6 +48,19 @@ foreach ($results as $result) {
         $results_by_year[$year] = [];
     }
     $results_by_year[$year][] = $result;
+}
+
+// Fetch academic year comments added by admins
+$academic_year_comments = [];
+$stmt = $pdo->prepare("
+    SELECT academic_year, comment 
+    FROM academic_year_comments 
+    WHERE student_user_id = ?
+");
+$stmt->execute([currentUserId()]);
+$year_comments = $stmt->fetchAll();
+foreach ($year_comments as $comment) {
+    $academic_year_comments[$comment['academic_year']] = $comment['comment'];
 }
 
 // For each year, compute GPA, total credits, failed courses, comment
@@ -84,12 +97,19 @@ foreach ($results_by_year as $year => $courses) {
     // Calculate GPA using weighted average: (Sum of credits * grade points) / Sum of credits
     $gpa = $total_credits > 0 ? round($total_grade_points / $total_credits, 2) : 0;
 
-    if ($failed == 0) {
-        $comment = 'CLEAR PASS';
-    } elseif ($failed / $total_courses >= 0.5) {
-        $comment = 'REPEAT YEAR';
+    // Get admin comment for this academic year, fallback to system-generated comment
+    $admin_comment = $academic_year_comments[$year] ?? '';
+    
+    if (!empty($admin_comment)) {
+        $comment = $admin_comment;
     } else {
-        $comment = 'REPEAT COURSE(S)';
+        if ($failed == 0) {
+            $comment = 'CLEAR PASS';
+        } elseif ($failed / $total_courses >= 0.5) {
+            $comment = 'REPEAT YEAR';
+        } else {
+            $comment = 'REPEAT COURSE(S)';
+        }
     }
     
     // For students with no credits, set GPA to 0
@@ -507,7 +527,7 @@ foreach ($results_by_year as $year => $courses) {
                                     <td><?php echo htmlspecialchars($course['course_code'] . ' - ' . $course['course_name']); ?></td>
                                     <td><?php echo htmlspecialchars($course['credits'] ?? 'N/A'); ?></td>
                                     <td><?php echo htmlspecialchars($course['grade'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($data['comment']); ?></td>
+                                    <td><?php echo !empty($course['admin_comment']) ? htmlspecialchars($course['admin_comment']) : htmlspecialchars($data['comment']); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
