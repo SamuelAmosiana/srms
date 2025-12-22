@@ -51,6 +51,7 @@ $stats['pending_results'] = $stmt->fetch()['count'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lecturer Dashboard - LSC SRMS</title>
+    <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css"> <!-- Reuse styles, adjust if needed -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">

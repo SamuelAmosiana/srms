@@ -121,6 +121,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lecturer Profile - LSC SRMS</title>
+    <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -155,8 +156,8 @@ try {
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile.php" class="active"><i class="fas fa-user"></i> View Profile</a>
-                        <a href="settings.php"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="profile" class="active"><i class="fas fa-user"></i> View Profile</a>
+                        <a href="settings"><i class="fas fa-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
                         <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
