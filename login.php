@@ -26,6 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: finance/dashboard.php');
         } elseif (in_array('Enrollment Officer', $_SESSION['roles'])) {
             header('Location: enrollment/dashboard.php');
+        } elseif (in_array('Academics Coordinator', $_SESSION['roles'])) {
+            header('Location: academics/dashboard.php');
         } else {
             echo "Role not recognized";
         }

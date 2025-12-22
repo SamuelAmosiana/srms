@@ -130,6 +130,22 @@ foreach ($results_by_year as $year => $courses) {
         'gpa' => $gpa
     ];
 }
+
+// Fetch CA results for current academic year
+$current_year = date('Y');
+$ca_results = [];
+$stmt = $pdo->prepare("
+    SELECT r.ca_score,
+           c.code as course_code, c.name as course_name,
+           ce.academic_year
+    FROM results r
+    JOIN course_enrollment ce ON r.enrollment_id = ce.id
+    JOIN course c ON ce.course_id = c.id
+    WHERE ce.student_user_id = ? AND ce.academic_year = ?
+    ORDER BY c.code ASC
+");
+$stmt->execute([currentUserId(), $current_year]);
+$ca_results = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -137,6 +153,7 @@ foreach ($results_by_year as $year => $courses) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Results - LSC SRMS</title>
+    <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/student-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -195,9 +212,9 @@ foreach ($results_by_year as $year => $courses) {
         }
         
         .gpa-table th {
-            background-color: var(--light-gray);
+            background-color: #228B22; /* Green color */
             font-weight: 600;
-            color: var(--text-dark);
+            color: white;
         }
         
         .gpa-table tbody tr:hover {
@@ -253,9 +270,9 @@ foreach ($results_by_year as $year => $courses) {
         }
         
         .results-table th {
-            background-color: var(--light-gray);
+            background-color: #228B22; /* Green color */
             font-weight: 600;
-            color: var(--text-dark);
+            color: white;
         }
         
         .results-table tbody tr:hover {
@@ -428,9 +445,30 @@ foreach ($results_by_year as $year => $courses) {
         
         <!-- Continuous Assessment Results -->
         <h2 class="section-title">Continuous Assessment Results [Current Academic Year]</h2>
-        <div class="no-results">
-            There are no Continuous Assessment Results available for now
-        </div>
+        <?php if (!empty($ca_results)): ?>
+            <table class="gpa-table">
+                <thead>
+                    <tr>
+                        <th>Course Code</th>
+                        <th>Course Name</th>
+                        <th>CA Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($ca_results as $ca_result): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($ca_result['course_code']); ?></td>
+                            <td><?php echo htmlspecialchars($ca_result['course_name']); ?></td>
+                            <td><?php echo htmlspecialchars($ca_result['ca_score']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <div class="no-results">
+                There are no Continuous Assessment Results available for now
+            </div>
+        <?php endif; ?>
         
         <!-- Examination Results & GPA Computation -->
         <h2 class="section-title">Examination Results & GPA Computation</h2>
@@ -527,7 +565,10 @@ foreach ($results_by_year as $year => $courses) {
                                     <td><?php echo htmlspecialchars($course['course_code'] . ' - ' . $course['course_name']); ?></td>
                                     <td><?php echo htmlspecialchars($course['credits'] ?? 'N/A'); ?></td>
                                     <td><?php echo htmlspecialchars($course['grade'] ?? 'N/A'); ?></td>
-                                    <td><?php echo !empty($course['admin_comment']) ? htmlspecialchars($course['admin_comment']) : htmlspecialchars($data['comment']); ?></td>
+                                    <td><?php 
+                                        $comment = !empty($course['admin_comment']) ? $course['admin_comment'] : $data['comment'];
+                                        echo !empty($comment) ? htmlspecialchars($comment) : 'No Comment';
+                                    ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
