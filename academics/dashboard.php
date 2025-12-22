@@ -306,15 +306,15 @@ $admin = $stmt->fetch();
             
             <div class="nav-section">
                 <h4>Academic Planning</h4>
-                <a href="#" class="nav-item">
+                <a href="create_calendar.php" class="nav-item">
                     <i class="fas fa-calendar-alt"></i>
                     <span>Create Academic Calendars</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="timetable.php" class="nav-item">
                     <i class="fas fa-clock"></i>
                     <span>Generate Timetables</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="schedule_exams.php" class="nav-item">
                     <i class="fas fa-calendar-check"></i>
                     <span>Schedule Programs & Exams</span>
                 </a>
@@ -322,15 +322,15 @@ $admin = $stmt->fetch();
             
             <div class="nav-section">
                 <h4>Academic Operations</h4>
-                <a href="#" class="nav-item">
+                <a href="publish_results.php" class="nav-item">
                     <i class="fas fa-chart-line"></i>
                     <span>Publish Results</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="lecturer_attendance.php" class="nav-item">
                     <i class="fas fa-user-clock"></i>
                     <span>Track Lecturer Attendance</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="approve_registration.php" class="nav-item">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Approve Course Registration</span>
                 </a>
@@ -338,11 +338,11 @@ $admin = $stmt->fetch();
             
             <div class="nav-section">
                 <h4>Reports</h4>
-                <a href="#" class="nav-item">
+                <a href="reports.php" class="nav-item">
                     <i class="fas fa-file-alt"></i>
                     <span>Academic Reports</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="analytics.php" class="nav-item">
                     <i class="fas fa-chart-bar"></i>
                     <span>Performance Analytics</span>
                 </a>
@@ -407,7 +407,7 @@ $admin = $stmt->fetch();
                     </div>
                     <div class="card-body">
                         <div class="menu-grid">
-                            <a href="#" class="menu-item">
+                            <a href="create_calendar.php" class="menu-item">
                                 <div class="menu-icon bg-blue">
                                     <i class="fas fa-calendar-alt"></i>
                                 </div>
@@ -417,7 +417,7 @@ $admin = $stmt->fetch();
                                 </div>
                             </a>
                             
-                            <a href="#" class="menu-item">
+                            <a href="timetable.php" class="menu-item">
                                 <div class="menu-icon bg-green">
                                     <i class="fas fa-clock"></i>
                                 </div>
@@ -427,7 +427,7 @@ $admin = $stmt->fetch();
                                 </div>
                             </a>
                             
-                            <a href="#" class="menu-item">
+                            <a href="schedule_exams.php" class="menu-item">
                                 <div class="menu-icon bg-orange">
                                     <i class="fas fa-calendar-check"></i>
                                 </div>
@@ -437,7 +437,7 @@ $admin = $stmt->fetch();
                                 </div>
                             </a>
                             
-                            <a href="#" class="menu-item">
+                            <a href="publish_results.php" class="menu-item">
                                 <div class="menu-icon bg-purple">
                                     <i class="fas fa-chart-line"></i>
                                 </div>
@@ -458,7 +458,7 @@ $admin = $stmt->fetch();
                     </div>
                     <div class="card-body">
                         <div class="menu-grid">
-                            <a href="#" class="menu-item">
+                            <a href="lecturer_attendance.php" class="menu-item">
                                 <div class="menu-icon bg-red">
                                     <i class="fas fa-user-clock"></i>
                                 </div>
@@ -468,7 +468,7 @@ $admin = $stmt->fetch();
                                 </div>
                             </a>
                             
-                            <a href="#" class="menu-item">
+                            <a href="approve_registration.php" class="menu-item">
                                 <div class="menu-icon bg-teal">
                                     <i class="fas fa-clipboard-check"></i>
                                 </div>
@@ -478,7 +478,7 @@ $admin = $stmt->fetch();
                                 </div>
                             </a>
                             
-                            <a href="#" class="menu-item">
+                            <a href="reports.php" class="menu-item">
                                 <div class="menu-icon bg-indigo">
                                     <i class="fas fa-file-alt"></i>
                                 </div>
@@ -488,7 +488,7 @@ $admin = $stmt->fetch();
                                 </div>
                             </a>
                             
-                            <a href="#" class="menu-item">
+                            <a href="analytics.php" class="menu-item">
                                 <div class="menu-icon bg-pink">
                                     <i class="fas fa-chart-bar"></i>
                                 </div>
