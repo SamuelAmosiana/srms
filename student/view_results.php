@@ -102,6 +102,50 @@ foreach ($results_by_year as $year => $courses) {
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/student-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .results-section {
+            margin-bottom: 30px;
+            background: var(--white);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        
+        .results-section h2 {
+            color: var(--primary-green);
+            margin-bottom: 15px;
+        }
+        
+        /* Adjust column widths for results table */
+        .results-table {
+            table-layout: fixed;
+        }
+        
+        .results-table th:nth-child(1),
+        .results-table td:nth-child(1) { /* Course Code */
+            width: 15%;
+        }
+        
+        .results-table th:nth-child(2),
+        .results-table td:nth-child(2) { /* Course Name */
+            width: 45%;
+        }
+        
+        .results-table th:nth-child(3),
+        .results-table td:nth-child(3) { /* CA Score */
+            width: 15%;
+        }
+        
+        .results-table th:nth-child(4),
+        .results-table td:nth-child(4) { /* Exam Score */
+            width: 15%;
+        }
+        
+        .results-table th:nth-child(5),
+        .results-table td:nth-child(5) { /* Final Grade */
+            width: 10%;
+        }
+    </style>
 </head>
 <body class="student-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -205,7 +249,7 @@ foreach ($results_by_year as $year => $courses) {
                 <p>GPA: <?php echo $data['gpa']; ?></p>
                 <p>Comment: <?php echo htmlspecialchars($data['comment']); ?></p>
                 
-                <table class="results-table">
+                <table class="results-table data-table">
                     <thead>
                         <tr>
                             <th>Course Code</th>

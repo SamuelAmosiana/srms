@@ -277,23 +277,6 @@ try {
             flex: 1;
         }
         
-        .history-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .history-table th,
-        .history-table td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .history-table th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-        
         .no-applications {
             text-align: center;
             padding: 20px;
@@ -510,7 +493,7 @@ try {
             </div>
             
             <?php if (!empty($applicationsHistory)): ?>
-                <table class="history-table">
+                <table class="data-table">
                     <thead>
                         <tr>
                             <th>Date</th>
