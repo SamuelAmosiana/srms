@@ -28,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: enrollment/dashboard.php');
         } elseif (in_array('Academics Coordinator', $_SESSION['roles'])) {
             header('Location: academics/dashboard.php');
+        } elseif (in_array('HR Manager', $_SESSION['roles'])) {
+            header('Location: human_resource/dashboard.php');
         } else {
             echo "Role not recognized";
         }

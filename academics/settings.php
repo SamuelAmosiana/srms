@@ -17,6 +17,9 @@ $stmt->execute([currentUserId()]);
 $admin = $stmt->fetch();
 
 // Handle password change
+$error = '';
+$success = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     $current_password = $_POST['current_password'];
     $new_password = $_POST['new_password'];
@@ -45,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
             $error = "Current password is incorrect.";
         }
     }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
