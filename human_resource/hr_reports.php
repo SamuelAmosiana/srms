@@ -29,14 +29,16 @@ $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WH
 $stmt->execute([currentUserId()]);
 $hr = $stmt->fetch();
 
-// Fetch HR statistics
+// Fetch HR report statistics
 $stats = [
     'total_employees' => 0,
     'active_employees' => 0,
-    'pending_payroll' => 0,
     'departments' => 0,
-    'payroll_processed' => 0,
-    'tax_brackets' => 0
+    'pending_payroll' => 0,
+    'monthly_payroll' => 0,
+    'turnover_rate' => 0,
+    'average_tenure' => 0,
+    'new_hires' => 0
 ];
 
 try {
@@ -48,21 +50,32 @@ try {
     $stmt = $pdo->query("SELECT COUNT(*) as count FROM employees WHERE status = 'active'");
     $stats['active_employees'] = $stmt->fetch()['count'];
     
+    // Get departments
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM department");
+    $stats['departments'] = $stmt->fetch()['count'];
+    
     // Get pending payroll
     $stmt = $pdo->query("SELECT COUNT(*) as count FROM payroll WHERE status = 'pending'");
     $stats['pending_payroll'] = $stmt->fetch()['count'];
     
-    // Get departments
-    $stmt = $pdo->query("SELECT COUNT(*) as count FROM departments");
-    $stats['departments'] = $stmt->fetch()['count'];
+    // Get monthly payroll (current month)
+    $current_month = date('Y-m');
+    $stmt = $pdo->query("SELECT SUM(net_salary) as total FROM payroll WHERE DATE_FORMAT(payment_date, '%Y-%m') = '$current_month'");
+    $stats['monthly_payroll'] = $stmt->fetch()['total'] ?? 0;
     
-    // Get processed payroll
-    $stmt = $pdo->query("SELECT COUNT(*) as count FROM payroll WHERE status = 'paid'");
-    $stats['payroll_processed'] = $stmt->fetch()['count'];
+    // Get turnover rate (terminated employees in last 12 months)
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM employees WHERE status = 'terminated' AND updated_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)");
+    $terminated_count = $stmt->fetch()['count'];
+    $stats['turnover_rate'] = $stats['total_employees'] > 0 ? round(($terminated_count / $stats['total_employees']) * 100, 2) : 0;
     
-    // Get tax brackets
-    $stmt = $pdo->query("SELECT COUNT(*) as count FROM tax_brackets WHERE active = 1");
-    $stats['tax_brackets'] = $stmt->fetch()['count'];
+    // Get average tenure
+    $stmt = $pdo->query("SELECT AVG(DATEDIFF(NOW(), hire_date)) as avg_days FROM employees WHERE status = 'active'");
+    $avg_days = $stmt->fetch()['avg_days'];
+    $stats['average_tenure'] = $avg_days ? round($avg_days / 365, 1) : 0;
+    
+    // Get new hires this month
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM employees WHERE hire_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)");
+    $stats['new_hires'] = $stmt->fetch()['count'];
 } catch (Exception $e) {
     // Handle error gracefully
     error_log("Error fetching HR statistics: " . $e->getMessage());
@@ -73,7 +86,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Dashboard - Human Resources</title>
+    <title>HR Reports - HR</title>
     <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
@@ -87,7 +100,7 @@ try {
         }
         
         .hr-card {
-            background: var(--white);
+            background: var(--White);
             border-radius: 8px;
             padding: 20px;
             box-shadow: 0 2px 8px var(--shadow);
@@ -133,44 +146,89 @@ try {
         .bg-red { background-color: #ea4335; }
         .bg-teal { background-color: #00897b; }
         
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-        
-        .action-card {
+        .report-section {
             background: var(--white);
             border-radius: 8px;
-            padding: 20px;
             box-shadow: 0 2px 8px var(--shadow);
-            text-align: center;
-            transition: transform 0.3s ease;
-            cursor: pointer;
+            margin-bottom: 30px;
+            overflow: hidden;
         }
         
-        .action-card:hover {
-            transform: translateY(-3px);
+        .section-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--primary-green);
+            color: white;
+        }
+        
+        .section-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 500;
+        }
+        
+        .section-body {
+            padding: 20px;
+        }
+        
+        .report-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .report-item {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            background: var(--white);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .report-item:hover {
             box-shadow: 0 4px 12px var(--shadow);
         }
         
-        .action-icon {
-            font-size: 36px;
-            margin-bottom: 15px;
-            color: var(--primary-green);
-        }
-        
-        .action-title {
-            font-size: 16px;
-            font-weight: 600;
+        .report-item h3 {
+            margin: 0 0 10px 0;
             color: var(--text-dark);
-            margin-bottom: 5px;
+            font-size: 18px;
         }
         
-        .action-desc {
-            font-size: 12px;
+        .report-item p {
             color: var(--text-light);
+            margin: 0 0 15px 0;
+            font-size: 14px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+            color: white;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-green);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--dark-green);
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
         }
         
         .section-title {
@@ -178,6 +236,18 @@ try {
             margin: 30px 0 20px 0;
             padding-bottom: 10px;
             border-bottom: 2px solid var(--primary-green);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #ccc;
         }
         
         .chart-container {
@@ -206,32 +276,12 @@ try {
             gap: 10px;
         }
         
-        .chart-wrapper {
-            height: 300px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            position: relative;
-        }
-        
-        .chart-placeholder {
-            text-align: center;
-            color: #6c757d;
-        }
-        
-        .chart-placeholder i {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-        
         @media (max-width: 768px) {
             .hr-cards {
                 grid-template-columns: 1fr;
             }
             
-            .quick-actions {
+            .report-list {
                 grid-template-columns: 1fr;
             }
         }
@@ -284,7 +334,7 @@ try {
         </div>
         
         <nav class="sidebar-nav">
-            <a href="dashboard" class="nav-item active">
+            <a href="dashboard" class="nav-item">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
@@ -323,7 +373,7 @@ try {
             
             <div class="nav-section">
                 <h4>Reports</h4>
-                <a href="hr_reports.php" class="nav-item">
+                <a href="hr_reports.php" class="nav-item active">
                     <i class="fas fa-chart-bar"></i>
                     <span>HR Reports</span>
                 </a>
@@ -338,8 +388,8 @@ try {
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-users"></i> HR Dashboard</h1>
-            <p>Manage employees, payroll, and human resources</p>
+            <h1><i class="fas fa-chart-bar"></i> HR Reports</h1>
+            <p>Generate and view comprehensive HR reports</p>
         </div>
         
         <div class="hr-cards">
@@ -367,17 +417,6 @@ try {
             
             <div class="hr-card">
                 <div class="hr-icon bg-orange">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div class="hr-content">
-                    <h3><?php echo number_format($stats['pending_payroll']); ?></h3>
-                    <p>Pending Payroll</p>
-                    <div class="metric-label">Awaiting processing</div>
-                </div>
-            </div>
-            
-            <div class="hr-card">
-                <div class="hr-icon bg-purple">
                     <i class="fas fa-building"></i>
                 </div>
                 <div class="hr-content">
@@ -386,86 +425,137 @@ try {
                     <div class="metric-label">Organizational units</div>
                 </div>
             </div>
+            
+            <div class="hr-card">
+                <div class="hr-icon bg-purple">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <div class="hr-content">
+                    <h3>$<?php echo number_format($stats['monthly_payroll'], 2); ?></h3>
+                    <p>Monthly Payroll</p>
+                    <div class="metric-label">This month's expenses</div>
+                </div>
+            </div>
         </div>
         
         <div class="hr-cards">
             <div class="hr-card">
                 <div class="hr-icon bg-teal">
-                    <i class="fas fa-file-invoice-dollar"></i>
+                    <i class="fas fa-clock"></i>
                 </div>
                 <div class="hr-content">
-                    <h3><?php echo number_format($stats['payroll_processed']); ?></h3>
-                    <p>Payroll Processed</p>
-                    <div class="metric-label">Completed this month</div>
+                    <h3><?php echo $stats['turnover_rate']; ?>%</h3>
+                    <p>Turnover Rate</p>
+                    <div class="metric-label">Annual turnover percentage</div>
                 </div>
             </div>
             
             <div class="hr-card">
                 <div class="hr-icon bg-red">
-                    <i class="fas fa-percent"></i>
+                    <i class="fas fa-user-clock"></i>
                 </div>
                 <div class="hr-content">
-                    <h3><?php echo number_format($stats['tax_brackets']); ?></h3>
-                    <p>Tax Brackets</p>
-                    <div class="metric-label">Active brackets</div>
+                    <h3><?php echo $stats['average_tenure']; ?> yrs</h3>
+                    <p>Avg Tenure</p>
+                    <div class="metric-label">Average employment length</div>
                 </div>
             </div>
             
             <div class="hr-card">
                 <div class="hr-icon bg-blue">
-                    <i class="fas fa-chart-line"></i>
+                    <i class="fas fa-user-plus"></i>
                 </div>
                 <div class="hr-content">
-                    <h3>$<?php echo number_format(0, 2); ?></h3>
-                    <p>Monthly Payroll</p>
-                    <div class="metric-label">Estimated amount</div>
+                    <h3><?php echo number_format($stats['new_hires']); ?></h3>
+                    <p>New Hires</p>
+                    <div class="metric-label">This month</div>
                 </div>
             </div>
             
             <div class="hr-card">
                 <div class="hr-icon bg-green">
-                    <i class="fas fa-user-clock"></i>
+                    <i class="fas fa-clock"></i>
                 </div>
                 <div class="hr-content">
-                    <h3><?php echo number_format(0); ?></h3>
-                    <p>Leaves Pending</p>
-                    <div class="metric-label">Awaiting approval</div>
+                    <h3><?php echo number_format($stats['pending_payroll']); ?></h3>
+                    <p>Pending Payroll</p>
+                    <div class="metric-label">Awaiting processing</div>
                 </div>
             </div>
         </div>
         
-        <h2 class="section-title">Quick Actions</h2>
-        <div class="quick-actions">
-            <div class="action-card" onclick="location.href='add_employee.php'">
-                <div class="action-icon">
-                    <i class="fas fa-user-plus"></i>
-                </div>
-                <div class="action-title">Add Employee</div>
-                <div class="action-desc">Register new staff member</div>
+        <div class="report-section">
+            <div class="section-header">
+                <h2><i class="fas fa-file-invoice"></i> Available Reports</h2>
             </div>
-            
-            <div class="action-card" onclick="location.href='payroll.php'">
-                <div class="action-icon">
-                    <i class="fas fa-money-bill-wave"></i>
+            <div class="section-body">
+                <div class="report-list">
+                    <div class="report-item">
+                        <h3><i class="fas fa-user-graduate"></i> Employee Summary Report</h3>
+                        <p>Comprehensive report of all employees with their details and employment status</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-building"></i> Department Summary Report</h3>
+                        <p>Detailed analysis of employees distribution across departments</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-chart-line"></i> Employee Turnover Report</h3>
+                        <p>Track employee departures and retention rates</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-money-bill-wave"></i> Payroll Summary Report</h3>
+                        <p>Overview of payroll expenses and tax calculations</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-user-clock"></i> Attendance Summary Report</h3>
+                        <p>Detailed attendance records for all employees</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-clipboard-list"></i> Performance Summary Report</h3>
+                        <p>Track employee performance metrics and evaluations</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
                 </div>
-                <div class="action-title">Process Payroll</div>
-                <div class="action-desc">Calculate and process salaries</div>
             </div>
-            
-            <div class="action-card" onclick="location.href='employees.php'">
-                <div class="action-icon">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="action-title">Employee List</div>
-                <div class="action-desc">View all employees</div>
+        </div>
+        
+        <div class="report-section">
+            <div class="section-header">
+                <h2><i class="fas fa-download"></i> Downloadable Reports</h2>
             </div>
-            
-            <div class="action-card" onclick="location.href='tax_brackets.php'">
-                <div class="action-icon">
-                    <i class="fas fa-percent"></i>
+            <div class="section-body">
+                <div class="report-list">
+                    <div class="report-item">
+                        <h3><i class="fas fa-file-pdf"></i> Annual HR Report</h3>
+                        <p>Comprehensive annual report with all HR metrics and achievements</p>
+                        <a href="#" class="btn btn-primary">Download PDF</a>
+                        <a href="#" class="btn btn-secondary">Download Excel</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-file-pdf"></i> Employee Directory</h3>
+                        <p>Complete employee directory with contact information</p>
+                        <a href="#" class="btn btn-primary">Download PDF</a>
+                        <a href="#" class="btn btn-secondary">Download Excel</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-file-pdf"></i> Payroll Tax Report</h3>
+                        <p>Detailed report of payroll taxes and deductions</p>
+                        <a href="#" class="btn btn-primary">Download PDF</a>
+                        <a href="#" class="btn btn-secondary">Download Excel</a>
+                    </div>
                 </div>
-                <div class="action-title">Tax Brackets</div>
-                <div class="action-desc">Manage tax calculations</div>
             </div>
         </div>
         
@@ -474,39 +564,38 @@ try {
                 <div class="chart-title">Employee Distribution by Department</div>
                 <div class="chart-actions">
                     <select class="form-control" style="width: auto; padding: 5px 10px; font-size: 14px;">
-                        <option>This Month</option>
-                        <option>Last 3 Months</option>
-                        <option>Last 6 Months</option>
+                        <option>Last 30 Days</option>
+                        <option>Last 60 Days</option>
+                        <option>Last 90 Days</option>
                         <option>Last Year</option>
                     </select>
                 </div>
             </div>
-            <div class="chart-wrapper">
-                <div class="chart-placeholder">
-                    <i class="fas fa-chart-pie"></i>
+            <div style="height: 300px; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa; border-radius: 8px;">
+                <div style="text-align: center; color: #6c757d;">
+                    <i class="fas fa-chart-bar" style="font-size: 48px; margin-bottom: 15px;"></i>
                     <h3>Department Distribution</h3>
-                    <p>Visual representation of employee distribution across departments</p>
+                    <p>Visual representation of employee distribution by department</p>
                 </div>
             </div>
         </div>
         
         <div class="chart-container">
             <div class="chart-header">
-                <div class="chart-title">Payroll Summary</div>
+                <div class="chart-title">Monthly Payroll Trends</div>
                 <div class="chart-actions">
                     <select class="form-control" style="width: auto; padding: 5px 10px; font-size: 14px;">
-                        <option>This Month</option>
-                        <option>Last Month</option>
-                        <option>Current Quarter</option>
                         <option>Current Year</option>
+                        <option>Previous Year</option>
+                        <option>Custom Range</option>
                     </select>
                 </div>
             </div>
-            <div class="chart-wrapper">
-                <div class="chart-placeholder">
-                    <i class="fas fa-chart-bar"></i>
-                    <h3>Payroll Summary</h3>
-                    <p>Summary of payroll processing and tax calculations</p>
+            <div style="height: 300px; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa; border-radius: 8px;">
+                <div style="text-align: center; color: #6c757d;">
+                    <i class="fas fa-chart-line" style="font-size: 48px; margin-bottom: 15px;"></i>
+                    <h3>Payroll Trends</h3>
+                    <p>Monthly payroll expenses trend analysis</p>
                 </div>
             </div>
         </div>

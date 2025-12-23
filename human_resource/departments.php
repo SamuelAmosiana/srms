@@ -29,22 +29,16 @@ $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WH
 $stmt->execute([currentUserId()]);
 $hr = $stmt->fetch();
 
-// Fetch employees
-$stmt = $pdo->prepare("
-    SELECT e.*, d.name as department_name 
-    FROM employees e 
-    LEFT JOIN departments d ON e.department_id = d.id 
-    ORDER BY e.hire_date DESC
-");
-$stmt->execute();
-$employees = $stmt->fetchAll();
+// Fetch departments from the main department table
+$stmt = $pdo->query("SELECT * FROM department ORDER BY name");
+$departments = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Directory - HR</title>
+    <title>Departments - HR</title>
     <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
@@ -54,7 +48,7 @@ $employees = $stmt->fetchAll();
             overflow-x: auto;
         }
         
-        .employee-table {
+        .department-table {
             width: 100%;
             border-collapse: collapse;
             background: var(--white);
@@ -63,24 +57,24 @@ $employees = $stmt->fetchAll();
             box-shadow: 0 2px 8px var(--shadow);
         }
         
-        .employee-table th,
-        .employee-table td {
+        .department-table th,
+        .department-table td {
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
         
-        .employee-table th {
+        .department-table th {
             background-color: var(--primary-green);
             color: white;
             font-weight: 600;
         }
         
-        .employee-table tbody tr:hover {
+        .department-table tbody tr:hover {
             background-color: rgba(34, 139, 34, 0.05);
         }
         
-        .employee-table .actions {
+        .department-table .actions {
             display: flex;
             gap: 10px;
         }
@@ -202,12 +196,12 @@ $employees = $stmt->fetchAll();
         }
         
         @media (max-width: 768px) {
-            .employee-table {
+            .department-table {
                 font-size: 14px;
             }
             
-            .employee-table th,
-            .employee-table td {
+            .department-table th,
+            .department-table td {
                 padding: 8px 10px;
             }
             
@@ -272,11 +266,11 @@ $employees = $stmt->fetchAll();
             
             <div class="nav-section">
                 <h4>Employee Management</h4>
-                <a href="employees.php" class="nav-item active">
+                <a href="employees.php" class="nav-item">
                     <i class="fas fa-user-tie"></i>
                     <span>Employee Directory</span>
                 </a>
-                <a href="departments.php" class="nav-item">
+                <a href="departments.php" class="nav-item active">
                     <i class="fas fa-building"></i>
                     <span>Departments</span>
                 </a>
@@ -319,60 +313,43 @@ $employees = $stmt->fetchAll();
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-user-tie"></i> Employee Directory</h1>
-            <p>Manage and view all employees in the organization</p>
+            <h1><i class="fas fa-building"></i> Departments</h1>
+            <p>Manage and view all departments in the organization</p>
         </div>
         
         <div class="search-container">
-            <input type="text" class="search-input" placeholder="Search employees..." id="searchInput">
-            <a href="add_employee.php" class="btn btn-primary">
-                <i class="fas fa-user-plus"></i> Add Employee
-            </a>
+            <input type="text" class="search-input" placeholder="Search departments..." id="searchInput">
         </div>
         
-        <?php if (count($employees) > 0): ?>
+        <?php if (count($departments) > 0): ?>
             <div class="table-responsive">
-                <table class="employee-table">
+                <table class="department-table">
                     <thead>
                         <tr>
-                            <th>Employee ID</th>
+                            <th>Department ID</th>
                             <th>Name</th>
-                            <th>Email</th>
-                            <th>Department</th>
-                            <th>Position</th>
-                            <th>Hire Date</th>
-                            <th>Salary</th>
-                            <th>Status</th>
+                            <th>Description</th>
+                            <th>Head of Department</th>
+                            <th>Employees</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($employees as $employee): ?>
-                            <?php 
-                            $status_class = '';
-                            switch ($employee['status']) {
-                                case 'active':
-                                    $status_class = 'badge-success';
-                                    break;
-                                case 'inactive':
-                                    $status_class = 'badge-warning';
-                                    break;
-                                case 'terminated':
-                                    $status_class = 'badge-danger';
-                                    break;
-                                default:
-                                    $status_class = 'badge-warning';
-                            }
-                            ?>
+                        <?php foreach ($departments as $dept): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($employee['employee_id']); ?></td>
-                                <td><?php echo htmlspecialchars($employee['first_name'] . ' ' . $employee['last_name']); ?></td>
-                                <td><?php echo htmlspecialchars($employee['email']); ?></td>
-                                <td><?php echo htmlspecialchars($employee['department_name'] ?? 'N/A'); ?></td>
-                                <td><?php echo htmlspecialchars($employee['position'] ?? 'N/A'); ?></td>
-                                <td><?php echo $employee['hire_date'] ? date('M j, Y', strtotime($employee['hire_date'])) : 'N/A'; ?></td>
-                                <td><?php echo $employee['salary'] ? '$' . number_format($employee['salary'], 2) : 'N/A'; ?></td>
-                                <td><span class="badge <?php echo $status_class; ?>"><?php echo ucfirst($employee['status']); ?></span></td>
+                                <td><?php echo htmlspecialchars($dept['id']); ?></td>
+                                <td><?php echo htmlspecialchars($dept['name']); ?></td>
+                                <td><?php echo htmlspecialchars($dept['description'] ?? 'N/A'); ?></td>
+                                <td><?php echo htmlspecialchars($dept['head_of_department'] ?? 'N/A'); ?></td>
+                                <td>
+                                    <?php
+                                    // Count employees in this department
+                                    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM employees WHERE department_id = ?");
+                                    $stmt->execute([$dept['id']]);
+                                    $emp_count = $stmt->fetch()['count'];
+                                    echo $emp_count;
+                                    ?>
+                                </td>
                                 <td class="actions">
                                     <a href="#" class="btn-icon btn-view" title="View Details">
                                         <i class="fas fa-eye"></i>
@@ -391,10 +368,9 @@ $employees = $stmt->fetchAll();
             </div>
         <?php else: ?>
             <div class="empty-state">
-                <i class="fas fa-users"></i>
-                <h3>No Employees Found</h3>
-                <p>Add your first employee using the form above.</p>
-                <a href="add_employee.php" class="btn btn-primary">Add Employee</a>
+                <i class="fas fa-building"></i>
+                <h3>No Departments Found</h3>
+                <p>There are no departments in the system.</p>
             </div>
         <?php endif; ?>
     </main>
@@ -450,7 +426,7 @@ $employees = $stmt->fetchAll();
         // Search functionality
         document.getElementById('searchInput').addEventListener('keyup', function() {
             const searchTerm = this.value.toLowerCase();
-            const table = document.querySelector('.employee-table');
+            const table = document.querySelector('.department-table');
             const rows = table.querySelectorAll('tbody tr');
             
             rows.forEach(function(row) {
