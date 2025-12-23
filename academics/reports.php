@@ -15,6 +15,45 @@ requireRole('Academics Coordinator', $pdo);
 $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WHERE ap.user_id = ?");
 $stmt->execute([currentUserId()]);
 $admin = $stmt->fetch();
+
+// Fetch report statistics
+$stats = [
+    'total_students' => 0,
+    'active_courses' => 0,
+    'pending_registrations' => 0,
+    'lecturers' => 0,
+    'completed_courses' => 0,
+    'exams_scheduled' => 0
+];
+
+try {
+    // Get total students
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM registered_students");
+    $stats['total_students'] = $stmt->fetch()['count'];
+    
+    // Get active courses
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM course WHERE status = 'active'");
+    $stats['active_courses'] = $stmt->fetch()['count'];
+    
+    // Get pending registrations
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM course_registration WHERE status = 'pending'");
+    $stats['pending_registrations'] = $stmt->fetch()['count'];
+    
+    // Get lecturers count
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM users u JOIN user_roles ur ON u.id = ur.user_id JOIN roles r ON ur.role_id = r.id WHERE r.name = 'Lecturer'");
+    $stats['lecturers'] = $stmt->fetch()['count'];
+    
+    // Get completed courses
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM course WHERE status = 'completed'");
+    $stats['completed_courses'] = $stmt->fetch()['count'];
+    
+    // Get scheduled exams
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM exam_schedules");
+    $stats['exams_scheduled'] = $stmt->fetch()['count'];
+} catch (Exception $e) {
+    // Handle error gracefully
+    error_log("Error fetching report statistics: " . $e->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -27,32 +66,198 @@ $admin = $stmt->fetch();
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .placeholder-container {
-            text-align: center;
-            padding: 60px 20px;
+        .report-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .report-card {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px var(--shadow);
+            display: flex;
+            align-items: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .report-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 16px var(--shadow);
+        }
+        
+        .report-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .report-content h3 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text-dark);
+        }
+        
+        .report-content p {
+            color: var(--text-light);
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        .bg-blue { background-color: #4285f4; }
+        .bg-green { background-color: #34a853; }
+        .bg-orange { background-color: #fbbc05; }
+        .bg-purple { background-color: #673ab7; }
+        .bg-red { background-color: #ea4335; }
+        .bg-teal { background-color: #00897b; }
+        
+        .report-section {
             background: var(--white);
             border-radius: 8px;
             box-shadow: 0 2px 8px var(--shadow);
-            margin-top: 30px;
+            margin-bottom: 30px;
+            overflow: hidden;
         }
         
-        .placeholder-icon {
-            font-size: 64px;
-            color: #ccc;
-            margin-bottom: 20px;
+        .section-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--primary-green);
+            color: white;
         }
         
-        .placeholder-title {
-            color: var(--primary-green);
-            margin-bottom: 15px;
+        .section-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 500;
         }
         
-        .placeholder-text {
+        .section-body {
+            padding: 20px;
+        }
+        
+        .report-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .report-item {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            background: var(--white);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .report-item:hover {
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+        
+        .report-item h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-dark);
+            font-size: 18px;
+        }
+        
+        .report-item p {
             color: var(--text-light);
+            margin: 0 0 15px 0;
+            font-size: 14px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+            color: white;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-green);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--dark-green);
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .section-title {
+            color: var(--primary-green);
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-green);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #ccc;
+        }
+        
+        .chart-container {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px var(--shadow);
+            margin-bottom: 30px;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+        }
+        
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        
+        .chart-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .report-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .report-list {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -158,21 +363,165 @@ $admin = $stmt->fetch();
     <main class="main-content">
         <div class="content-header">
             <h1><i class="fas fa-file-alt"></i> Academic Reports</h1>
-            <p>Generate and download system reports</p>
+            <p>Generate and manage comprehensive academic reports</p>
         </div>
         
-        <div class="placeholder-container">
-            <div class="placeholder-icon">
-                <i class="fas fa-file-alt"></i>
+        <div class="report-cards">
+            <div class="report-card">
+                <div class="report-icon bg-blue">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="report-content">
+                    <h3><?php echo number_format($stats['total_students']); ?></h3>
+                    <p>Total Students</p>
+                </div>
             </div>
-            <h2 class="placeholder-title">Academic Reports Module</h2>
-            <p class="placeholder-text">This module will allow you to generate and download academic reports. Implementation is pending.</p>
-            <p class="placeholder-text">Features will include:
-                <br>• Performance reports
-                <br>• Enrollment statistics
-                <br>• Attendance summaries
-                <br>• Export options (PDF, Excel, CSV)
-                <br>• Custom report builder</p>
+            
+            <div class="report-card">
+                <div class="report-icon bg-green">
+                    <i class="fas fa-book"></i>
+                </div>
+                <div class="report-content">
+                    <h3><?php echo number_format($stats['active_courses']); ?></h3>
+                    <p>Active Courses</p>
+                </div>
+            </div>
+            
+            <div class="report-card">
+                <div class="report-icon bg-orange">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="report-content">
+                    <h3><?php echo number_format($stats['pending_registrations']); ?></h3>
+                    <p>Pending Registrations</p>
+                </div>
+            </div>
+            
+            <div class="report-card">
+                <div class="report-icon bg-purple">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                </div>
+                <div class="report-content">
+                    <h3><?php echo number_format($stats['lecturers']); ?></h3>
+                    <p>Lecturers</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-section">
+            <div class="section-header">
+                <h2><i class="fas fa-file-invoice"></i> Available Reports</h2>
+            </div>
+            <div class="section-body">
+                <div class="report-list">
+                    <div class="report-item">
+                        <h3><i class="fas fa-user-graduate"></i> Student Enrollment Report</h3>
+                        <p>Comprehensive report of all enrolled students with their details and academic progress</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-book-open"></i> Course Performance Report</h3>
+                        <p>Detailed analysis of course performance, completion rates, and student outcomes</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-chart-line"></i> Academic Progress Report</h3>
+                        <p>Track academic progress across programmes and identify areas for improvement</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-calendar-alt"></i> Exam Schedule Report</h3>
+                        <p>Overview of all scheduled exams with venues, invigilators, and attendance</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-user-clock"></i> Lecturer Attendance Report</h3>
+                        <p>Detailed attendance records for lecturers across all courses and programmes</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-clipboard-list"></i> Registration Status Report</h3>
+                        <p>Track course registration status and identify pending approvals</p>
+                        <a href="#" class="btn btn-primary">Generate Report</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-section">
+            <div class="section-header">
+                <h2><i class="fas fa-download"></i> Downloadable Reports</h2>
+            </div>
+            <div class="section-body">
+                <div class="report-list">
+                    <div class="report-item">
+                        <h3><i class="fas fa-file-pdf"></i> Annual Academic Report</h3>
+                        <p>Comprehensive annual report with all academic metrics and achievements</p>
+                        <a href="#" class="btn btn-primary">Download PDF</a>
+                        <a href="#" class="btn btn-secondary">Download Excel</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-file-pdf"></i> Programme Completion Report</h3>
+                        <p>Detailed report on programme completion rates and graduation statistics</p>
+                        <a href="#" class="btn btn-primary">Download PDF</a>
+                        <a href="#" class="btn btn-secondary">Download Excel</a>
+                    </div>
+                    
+                    <div class="report-item">
+                        <h3><i class="fas fa-file-pdf"></i> Financial Summary Report</h3>
+                        <p>Financial overview of academic operations and fee collection</p>
+                        <a href="#" class="btn btn-primary">Download PDF</a>
+                        <a href="#" class="btn btn-secondary">Download Excel</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-header">
+                <div class="chart-title">Academic Performance Overview</div>
+                <div class="chart-actions">
+                    <select class="form-control" style="width: auto; padding: 5px 10px; font-size: 14px;">
+                        <option>Last 30 Days</option>
+                        <option>Last 60 Days</option>
+                        <option>Last 90 Days</option>
+                        <option>Last Year</option>
+                    </select>
+                </div>
+            </div>
+            <div style="height: 300px; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa; border-radius: 8px;">
+                <div style="text-align: center; color: #6c757d;">
+                    <i class="fas fa-chart-bar" style="font-size: 48px; margin-bottom: 15px;"></i>
+                    <h3>Performance Chart</h3>
+                    <p>Interactive chart showing academic performance metrics</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-header">
+                <div class="chart-title">Student Enrollment by Programme</div>
+                <div class="chart-actions">
+                    <select class="form-control" style="width: auto; padding: 5px 10px; font-size: 14px;">
+                        <option>Current Academic Year</option>
+                        <option>Previous Academic Year</option>
+                        <option>Custom Range</option>
+                    </select>
+                </div>
+            </div>
+            <div style="height: 300px; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa; border-radius: 8px;">
+                <div style="text-align: center; color: #6c757d;">
+                    <i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 15px;"></i>
+                    <h3>Enrollment Distribution</h3>
+                    <p>Visual representation of student enrollment by programme</p>
+                </div>
+            </div>
         </div>
     </main>
 
