@@ -24,17 +24,34 @@ if (!$hrRole) {
     exit;
 }
 
-// Get HR profile
-$stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WHERE ap.user_id = ?");
-$stmt->execute([currentUserId()]);
-$hr = $stmt->fetch();
+// Get employee ID from URL
+$employee_id = $_GET['id'] ?? null;
+
+if (!$employee_id) {
+    header('Location: employees.php');
+    exit;
+}
+
+// Fetch employee details
+$stmt = $pdo->prepare("
+    SELECT e.*, d.name as department_name 
+    FROM employees e 
+    LEFT JOIN department d ON e.department_id = d.id 
+    WHERE e.employee_id = ?
+");
+$stmt->execute([$employee_id]);
+$employee = $stmt->fetch();
+
+if (!$employee) {
+    header('Location: employees.php');
+    exit;
+}
 
 // Handle form submission
 $message = '';
 $message_type = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
-    $employee_id = trim($_POST['employee_id']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $first_name = trim($_POST['first_name']);
     $last_name = trim($_POST['last_name']);
     $email = trim($_POST['email']);
@@ -45,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
     $salary = floatval($_POST['salary']);
     $status = trim($_POST['status']);
     
-    // KYC fields
+    // Additional KYC fields
     $address = trim($_POST['address']);
     $city = trim($_POST['city']);
     $state = trim($_POST['state']);
@@ -57,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
     $branch_code = trim($_POST['branch_code']);
 
     // Validation
-    if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($email)) {
+    if (empty($first_name) || empty($last_name) || empty($email)) {
         $message = 'Please fill in all required fields.';
         $message_type = 'error';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -65,52 +82,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
         $message_type = 'error';
     } else {
         try {
-            // Check if employee ID already exists
-            $stmt = $pdo->prepare("SELECT id FROM employees WHERE employee_id = ?");
-            $stmt->execute([$employee_id]);
+            // Check if email already exists for another employee
+            $stmt = $pdo->prepare("SELECT id FROM employees WHERE email = ? AND employee_id != ?");
+            $stmt->execute([$email, $employee_id]);
             $existing = $stmt->fetch();
             
             if ($existing) {
-                $message = 'Employee ID already exists.';
+                $message = 'Email address already exists for another employee.';
                 $message_type = 'error';
             } else {
-                // Check if email already exists
-                $stmt = $pdo->prepare("SELECT id FROM employees WHERE email = ?");
-                $stmt->execute([$email]);
-                $existing = $stmt->fetch();
+                // Update employee record
+                $stmt = $pdo->prepare("
+                    UPDATE employees 
+                    SET first_name = ?, last_name = ?, email = ?, phone = ?, department_id = ?, 
+                        position = ?, hire_date = ?, salary = ?, status = ?, address = ?, 
+                        city = ?, state = ?, country = ?, postal_code = ?, bank_name = ?, 
+                        account_number = ?, account_name = ?, branch_code = ?
+                    WHERE employee_id = ?
+                ");
+                $result = $stmt->execute([
+                    $first_name, $last_name, $email, $phone, $department_id, $position, $hire_date, 
+                    $salary, $status, $address, $city, $state, $country, $postal_code, 
+                    $bank_name, $account_number, $account_name, $branch_code, $employee_id
+                ]);
                 
-                if ($existing) {
-                    $message = 'Email address already exists.';
-                    $message_type = 'error';
-                } else {
-                    // Insert employee record with KYC fields
-                    $stmt = $pdo->prepare("
-                        INSERT INTO employees 
-                        (employee_id, first_name, last_name, email, phone, department_id, position, hire_date, salary, status, 
-                         address, city, state, country, postal_code, bank_name, account_number, account_name, branch_code) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ");
-                    $stmt->execute([
-                        $employee_id, $first_name, $last_name, $email, $phone, $department_id, $position, $hire_date, $salary, $status,
-                        $address, $city, $state, $country, $postal_code, $bank_name, $account_number, $account_name, $branch_code
-                    ]);
-                    
-                    $message = 'Employee added successfully!';
+                if ($result) {
+                    $message = 'Employee updated successfully!';
                     $message_type = 'success';
                     
-                    // Clear form values
-                    $employee_id = $first_name = $last_name = $email = $phone = $position = $hire_date = '';
-                    $department_id = $salary = 0;
-                    $status = 'active';
-                    $address = $city = $state = $country = $postal_code = $bank_name = $account_number = $account_name = $branch_code = '';
+                    // Refresh employee data
+                    $stmt = $pdo->prepare("
+                        SELECT e.*, d.name as department_name 
+                        FROM employees e 
+                        LEFT JOIN department d ON e.department_id = d.id 
+                        WHERE e.employee_id = ?
+                    ");
+                    $stmt->execute([$employee_id]);
+                    $employee = $stmt->fetch();
+                } else {
+                    $message = 'Error updating employee.';
+                    $message_type = 'error';
                 }
             }
         } catch (Exception $e) {
-            $message = 'Error adding employee: ' . $e->getMessage();
+            $message = 'Error updating employee: ' . $e->getMessage();
             $message_type = 'error';
         }
     }
 }
+
+// Get HR profile
+$stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WHERE ap.user_id = ?");
+$stmt->execute([currentUserId()]);
+$hr = $stmt->fetch();
 
 // Fetch departments for dropdown
 $stmt = $pdo->query("SELECT id, name FROM department ORDER BY name");
@@ -121,14 +145,14 @@ $departments = $stmt->fetchAll();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Employee - HR</title>
+    <title>Edit Employee - HR</title>
     <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .form-card {
-            background: var(--white);
+            background: var(--White);
             border-radius: 8px;
             box-shadow: 0 2px 8px var(--shadow);
             margin-bottom: 30px;
@@ -234,6 +258,7 @@ $departments = $stmt->fetchAll();
             display: flex;
             gap: 10px;
             margin-top: 20px;
+            flex-wrap: wrap;
         }
         
         .alert {
@@ -298,6 +323,14 @@ $departments = $stmt->fetchAll();
             
             .form-group.half-width {
                 flex: 1 0 100%;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
             }
         }
     </style>
@@ -364,7 +397,7 @@ $departments = $stmt->fetchAll();
                     <i class="fas fa-building"></i>
                     <span>Departments</span>
                 </a>
-                <a href="add_employee.php" class="nav-item active">
+                <a href="add_employee.php" class="nav-item">
                     <i class="fas fa-user-plus"></i>
                     <span>Add Employee</span>
                 </a>
@@ -403,8 +436,8 @@ $departments = $stmt->fetchAll();
     <!-- Main Content -->
     <main class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-user-plus"></i> Add Employee</h1>
-            <p>Register a new employee in the system</p>
+            <h1><i class="fas fa-user-edit"></i> Edit Employee</h1>
+            <p>Update employee details and KYC information</p>
         </div>
         
         <?php if ($message): ?>
@@ -416,12 +449,10 @@ $departments = $stmt->fetchAll();
         
         <div class="form-card">
             <div class="card-header">
-                <h2><i class="fas fa-user-plus"></i> Employee Information</h2>
+                <h2><i class="fas fa-user-edit"></i> Employee Information</h2>
             </div>
             <div class="card-body">
                 <form method="POST">
-                    <input type="hidden" name="add_employee" value="1">
-                    
                     <div class="tab-nav">
                         <button type="button" class="tab-btn active" onclick="showTab('personal')">Personal Info</button>
                         <button type="button" class="tab-btn" onclick="showTab('employment')">Employment</button>
@@ -432,42 +463,29 @@ $departments = $stmt->fetchAll();
                     <div id="personal-tab" class="tab-content active">
                         <div class="form-row">
                             <div class="form-group required half-width">
-                                <label for="employee_id">Employee ID</label>
-                                <input type="text" id="employee_id" name="employee_id" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['employee_id'] ?? ''); ?>" 
-                                       placeholder="e.g., EMP001" required>
-                            </div>
-                            
-                            <div class="form-group required half-width">
-                                <label for="email">Email</label>
-                                <input type="email" id="email" name="email" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" 
-                                       placeholder="employee@lsc.edu" required>
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group required half-width">
                                 <label for="first_name">First Name</label>
                                 <input type="text" id="first_name" name="first_name" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['first_name'] ?? ''); ?>" 
-                                       placeholder="First name" required>
+                                       value="<?php echo htmlspecialchars($employee['first_name']); ?>" required>
                             </div>
                             
                             <div class="form-group required half-width">
                                 <label for="last_name">Last Name</label>
                                 <input type="text" id="last_name" name="last_name" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['last_name'] ?? ''); ?>" 
-                                       placeholder="Last name" required>
+                                       value="<?php echo htmlspecialchars($employee['last_name']); ?>" required>
                             </div>
                         </div>
                         
                         <div class="form-row">
+                            <div class="form-group required half-width">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email" class="form-control" 
+                                       value="<?php echo htmlspecialchars($employee['email']); ?>" required>
+                            </div>
+                            
                             <div class="form-group half-width">
                                 <label for="phone">Phone</label>
                                 <input type="text" id="phone" name="phone" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['phone'] ?? ''); ?>" 
-                                       placeholder="e.g., +260-900-000-000">
+                                       value="<?php echo htmlspecialchars($employee['phone'] ?? ''); ?>">
                             </div>
                         </div>
                     </div>
@@ -480,7 +498,7 @@ $departments = $stmt->fetchAll();
                                     <option value="">Select Department</option>
                                     <?php foreach ($departments as $dept): ?>
                                         <option value="<?php echo $dept['id']; ?>" 
-                                            <?php echo (($_POST['department_id'] ?? '') == $dept['id']) ? 'selected' : ''; ?>>
+                                            <?php echo ($employee['department_id'] == $dept['id']) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($dept['name']); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -490,8 +508,7 @@ $departments = $stmt->fetchAll();
                             <div class="form-group half-width">
                                 <label for="position">Position</label>
                                 <input type="text" id="position" name="position" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['position'] ?? ''); ?>" 
-                                       placeholder="Job title">
+                                       value="<?php echo htmlspecialchars($employee['position'] ?? ''); ?>">
                             </div>
                         </div>
                         
@@ -499,14 +516,13 @@ $departments = $stmt->fetchAll();
                             <div class="form-group half-width">
                                 <label for="hire_date">Hire Date</label>
                                 <input type="date" id="hire_date" name="hire_date" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['hire_date'] ?? ''); ?>">
+                                       value="<?php echo htmlspecialchars($employee['hire_date'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group half-width">
                                 <label for="salary">Salary</label>
                                 <input type="number" id="salary" name="salary" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['salary'] ?? ''); ?>" 
-                                       placeholder="e.g., 5000.00" step="0.01">
+                                       value="<?php echo htmlspecialchars($employee['salary'] ?? ''); ?>" step="0.01">
                             </div>
                         </div>
                         
@@ -514,9 +530,9 @@ $departments = $stmt->fetchAll();
                             <div class="form-group half-width">
                                 <label for="status">Status</label>
                                 <select id="status" name="status" class="form-control">
-                                    <option value="active" <?php echo (($_POST['status'] ?? 'active') === 'active') ? 'selected' : ''; ?>>Active</option>
-                                    <option value="inactive" <?php echo (($_POST['status'] ?? 'active') === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
-                                    <option value="terminated" <?php echo (($_POST['status'] ?? 'active') === 'terminated') ? 'selected' : ''; ?>>Terminated</option>
+                                    <option value="active" <?php echo ($employee['status'] === 'active') ? 'selected' : ''; ?>>Active</option>
+                                    <option value="inactive" <?php echo ($employee['status'] === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
+                                    <option value="terminated" <?php echo ($employee['status'] === 'terminated') ? 'selected' : ''; ?>>Terminated</option>
                                 </select>
                             </div>
                         </div>
@@ -527,8 +543,7 @@ $departments = $stmt->fetchAll();
                             <div class="form-group full-width">
                                 <label for="address">Address</label>
                                 <input type="text" id="address" name="address" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['address'] ?? ''); ?>" 
-                                       placeholder="Street address">
+                                       value="<?php echo htmlspecialchars($employee['address'] ?? ''); ?>">
                             </div>
                         </div>
                         
@@ -536,15 +551,13 @@ $departments = $stmt->fetchAll();
                             <div class="form-group half-width">
                                 <label for="city">City</label>
                                 <input type="text" id="city" name="city" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['city'] ?? ''); ?>" 
-                                       placeholder="City">
+                                       value="<?php echo htmlspecialchars($employee['city'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group half-width">
                                 <label for="state">State/Province</label>
                                 <input type="text" id="state" name="state" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['state'] ?? ''); ?>" 
-                                       placeholder="State/Province">
+                                       value="<?php echo htmlspecialchars($employee['state'] ?? ''); ?>">
                             </div>
                         </div>
                         
@@ -552,15 +565,13 @@ $departments = $stmt->fetchAll();
                             <div class="form-group half-width">
                                 <label for="country">Country</label>
                                 <input type="text" id="country" name="country" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['country'] ?? ''); ?>" 
-                                       placeholder="Country">
+                                       value="<?php echo htmlspecialchars($employee['country'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group half-width">
                                 <label for="postal_code">Postal Code</label>
                                 <input type="text" id="postal_code" name="postal_code" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['postal_code'] ?? ''); ?>" 
-                                       placeholder="Postal Code">
+                                       value="<?php echo htmlspecialchars($employee['postal_code'] ?? ''); ?>">
                             </div>
                         </div>
                     </div>
@@ -570,15 +581,13 @@ $departments = $stmt->fetchAll();
                             <div class="form-group half-width">
                                 <label for="bank_name">Bank Name</label>
                                 <input type="text" id="bank_name" name="bank_name" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['bank_name'] ?? ''); ?>" 
-                                       placeholder="Bank name">
+                                       value="<?php echo htmlspecialchars($employee['bank_name'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group half-width">
                                 <label for="account_number">Account Number</label>
                                 <input type="text" id="account_number" name="account_number" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['account_number'] ?? ''); ?>" 
-                                       placeholder="Account number">
+                                       value="<?php echo htmlspecialchars($employee['account_number'] ?? ''); ?>">
                             </div>
                         </div>
                         
@@ -586,25 +595,26 @@ $departments = $stmt->fetchAll();
                             <div class="form-group half-width">
                                 <label for="account_name">Account Name</label>
                                 <input type="text" id="account_name" name="account_name" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['account_name'] ?? ''); ?>" 
-                                       placeholder="Account name">
+                                       value="<?php echo htmlspecialchars($employee['account_name'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group half-width">
                                 <label for="branch_code">Branch Code</label>
                                 <input type="text" id="branch_code" name="branch_code" class="form-control" 
-                                       value="<?php echo htmlspecialchars($_POST['branch_code'] ?? ''); ?>" 
-                                       placeholder="Branch code">
+                                       value="<?php echo htmlspecialchars($employee['branch_code'] ?? ''); ?>">
                             </div>
                         </div>
                     </div>
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-user-plus"></i> Add Employee
+                            <i class="fas fa-save"></i> Update Employee
                         </button>
+                        <a href="view_employee.php?id=<?php echo urlencode($employee['employee_id']); ?>" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Profile
+                        </a>
                         <a href="employees.php" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Back to Employees
+                            <i class="fas fa-list"></i> Employee Directory
                         </a>
                     </div>
                 </form>

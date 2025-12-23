@@ -38,6 +38,22 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute();
 $employees = $stmt->fetchAll();
+
+// Handle messages
+$message = '';
+$message_type = '';
+
+if (isset($_GET['message'])) {
+    $msg_type = $_GET['message'];
+    if ($msg_type === 'deleted' && isset($_GET['name'])) {
+        $employee_name = htmlspecialchars($_GET['name']);
+        $message = "Employee '$employee_name' has been deleted successfully.";
+        $message_type = 'success';
+    } elseif ($msg_type === 'error') {
+        $message = 'Error occurred while deleting employee.';
+        $message_type = 'error';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -227,6 +243,24 @@ $employees = $stmt->fetchAll();
         
         .btn-csv {
             background-color: #007bff;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
         
         @media (max-width: 768px) {
@@ -424,6 +458,13 @@ $employees = $stmt->fetchAll();
             </a>
         </div>
         
+        <?php if ($message): ?>
+            <div class="alert alert-<?php echo $message_type; ?>">
+                <i class="fas fa-<?php echo $message_type === 'success' ? 'check-circle' : 'exclamation-circle'; ?>"></i>
+                <?php echo $message; ?>
+            </div>
+        <?php endif; ?>
+        
         <?php if (count($employees) > 0): ?>
             <div class="table-responsive">
                 <table class="employee-table" id="employeeTable">
@@ -468,13 +509,13 @@ $employees = $stmt->fetchAll();
                                 <td><?php echo $employee['salary'] ? '$' . number_format($employee['salary'], 2) : 'N/A'; ?></td>
                                 <td><span class="badge <?php echo $status_class; ?>"><?php echo ucfirst($employee['status']); ?></span></td>
                                 <td class="actions">
-                                    <a href="#" class="btn-icon btn-view" title="View Details">
+                                    <a href="#" class="btn-icon btn-view" title="View Details" onclick="navigateTo('view_employee.php?id=<?php echo urlencode($employee['employee_id']); ?>')">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="#" class="btn-icon btn-edit" title="Edit">
+                                    <a href="#" class="btn-icon btn-edit" title="Edit" onclick="navigateTo('edit_employee.php?id=<?php echo urlencode($employee['employee_id']); ?>')">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <a href="#" class="btn-icon btn-delete" title="Delete">
+                                    <a href="#" class="btn-icon btn-delete" title="Delete" onclick="confirmDelete('<?php echo addslashes($employee['employee_id']); ?>', '<?php echo addslashes($employee['first_name'] . ' ' . $employee['last_name']); ?>')">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 </td>
@@ -617,7 +658,7 @@ $employees = $stmt->fetchAll();
                         <div class="print-header">
                             <img src="../assets/images/school_logo.jpg" alt="LSC Logo">
                             <h1>Lusaka South College</h1>
-                            <p>Human Resource Management </p>
+                            <p>Student Records Management System</p>
                         </div>
                         <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
                         <div>${document.querySelector('.employee-table').outerHTML}</div>
@@ -640,6 +681,30 @@ $employees = $stmt->fetchAll();
         // Export to CSV functionality
         function exportToCSV() {
             window.open('export_employees.php?type=csv', '_blank');
+        }
+        
+        // Confirm delete function
+        function confirmDelete(employeeId, employeeName) {
+            if (confirm('Are you sure you want to delete employee "' + employeeName + '"?\nThis action cannot be undone.')) {
+                // Create a form to submit the delete request
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'delete_employee.php';
+                
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'employee_id';
+                idInput.value = employeeId;
+                
+                form.appendChild(idInput);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+        
+        // Navigate to URL function
+        function navigateTo(url) {
+            window.location.href = url;
         }
     </script>
 </body>
