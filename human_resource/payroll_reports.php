@@ -85,7 +85,7 @@ try {
 }
 
 // Get recent payroll records
-$stmt = $pdo->query("SELECT p.*, e.full_name FROM payroll p JOIN employees e ON p.employee_id = e.id ORDER BY p.payment_date DESC LIMIT 10");
+$stmt = $pdo->query("SELECT p.*, CONCAT(e.first_name, ' ', e.last_name) AS full_name FROM payroll p JOIN employees e ON p.employee_id = e.id ORDER BY p.payment_date DESC LIMIT 10");
 $recent_payroll = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>

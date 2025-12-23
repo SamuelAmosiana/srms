@@ -33,7 +33,7 @@ $hr = $stmt->fetch();
 $stmt = $pdo->prepare("
     SELECT e.*, d.name as department_name 
     FROM employees e 
-    LEFT JOIN departments d ON e.department_id = d.id 
+    LEFT JOIN department d ON e.department_id = d.id 
     ORDER BY e.hire_date DESC
 ");
 $stmt->execute();
@@ -161,6 +161,7 @@ $employees = $stmt->fetchAll();
             gap: 10px;
             margin-bottom: 20px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .search-input {
@@ -201,6 +202,33 @@ $employees = $stmt->fetchAll();
             background-color: #5a6268;
         }
         
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-export {
+            padding: 8px 15px;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .btn-print {
+            background-color: #28a745;
+        }
+        
+        .btn-pdf {
+            background-color: #dc3545;
+        }
+        
+        .btn-csv {
+            background-color: #007bff;
+        }
+        
         @media (max-width: 768px) {
             .employee-table {
                 font-size: 14px;
@@ -214,6 +242,60 @@ $employees = $stmt->fetchAll();
             .search-container {
                 flex-direction: column;
                 align-items: stretch;
+            }
+            
+            .export-buttons {
+                flex-direction: column;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            .top-nav, .sidebar, .search-container, .actions, .export-buttons, .btn {
+                display: none !important;
+            }
+            
+            body {
+                background: white !important;
+            }
+            
+            .main-content {
+                margin: 0 !important;
+                padding: 20px !important;
+            }
+            
+            .employee-table {
+                box-shadow: none !important;
+                width: 100% !important;
+            }
+            
+            .print-header {
+                text-align: center;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid var(--primary-green);
+            }
+            
+            .print-header img {
+                max-width: 100px;
+                margin-bottom: 10px;
+            }
+            
+            .print-header h1 {
+                margin: 0;
+                color: var(--primary-green);
+                font-size: 24px;
+            }
+            
+            .print-header p {
+                margin: 5px 0 0 0;
+                color: var(--text-light);
+            }
+            
+            .print-date {
+                text-align: right;
+                margin-bottom: 10px;
+                color: var(--text-light);
             }
         }
     </style>
@@ -323,6 +405,18 @@ $employees = $stmt->fetchAll();
             <p>Manage and view all employees in the organization</p>
         </div>
         
+        <div class="export-buttons">
+            <button class="btn btn-print btn-export" onclick="printTable()">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <button class="btn btn-pdf btn-export" onclick="exportToPDF()">
+                <i class="fas fa-file-pdf"></i> Export PDF
+            </button>
+            <button class="btn btn-csv btn-export" onclick="exportToCSV()">
+                <i class="fas fa-file-csv"></i> Export CSV
+            </button>
+        </div>
+        
         <div class="search-container">
             <input type="text" class="search-input" placeholder="Search employees..." id="searchInput">
             <a href="add_employee.php" class="btn btn-primary">
@@ -332,7 +426,7 @@ $employees = $stmt->fetchAll();
         
         <?php if (count($employees) > 0): ?>
             <div class="table-responsive">
-                <table class="employee-table">
+                <table class="employee-table" id="employeeTable">
                     <thead>
                         <tr>
                             <th>Employee ID</th>
@@ -462,6 +556,91 @@ $employees = $stmt->fetchAll();
                 }
             });
         });
+        
+        // Print functionality
+        function printTable() {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Employee Directory - LSC SRMS</title>
+                        <style>
+                            body {
+                                font-family: Arial, sans-serif;
+                                margin: 20px;
+                            }
+                            .print-header {
+                                text-align: center;
+                                margin-bottom: 20px;
+                                padding-bottom: 10px;
+                                border-bottom: 2px solid #228b22;
+                            }
+                            .print-header img {
+                                max-width: 100px;
+                                margin-bottom: 10px;
+                            }
+                            .print-header h1 {
+                                margin: 0;
+                                color: #228b22;
+                                font-size: 24px;
+                            }
+                            .print-header p {
+                                margin: 5px 0 0 0;
+                                color: #6c757d;
+                            }
+                            .print-date {
+                                text-align: right;
+                                margin-bottom: 10px;
+                                color: #6c757d;
+                                font-size: 12px;
+                            }
+                            table {
+                                width: 100%;
+                                border-collapse: collapse;
+                            }
+                            th, td {
+                                border: 1px solid #ddd;
+                                padding: 8px;
+                                text-align: left;
+                            }
+                            th {
+                                background-color: #228b22;
+                                color: white;
+                                font-weight: bold;
+                            }
+                            tr:nth-child(even) {
+                                background-color: #f2f2f2;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="print-header">
+                            <img src="../assets/images/school_logo.jpg" alt="LSC Logo">
+                            <h1>Lusaka South College</h1>
+                            <p>Human Resource Management </p>
+                        </div>
+                        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+                        <div>${document.querySelector('.employee-table').outerHTML}</div>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+        
+        // Export to PDF functionality
+        function exportToPDF() {
+            window.open('export_employees.php?type=pdf', '_blank');
+        }
+        
+        // Export to CSV functionality
+        function exportToCSV() {
+            window.open('export_employees.php?type=csv', '_blank');
+        }
     </script>
 </body>
 </html>

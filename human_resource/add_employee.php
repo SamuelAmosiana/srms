@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
 }
 
 // Fetch departments for dropdown
-$stmt = $pdo->query("SELECT id, name FROM departments ORDER BY name");
+$stmt = $pdo->query("SELECT id, name FROM department ORDER BY name");
 $departments = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
