@@ -352,11 +352,11 @@ $calendars = $stmt->fetchAll();
                     <i class="fas fa-calendar-alt"></i>
                     <span>Create Academic Calendars</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="timetable.php" class="nav-item">
                     <i class="fas fa-clock"></i>
                     <span>Generate Timetables</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="schedule_exams.php" class="nav-item">
                     <i class="fas fa-calendar-check"></i>
                     <span>Schedule Programs & Exams</span>
                 </a>
@@ -364,15 +364,15 @@ $calendars = $stmt->fetchAll();
             
             <div class="nav-section">
                 <h4>Academic Operations</h4>
-                <a href="#" class="nav-item">
+                <a href="publish_results.php" class="nav-item">
                     <i class="fas fa-chart-line"></i>
                     <span>Publish Results</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="lecturer_attendance.php" class="nav-item">
                     <i class="fas fa-user-clock"></i>
                     <span>Track Lecturer Attendance</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="approve_registration.php" class="nav-item">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Approve Course Registration</span>
                 </a>
@@ -380,11 +380,11 @@ $calendars = $stmt->fetchAll();
             
             <div class="nav-section">
                 <h4>Reports</h4>
-                <a href="#" class="nav-item">
+                <a href="reports.php" class="nav-item">
                     <i class="fas fa-file-alt"></i>
                     <span>Academic Reports</span>
                 </a>
-                <a href="#" class="nav-item">
+                <a href="analytics.php" class="nav-item">
                     <i class="fas fa-chart-bar"></i>
                     <span>Performance Analytics</span>
                 </a>
