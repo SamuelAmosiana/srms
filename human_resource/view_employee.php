@@ -340,6 +340,32 @@ $hr = $stmt->fetch();
                 </div>
                 
                 <div class="profile-section">
+                    <h3><i class="fas fa-id-card"></i> Personal Documents</h3>
+                    <div class="profile-info">
+                        <div class="info-item">
+                            <span class="info-label">NRC Number</span>
+                            <span class="info-value"><?php echo htmlspecialchars($employee['nrc_number'] ?? 'N/A'); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">T-PIN</span>
+                            <span class="info-value"><?php echo htmlspecialchars($employee['tax_pin'] ?? 'N/A'); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">CV/Resume</span>
+                            <span class="info-value">
+                                <?php if ($employee['cv_path']): ?>
+                                    <a href="../<?php echo htmlspecialchars($employee['cv_path']); ?>" target="_blank" class="btn btn-sm btn-info">
+                                        <i class="fas fa-file"></i> View CV
+                                    </a>
+                                <?php else: ?>
+                                    N/A
+                                <?php endif; ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="profile-section">
                     <h3><i class="fas fa-briefcase"></i> Employment Details</h3>
                     <div class="profile-info">
                         <div class="info-item">

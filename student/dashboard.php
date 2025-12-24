@@ -135,6 +135,10 @@ $stats['accommodation_status'] = 'Not Applied';
                     <i class="fas fa-file-alt"></i>
                     <span>View Docket</span>
                 </a>
+                <a href="elearning" class="nav-item">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>E-Learning (Moodle)</span>
+                </a>
             </div>
             
             <div class="nav-section">
@@ -233,6 +237,12 @@ $stats['accommodation_status'] = 'Not Applied';
                     <i class="fas fa-bed"></i>
                     <h3>Accommodation</h3>
                     <p>Apply or view status</p>
+                </a>
+                
+                <a href="elearning" class="action-card green">
+                    <i class="fas fa-graduation-cap"></i>
+                    <h3>E-Learning (Moodle)</h3>
+                    <p>Access online learning platform</p>
                 </a>
             </div>
         </div>

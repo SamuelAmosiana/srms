@@ -56,6 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $last_name = trim($_POST['last_name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
+    $nrc_number = trim($_POST['nrc_number']);
+    $tax_pin = trim($_POST['tax_pin']);
     $department_id = intval($_POST['department_id']);
     $position = trim($_POST['position']);
     $hire_date = trim($_POST['hire_date']);
@@ -72,6 +74,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $account_number = trim($_POST['account_number']);
     $account_name = trim($_POST['account_name']);
     $branch_code = trim($_POST['branch_code']);
+    
+    // Handle CV upload
+    $cv_path = $employee['cv_path']; // Keep existing CV path by default
+    if (isset($_FILES['cv']) && $_FILES['cv']['error'] == 0) {
+        $upload_dir = '../uploads/cvs/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_extension = strtolower(pathinfo($_FILES['cv']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['pdf', 'doc', 'docx'];
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            $file_name = $employee_id . '_cv.' . $file_extension;
+            $file_path = $upload_dir . $file_name;
+            
+            // Delete old CV if it exists
+            if ($employee['cv_path']) {
+                $old_file_path = '../' . $employee['cv_path'];
+                if (file_exists($old_file_path)) {
+                    unlink($old_file_path);
+                }
+            }
+            
+            if (move_uploaded_file($_FILES['cv']['tmp_name'], $file_path)) {
+                $cv_path = 'uploads/cvs/' . $file_name;
+            } else {
+                $message = 'Error uploading CV file.';
+                $message_type = 'error';
+            }
+        } else {
+            $message = 'Invalid CV file format. Only PDF, DOC, DOCX files are allowed.';
+            $message_type = 'error';
+        }
+    }
 
     // Validation
     if (empty($first_name) || empty($last_name) || empty($email)) {
@@ -97,13 +134,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     SET first_name = ?, last_name = ?, email = ?, phone = ?, department_id = ?, 
                         position = ?, hire_date = ?, salary = ?, status = ?, address = ?, 
                         city = ?, state = ?, country = ?, postal_code = ?, bank_name = ?, 
-                        account_number = ?, account_name = ?, branch_code = ?
+                        account_number = ?, account_name = ?, branch_code = ?, cv_path = ?
                     WHERE employee_id = ?
                 ");
                 $result = $stmt->execute([
                     $first_name, $last_name, $email, $phone, $department_id, $position, $hire_date, 
                     $salary, $status, $address, $city, $state, $country, $postal_code, 
-                    $bank_name, $account_number, $account_name, $branch_code, $employee_id
+                    $bank_name, $account_number, $account_name, $branch_code, $cv_path, $employee_id
                 ]);
                 
                 if ($result) {
@@ -452,7 +489,7 @@ $departments = $stmt->fetchAll();
                 <h2><i class="fas fa-user-edit"></i> Employee Information</h2>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <div class="tab-nav">
                         <button type="button" class="tab-btn active" onclick="showTab('personal')">Personal Info</button>
                         <button type="button" class="tab-btn" onclick="showTab('employment')">Employment</button>
@@ -486,6 +523,35 @@ $departments = $stmt->fetchAll();
                                 <label for="phone">Phone</label>
                                 <input type="text" id="phone" name="phone" class="form-control" 
                                        value="<?php echo htmlspecialchars($employee['phone'] ?? ''); ?>">
+                            </div>
+                            
+                            <div class="form-group half-width">
+                                <label for="nrc_number">NRC Number</label>
+                                <input type="text" id="nrc_number" name="nrc_number" class="form-control" 
+                                       value="<?php echo htmlspecialchars($employee['nrc_number'] ?? ''); ?>" 
+                                       placeholder="e.g., 123456/AA/12">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group half-width">
+                                <label for="tax_pin">T-PIN</label>
+                                <input type="text" id="tax_pin" name="tax_pin" class="form-control" 
+                                       value="<?php echo htmlspecialchars($employee['tax_pin'] ?? ''); ?>" 
+                                       placeholder="e.g., 123456789Z">
+                            </div>
+                            
+                            <div class="form-group half-width">
+                                <label for="cv">CV/Resume</label>
+                                <input type="file" id="cv" name="cv" class="form-control" accept=".pdf,.doc,.docx">
+                                <small class="form-text">Accepted formats: PDF, DOC, DOCX (Max 5MB)</small>
+                                <?php if ($employee['cv_path']): ?>
+                                    <div class="mt-2">
+                                        <a href="../<?php echo htmlspecialchars($employee['cv_path']); ?>" target="_blank" class="btn btn-sm btn-info">
+                                            <i class="fas fa-file"></i> View Current CV
+                                        </a>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>

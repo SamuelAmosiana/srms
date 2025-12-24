@@ -39,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
     $last_name = trim($_POST['last_name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
+    $nrc_number = trim($_POST['nrc_number']);
+    $tax_pin = trim($_POST['tax_pin']);
     $department_id = intval($_POST['department_id']);
     $position = trim($_POST['position']);
     $hire_date = trim($_POST['hire_date']);
@@ -55,6 +57,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
     $account_number = trim($_POST['account_number']);
     $account_name = trim($_POST['account_name']);
     $branch_code = trim($_POST['branch_code']);
+    
+    // Handle CV upload
+    $cv_path = null;
+    if (isset($_FILES['cv']) && $_FILES['cv']['error'] == 0) {
+        $upload_dir = '../uploads/cvs/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_extension = strtolower(pathinfo($_FILES['cv']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['pdf', 'doc', 'docx'];
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            $file_name = $employee_id . '_cv.' . $file_extension;
+            $file_path = $upload_dir . $file_name;
+            
+            if (move_uploaded_file($_FILES['cv']['tmp_name'], $file_path)) {
+                $cv_path = 'uploads/cvs/' . $file_name;
+            } else {
+                $message = 'Error uploading CV file.';
+                $message_type = 'error';
+            }
+        } else {
+            $message = 'Invalid CV file format. Only PDF, DOC, DOCX files are allowed.';
+            $message_type = 'error';
+        }
+    }
 
     // Validation
     if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($email)) {
@@ -86,13 +115,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
                     // Insert employee record with KYC fields
                     $stmt = $pdo->prepare("
                         INSERT INTO employees 
-                        (employee_id, first_name, last_name, email, phone, department_id, position, hire_date, salary, status, 
-                         address, city, state, country, postal_code, bank_name, account_number, account_name, branch_code) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (employee_id, first_name, last_name, email, phone, nrc_number, tax_pin, department_id, position, hire_date, salary, status, 
+                         address, city, state, country, postal_code, bank_name, account_number, account_name, branch_code, cv_path) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ");
                     $stmt->execute([
-                        $employee_id, $first_name, $last_name, $email, $phone, $department_id, $position, $hire_date, $salary, $status,
-                        $address, $city, $state, $country, $postal_code, $bank_name, $account_number, $account_name, $branch_code
+                        $employee_id, $first_name, $last_name, $email, $phone, $nrc_number, $tax_pin, $department_id, $position, $hire_date, $salary, $status,
+                        $address, $city, $state, $country, $postal_code, $bank_name, $account_number, $account_name, $branch_code, $cv_path
                     ]);
                     
                     $message = 'Employee added successfully!';
@@ -100,9 +129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
                     
                     // Clear form values
                     $employee_id = $first_name = $last_name = $email = $phone = $position = $hire_date = '';
+                    $nrc_number = $tax_pin = '';
                     $department_id = $salary = 0;
                     $status = 'active';
-                    $address = $city = $state = $country = $postal_code = $bank_name = $account_number = $account_name = $branch_code = '';
+                    $address = $city = $state = $country = $postal_code = $bank_name = $account_number = $account_name = $branch_code = $cv_path = '';
                 }
             }
         } catch (Exception $e) {
@@ -419,7 +449,7 @@ $departments = $stmt->fetchAll();
                 <h2><i class="fas fa-user-plus"></i> Employee Information</h2>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="add_employee" value="1">
                     
                     <div class="tab-nav">
@@ -468,6 +498,28 @@ $departments = $stmt->fetchAll();
                                 <input type="text" id="phone" name="phone" class="form-control" 
                                        value="<?php echo htmlspecialchars($_POST['phone'] ?? ''); ?>" 
                                        placeholder="e.g., +260-900-000-000">
+                            </div>
+                            
+                            <div class="form-group half-width">
+                                <label for="nrc_number">NRC Number</label>
+                                <input type="text" id="nrc_number" name="nrc_number" class="form-control" 
+                                       value="<?php echo htmlspecialchars($_POST['nrc_number'] ?? ''); ?>" 
+                                       placeholder="e.g., 123456/AA/12">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group half-width">
+                                <label for="tax_pin">T-PIN</label>
+                                <input type="text" id="tax_pin" name="tax_pin" class="form-control" 
+                                       value="<?php echo htmlspecialchars($_POST['tax_pin'] ?? ''); ?>" 
+                                       placeholder="e.g., 123456789Z">
+                            </div>
+                            
+                            <div class="form-group half-width">
+                                <label for="cv">CV/Resume</label>
+                                <input type="file" id="cv" name="cv" class="form-control" accept=".pdf,.doc,.docx">
+                                <small class="form-text">Accepted formats: PDF, DOC, DOCX (Max 5MB)</small>
                             </div>
                         </div>
                     </div>
