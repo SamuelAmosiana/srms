@@ -67,6 +67,7 @@ $system_name = getSetting('system_name', 'Lusaka South College SRMS');
 $system_email = getSetting('system_email', 'admin@lsc.ac.zm');
 $timezone = getSetting('timezone', 'Africa/Lusaka');
 $maintenance_mode = getSetting('maintenance_mode', '0') === '1';
+$maintenance_end_time = getSetting('maintenance_end_time', '');
 
 // Email settings variables
 $email_host = getSetting('email_host', 'smtp.gmail.com');
@@ -86,6 +87,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_general'])) {
     saveSetting('system_email', $system_email);
     saveSetting('timezone', $timezone);
     saveSetting('maintenance_mode', $maintenance_mode);
+    
+    // Handle maintenance end time
+    if ($maintenance_mode === '1') {
+        $maintenance_end_date = $_POST['maintenance_end_date'] ?? '';
+        $maintenance_end_time = $_POST['maintenance_end_time'] ?? '';
+        
+        if ($maintenance_end_date) {
+            $end_datetime = $maintenance_end_date . ' ' . ($maintenance_end_time ?: '23:59:59');
+            saveSetting('maintenance_end_time', $end_datetime);
+        }
+    } else {
+        // Clear maintenance end time when maintenance mode is disabled
+        saveSetting('maintenance_end_time', '');
+    }
     
     $message = "General settings saved successfully!";
     $messageType = 'success';
@@ -353,11 +368,43 @@ try {
                         
                         <div class="form-group">
                             <label for="maintenance_mode">
-                                <input type="checkbox" id="maintenance_mode" name="maintenance_mode" <?php echo $maintenance_mode ? 'checked' : ''; ?>>
+                                <input type="checkbox" id="maintenance_mode" name="maintenance_mode" <?php echo $maintenance_mode ? 'checked' : ''; ?> onchange="toggleMaintenanceOptions()">
                                 Maintenance Mode
                             </label>
                             <small class="form-text">Enable maintenance mode to restrict access to administrators only</small>
                         </div>
+                        
+                        <div id="maintenance-options" style="display: <?php echo $maintenance_mode ? 'block' : 'none'; ?>; margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;">
+                            <h4>Maintenance Duration</h4>
+                            <div class="form-group">
+                                <label for="maintenance_end_date">End Date</label>
+                                <input type="date" id="maintenance_end_date" name="maintenance_end_date" value="<?php echo date('Y-m-d', strtotime($maintenance_end_time ?: '+2 days')); ?>" class="form-control" <?php echo $maintenance_mode ? '' : 'disabled'; ?>>
+                            </div>
+                            <div class="form-group">
+                                <label for="maintenance_end_time">End Time</label>
+                                <input type="time" id="maintenance_end_time" name="maintenance_end_time" value="<?php echo date('H:i', strtotime($maintenance_end_time ?: '23:59')); ?>" class="form-control" <?php echo $maintenance_mode ? '' : 'disabled'; ?>>
+                            </div>
+                            <small class="form-text">Set when the maintenance will end. The countdown will be displayed on the maintenance page.</small>
+                        </div>
+                        
+                        <script>
+                        function toggleMaintenanceOptions() {
+                            const checkbox = document.getElementById('maintenance_mode');
+                            const options = document.getElementById('maintenance-options');
+                            
+                            if (checkbox.checked) {
+                                options.style.display = 'block';
+                                // Enable the date and time inputs
+                                document.getElementById('maintenance_end_date').disabled = false;
+                                document.getElementById('maintenance_end_time').disabled = false;
+                            } else {
+                                options.style.display = 'none';
+                                // Disable the date and time inputs
+                                document.getElementById('maintenance_end_date').disabled = true;
+                                document.getElementById('maintenance_end_time').disabled = true;
+                            }
+                        }
+                        </script>
                     </div>
                     
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save General Settings</button>

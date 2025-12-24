@@ -30,6 +30,18 @@ function isMaintenanceModeEnabled($pdo) {
     }
 }
 
+// Function to get maintenance end time
+function getMaintenanceEndTime($pdo) {
+    try {
+        $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_end_time'");
+        $stmt->execute();
+        $result = $stmt->fetch();
+        return $result ? $result['setting_value'] : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
 // Function to check if current user has emergency access during maintenance
 function hasEmergencyAccess($pdo, $userId) {
     if (!$userId) {
@@ -71,6 +83,10 @@ function checkMaintenanceMode($pdo) {
         $userId = $_SESSION['user_id'] ?? null;
         if (!hasEmergencyAccess($pdo, $userId)) {
             // Show maintenance mode page
+            // Get maintenance end time
+            $maintenance_end_time = getMaintenanceEndTime($pdo);
+            $end_timestamp = $maintenance_end_time ? strtotime($maintenance_end_time) : time() + (2 * 24 * 60 * 60); // Default to 2 days from now
+            
             http_response_code(503);
             echo '<!DOCTYPE html>
 <html lang="en">
@@ -482,15 +498,19 @@ function checkMaintenanceMode($pdo) {
                 <h3 class="countdown-title">Estimated Time to Completion</h3>
                 <div class="countdown">
                     <div class="countdown-item">
-                        <div class="countdown-value" id="hours">02</div>
+                        <div class="countdown-value" id="days">00</div>
+                        <div class="countdown-label">Days</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="countdown-value" id="hours">00</div>
                         <div class="countdown-label">Hours</div>
                     </div>
                     <div class="countdown-item">
-                        <div class="countdown-value" id="minutes">30</div>
+                        <div class="countdown-value" id="minutes">00</div>
                         <div class="countdown-label">Mins</div>
                     </div>
                     <div class="countdown-item">
-                        <div class="countdown-value" id="seconds">45</div>
+                        <div class="countdown-value" id="seconds">00</div>
                         <div class="countdown-label">Secs</div>
                     </div>
                 </div>
@@ -554,42 +574,39 @@ function checkMaintenanceMode($pdo) {
     </div>
     
     <script>
-        // Simple countdown timer
+        // Calculate the end time from PHP
+        const maintenanceEndTime = new Date(' . $end_timestamp . ' * 1000);
+        
         function updateCountdown() {
-            const hoursElement = document.getElementById(\'hours\');
-            const minutesElement = document.getElementById(\'minutes\');
-            const secondsElement = document.getElementById(\'seconds\');
-            
-            let hours = parseInt(hoursElement.textContent);
-            let minutes = parseInt(minutesElement.textContent);
-            let seconds = parseInt(secondsElement.textContent);
-            
-            seconds--;
-            
-            if (seconds < 0) {
-                seconds = 59;
-                minutes--;
-                
-                if (minutes < 0) {
-                    minutes = 59;
-                    hours--;
-                    
-                    if (hours < 0) {
-                        hours = 0;
-                        minutes = 0;
-                        seconds = 0;
-                    }
-                }
+            const now = new Date().getTime();
+            const distance = maintenanceEndTime - now;
+
+            // Time calculations for days, hours, minutes and seconds
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            // If the count down is finished, write some text
+            if (distance < 0) {
+                clearInterval(x);
+                document.getElementById("days").innerHTML = "00";
+                document.getElementById("hours").innerHTML = "00";
+                document.getElementById("minutes").innerHTML = "00";
+                document.getElementById("seconds").innerHTML = "00";
+                return;
             }
             
-            hoursElement.textContent = hours.toString().padStart(2, \'0\');
-            minutesElement.textContent = minutes.toString().padStart(2, \'0\');
-            secondsElement.textContent = seconds.toString().padStart(2, \'0\');
+            // Display the results
+            document.getElementById("days").innerHTML = days.toString().padStart(2, "0");
+            document.getElementById("hours").innerHTML = hours.toString().padStart(2, "0");
+            document.getElementById("minutes").innerHTML = minutes.toString().padStart(2, "0");
+            document.getElementById("seconds").innerHTML = seconds.toString().padStart(2, "0");
         }
-        
-        // Update countdown every second
-        setInterval(updateCountdown, 1000);
-        
+
+        // Update the count down every 1 second
+        const x = setInterval(updateCountdown, 1000);
+
         // Initialize countdown
         updateCountdown();
     </script>
