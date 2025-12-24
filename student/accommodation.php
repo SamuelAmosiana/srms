@@ -354,9 +354,13 @@ try {
             
             <div class="nav-section">
                 <h4>Finance & Accommodation</h4>
-                <a href="view_balance.php" class="nav-item">
+                <a href="view_fee_balance.php" class="nav-item">
                     <i class="fas fa-money-bill-wave"></i>
                     <span>View Fee Balance</span>
+                </a>
+                <a href="elearning.php" class="nav-item">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>E-Learning (Moodle)</span>
                 </a>
                 <a href="accommodation.php" class="nav-item active">
                     <i class="fas fa-bed"></i>

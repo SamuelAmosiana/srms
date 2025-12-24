@@ -396,6 +396,10 @@ $ca_results = $stmt->fetchAll();
                     <i class="fas fa-file-alt"></i>
                     <span>View Docket</span>
                 </a>
+                <a href="elearning.php" class="nav-item">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>E-Learning (Moodle)</span>
+                </a>
             </div>
             
             <div class="nav-section">
