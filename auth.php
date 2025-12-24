@@ -73,48 +73,526 @@ function checkMaintenanceMode($pdo) {
             // Show maintenance mode page
             http_response_code(503);
             echo '<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Maintenance Mode - LSC SRMS</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lusaka South College - Under Maintenance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary-orange: #FF8C00;
+            --secondary-green: #2E8B57;
+            --light-orange: #FFE4B5;
+            --light-green: #98FB98;
+            --dark-orange: #CC7000;
+            --dark-green: #1D5C3A;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 50px;
-            background-color: #f5f5f5;
-        }
-        .maintenance-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
+            font-family: \'Poppins\', sans-serif;
+            background: linear-gradient(135deg, #f9f9f9 0%, #f0f0f0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
             color: #333;
-            margin-bottom: 20px;
         }
-        p {
+        
+        .maintenance-container {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .header-section {
+            background: linear-gradient(to right, var(--primary-orange), var(--secondary-green));
+            padding: 40px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-section::before {
+            content: \'\';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path fill="rgba(255,255,255,0.05)" d="M0,0 L100,0 L100,100 Z"/><path fill="rgba(255,255,255,0.1)" d="M0,0 L0,100 L100,100 Z"/></svg>\');
+            background-size: cover;
+        }
+        
+        .school-logo {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            line-height: 80px;
+        }
+        
+        .school-name {
+            font-family: \'Montserrat\', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .school-tagline {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            font-weight: 300;
+            margin-bottom: 10px;
+        }
+        
+        .content-section {
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        .maintenance-icon {
+            font-size: 5rem;
+            color: var(--primary-orange);
+            margin-bottom: 30px;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-20px);
+            }
+            60% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        .maintenance-title {
+            font-size: 2.5rem;
+            color: var(--dark-orange);
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        .maintenance-message {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            color: #555;
+            max-width: 800px;
+            margin: 0 auto 40px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin: 50px 0;
+        }
+        
+        .feature-item {
+            padding: 25px;
+            background: #f9f9f9;
+            border-radius: 15px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .feature-item:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--secondary-green);
+            margin-bottom: 15px;
+        }
+        
+        .feature-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--dark-green);
+        }
+        
+        .feature-description {
             color: #666;
-            font-size: 18px;
-            line-height: 1.6;
+            font-size: 1rem;
         }
-        .icon {
-            font-size: 64px;
-            color: #ff9800;
+        
+        .application-section {
+            background: linear-gradient(to right, #f8f9fa, #f0f0f0);
+            padding: 50px 40px;
+            border-radius: 15px;
+            margin: 40px 0;
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            color: var(--dark-green);
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+        
+        .btn-application {
+            padding: 18px 40px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 50px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 250px;
+        }
+        
+        .btn-undergrad {
+            background: linear-gradient(to right, var(--primary-orange), var(--dark-orange));
+            color: white;
+            border: none;
+        }
+        
+        .btn-undergrad:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(255, 140, 0, 0.3);
+            color: white;
+        }
+        
+        .btn-shortcourse {
+            background: linear-gradient(to right, var(--secondary-green), var(--dark-green));
+            color: white;
+            border: none;
+        }
+        
+        .btn-shortcourse:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(46, 139, 87, 0.3);
+            color: white;
+        }
+        
+        .btn-icon {
+            margin-right: 10px;
+            font-size: 1.3rem;
+        }
+        
+        .contact-section {
+            padding: 40px;
+            background: var(--light-green);
+            border-radius: 15px;
+            margin-top: 40px;
+        }
+        
+        .contact-title {
+            font-size: 1.8rem;
+            color: var(--dark-green);
+            margin-bottom: 25px;
+            font-weight: 700;
+        }
+        
+        .contact-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            min-width: 250px;
+        }
+        
+        .contact-icon {
+            font-size: 1.8rem;
+            color: var(--primary-orange);
+            margin-right: 15px;
+        }
+        
+        .contact-details h4 {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .contact-details p {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--dark-green);
+            margin-bottom: 0;
+        }
+        
+        .countdown-section {
+            margin: 40px 0;
+            padding: 30px;
+            background: linear-gradient(to right, var(--light-orange), #fff5e6);
+            border-radius: 15px;
+        }
+        
+        .countdown-title {
+            font-size: 1.5rem;
+            color: var(--dark-orange);
             margin-bottom: 20px;
+        }
+        
+        .countdown {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .countdown-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            min-width: 100px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .countdown-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-orange);
+            line-height: 1;
+        }
+        
+        .countdown-label {
+            font-size: 1rem;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .footer {
+            padding: 30px;
+            background: #333;
+            color: white;
+            text-align: center;
+        }
+        
+        .social-icons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .social-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 45px;
+            height: 45px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            color: white;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+        }
+        
+        .social-icon:hover {
+            background: var(--primary-orange);
+            transform: translateY(-5px);
+        }
+        
+        .copyright {
+            margin-top: 20px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .school-name {
+                font-size: 2rem;
+            }
+            
+            .maintenance-title {
+                font-size: 2rem;
+            }
+            
+            .btn-application {
+                min-width: 100%;
+                margin: 10px 0;
+            }
+            
+            .countdown {
+                flex-wrap: wrap;
+            }
+            
+            .countdown-item {
+                min-width: 80px;
+            }
+            
+            .content-section, .header-section {
+                padding: 30px 20px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="maintenance-container">
-        <div class="icon">⚙️</div>
-        <h1>System Maintenance in Progress</h1>
-        <p>The Student Records Management System is currently undergoing maintenance. We apologize for any inconvenience.</p>
-        <p>Please try again later.</p>
-        <p><em>- Lusaka South College IT Team</em></p>
+        <!-- Header Section -->
+        <div class="header-section">
+            <div class="school-logo">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+            <h1 class="school-name">LUSAKA SOUTH COLLEGE</h1>
+            <p class="school-tagline">Dream, Explore, Acquire</p>
+            <p class="school-tagline">Temporal Page - Back Soon...!</p>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content-section">
+            <div class="maintenance-icon">
+                <i class="fas fa-tools"></i>
+            </div>
+            
+            <h2 class="maintenance-title">System Under Maintenance</h2>
+            
+            <p class="maintenance-message">
+                System Maintenance in Progress...
+    We are currently performing scheduled maintenance to improve your experience. We apologize for any inconvenience.
+            </p>
+            
+            <div class="countdown-section">
+                <h3 class="countdown-title">Estimated Time to Completion</h3>
+                <div class="countdown">
+                    <div class="countdown-item">
+                        <div class="countdown-value" id="hours">02</div>
+                        <div class="countdown-label">Hours</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="countdown-value" id="minutes">30</div>
+                        <div class="countdown-label">Mins</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="countdown-value" id="seconds">45</div>
+                        <div class="countdown-label">Secs</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="application-section">
+                <h3 class="section-title">Continue with Your Application</h3>
+                <p>While our main system is under maintenance, you can still apply through our temporary application portal:</p>
+                
+                <div class="d-flex flex-wrap justify-content-center">
+                    <a href="/undergraduate_application.php" class="btn btn-application btn-undergrad">
+                        <i class="fas fa-graduation-cap btn-icon"></i>
+                        Undergraduate Application
+                    </a>
+                    <a href="/short_courses_application.php" class="btn btn-application btn-shortcourse">
+                        <i class="fas fa-book btn-icon"></i>
+                        Short Courses Application
+                    </a>
+                </div>
+            </div>
+            
+            <div class="contact-section">
+                <h3 class="contact-title">Need Immediate Assistance?</h3>
+                <div class="contact-info">
+                    <div class="contact-item">
+                        <i class="fas fa-phone contact-icon"></i>
+                        <div class="contact-details">
+                            <h4>Phone</h4>
+                            <p>+260 977 123 456</p>
+                        </div>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fas fa-envelope contact-icon"></i>
+                        <div class="contact-details">
+                            <h4>Email</h4>
+                            <p>info@lsc.ac.zm</p>
+                        </div>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fas fa-map-marker-alt contact-icon"></i>
+                        <div class="contact-details">
+                            <h4>Location</h4>
+                            <p>Lusaka, Zambia</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p class="school-name mb-3">LUSAKA SOUTH COLLEGE</p>
+            <p class="school-tagline mb-3">Quality Education for a Better Future</p>
+            <div class="social-icons">
+                <a href="#" class="social-icon"><i class="fab fa-facebook-f"></i></a>
+                <a href="#" class="social-icon"><i class="fab fa-twitter"></i></a>
+                <a href="#" class="social-icon"><i class="fab fa-instagram"></i></a>
+                <a href="#" class="social-icon"><i class="fab fa-linkedin-in"></i></a>
+            </div>
+            <p class="copyright">© 2023 Lusaka South College. All Rights Reserved.</p>
+        </div>
     </div>
+    
+    <script>
+        // Simple countdown timer
+        function updateCountdown() {
+            const hoursElement = document.getElementById(\'hours\');
+            const minutesElement = document.getElementById(\'minutes\');
+            const secondsElement = document.getElementById(\'seconds\');
+            
+            let hours = parseInt(hoursElement.textContent);
+            let minutes = parseInt(minutesElement.textContent);
+            let seconds = parseInt(secondsElement.textContent);
+            
+            seconds--;
+            
+            if (seconds < 0) {
+                seconds = 59;
+                minutes--;
+                
+                if (minutes < 0) {
+                    minutes = 59;
+                    hours--;
+                    
+                    if (hours < 0) {
+                        hours = 0;
+                        minutes = 0;
+                        seconds = 0;
+                    }
+                }
+            }
+            
+            hoursElement.textContent = hours.toString().padStart(2, \'0\');
+            minutesElement.textContent = minutes.toString().padStart(2, \'0\');
+            secondsElement.textContent = seconds.toString().padStart(2, \'0\');
+        }
+        
+        // Update countdown every second
+        setInterval(updateCountdown, 1000);
+        
+        // Initialize countdown
+        updateCountdown();
+    </script>
 </body>
 </html>';
             exit();
