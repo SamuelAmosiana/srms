@@ -19,7 +19,7 @@
         <h2>Student and Staff Portal</h2>
         <p>Please select your login type to access the system:</p>
         <div class="login-options">
-            <a href="login.php">👨‍💼 Staff Login</a>
+            <a href="login.php">👨‍💼 STAFF lOGIN</a>
             <a href="student_login.php">🎓 Student Login</a>
             <a href="enroll.php" class="btn-orange">📝 Enroll Now</a>
         </div>
