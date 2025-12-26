@@ -537,7 +537,7 @@ try {
                                     <th>Role</th>
                                     <th>Granted By</th>
                                     <th>Reason</th>
-                                    <th>Granted At</th>
+                                    <th>Granted At.</th>
                                     <th>Expires At</th>
                                     <th>Actions</th>
                                 </tr>
