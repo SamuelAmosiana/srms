@@ -26,12 +26,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
     header('Content-Disposition: attachment; filename="programmes_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['Code', 'Name', 'School', 'Duration', 'Students', 'Courses', 'Created']);
+    fputcsv($output, ['Code', 'Name', 'School', 'Duration', 'Category', 'Students', 'Courses', 'Created']);
     
     $export_query = "
         SELECT p.code, p.name, s.name as school_name, p.duration,
                (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
                (SELECT COUNT(*) FROM course c WHERE c.programme_id = p.id) as course_count,
+               p.category,
                p.created_at
         FROM programme p 
         LEFT JOIN school s ON p.school_id = s.id 
@@ -45,6 +46,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
             $row['name'],
             $row['school_name'] ?: 'Not assigned',
             $row['duration'],
+            $row['category'] ?: 'undergraduate',
             $row['student_count'],
             $row['course_count'],
             date('Y-m-d', strtotime($row['created_at']))
@@ -175,8 +177,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             $header = fgetcsv($handle);
                             $lineNumber++;
                             
-                            // Validate header
-                            if ($header[0] !== 'Code' || $header[1] !== 'Name' || $header[2] !== 'School') {
+                            // Validate header - check both old and new format
+                            $validHeader = ($header[0] === 'Code' && $header[1] === 'Name' && $header[2] === 'School');
+                            $validNewHeader = ($header[0] === 'Code' && $header[1] === 'Name' && $header[2] === 'School' && $header[3] === 'Duration' && $header[4] === 'Category');
+                            
+                            if (!$validHeader && !$validNewHeader) {
                                 $message = "Invalid CSV format. Please use the correct template.";
                                 $messageType = 'error';
                             } else {
@@ -187,7 +192,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         $code = trim($row[0]);
                                         $name = trim($row[1]);
                                         $schoolName = trim($row[2]);
-                                        $duration = isset($row[3]) ? (int)$row[3] : 0;
+                                        
+                                        // Handle both old and new CSV formats
+                                        if (count($header) >= 6) { // New format with category
+                                            $duration = isset($row[3]) ? (int)$row[3] : 0;
+                                            $category = isset($row[4]) ? trim($row[4]) : 'undergraduate';
+                                        } else { // Old format without category
+                                            $duration = isset($row[3]) ? (int)$row[3] : 0;
+                                            $category = 'undergraduate'; // Default to undergraduate
+                                        }
+                                        
+                                        // Validate category
+                                        if (!in_array($category, ['undergraduate', 'short_course'])) {
+                                            $category = 'undergraduate'; // Default fallback
+                                        }
                                         
                                         // Validate required fields
                                         if (empty($code) || empty($name) || empty($schoolName)) {
@@ -223,8 +241,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         
                                         if ($existing) {
                                             // Update existing programme
-                                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, school_id = ?, duration = ?, updated_at = NOW() WHERE id = ?");
-                                            if ($stmt->execute([$name, $school_id, $duration, $existing['id']])) {
+                                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, school_id = ?, duration = ?, category = ?, updated_at = NOW() WHERE id = ?");
+                                            if ($stmt->execute([$name, $school_id, $duration, $category, $existing['id']])) {
                                                 $importReport[] = "Line $lineNumber: Updated programme '$code'";
                                                 $updatedCount++;
                                             } else {
@@ -233,8 +251,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                             }
                                         } else {
                                             // Insert new programme
-                                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, created_at) VALUES (?, ?, ?, ?, NOW())");
-                                            if ($stmt->execute([$name, $code, $school_id, $duration])) {
+                                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, category, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                                            if ($stmt->execute([$name, $code, $school_id, $duration, $category])) {
                                                 $importReport[] = "Line $lineNumber: Imported programme '$code'";
                                                 $importedCount++;
                                             } else {
@@ -695,7 +713,7 @@ if (isset($_GET['view'])) {
     <div class="form-section" id="importForm" style="display: none;">
         <div class="form-card">
             <h2><i class="fas fa-file-import"></i> Import Programmes from CSV</h2>
-            <p>Upload a CSV file with programme data. The file should have columns: Code, Name, School, Duration</p>
+            <p>Upload a CSV file with programme data. The file should have columns: Code, Name, School, Duration, Category (undergraduate or short_course)</p>
             <form method="POST" enctype="multipart/form-data" class="import-form">
                 <input type="hidden" name="action" value="import_programmes">
                 <div class="form-row">
@@ -1149,9 +1167,9 @@ if (isset($_GET['view'])) {
         
         function downloadTemplate() {
             // Create CSV content
-            let csvContent = "Code,Name,School,Duration\n";
-            csvContent += "BSC-CS,Bachelor of Science in Computer Science,School of Computing,4\n";
-            csvContent += "BBA,Bachelor of Business Administration,School of Business,4\n";
+            let csvContent = "Code,Name,School,Duration,Category\n";
+            csvContent += "BSC-CS,Bachelor of Science in Computer Science,School of Computing,4,undergraduate\n";
+            csvContent += "SHORT-CS,Short Course in Computer Science,School of Computing,1,short_course\n";
             
             // Create blob and download
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
