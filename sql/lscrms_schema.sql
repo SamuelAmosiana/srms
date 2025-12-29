@@ -49,7 +49,21 @@ CREATE TABLE admin_profile (
   full_name VARCHAR(150),
   staff_id VARCHAR(50) UNIQUE,
   bio TEXT,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  department_id INT,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL
+);
+
+-- Lecturer profile table
+CREATE TABLE lecturer_profile (
+  user_id INT PRIMARY KEY,
+  full_name VARCHAR(255),
+  staff_id VARCHAR(50),
+  school_id INT,
+  department_id INT,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (school_id) REFERENCES school(id) ON DELETE SET NULL,
+  FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL
 );
 
 CREATE TABLE staff_profile (
@@ -59,7 +73,10 @@ CREATE TABLE staff_profile (
   NRC VARCHAR(50),
   gender ENUM('Male','Female','Other'),
   qualification VARCHAR(255),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  bio TEXT,
+  department_id INT,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL
 );
 
 CREATE TABLE student_profile (
@@ -72,13 +89,22 @@ CREATE TABLE student_profile (
   school_id INT,
   department_id INT,
   balance DECIMAL(10,2) DEFAULT 0.00,
+  mode_of_learning ENUM('physical', 'online') DEFAULT 'physical',
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Programmes, courses, school, department, course enrolments and results
 CREATE TABLE programme (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(150) NOT NULL
+  name VARCHAR(150) NOT NULL,
+  code VARCHAR(20) UNIQUE,
+  description TEXT,
+  duration INT,
+  school_id INT,
+  category ENUM('undergraduate', 'short_course') DEFAULT 'undergraduate',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (school_id) REFERENCES school(id) ON DELETE SET NULL
 );
 
 CREATE TABLE school (
@@ -100,6 +126,7 @@ CREATE TABLE course (
   credits INT DEFAULT 3,
   programme_id INT,
   department_id INT,
+  term VARCHAR(50),
   FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL,
   FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL
 );
@@ -152,6 +179,88 @@ CREATE TABLE finance_transactions (
   description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Applications table for student applications
+CREATE TABLE applications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(150) NOT NULL,
+  email VARCHAR(150) NOT NULL,
+  phone VARCHAR(50),
+  application_type ENUM('undergraduate', 'short_course', 'corporate_training') NOT NULL,
+  programme_id INT,
+  intake_id INT,
+  mode_of_learning ENUM('physical', 'online') DEFAULT 'physical',
+  status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+  rejection_reason TEXT,
+  processed_by INT,
+  documents JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL,
+  FOREIGN KEY (intake_id) REFERENCES intake(id) ON DELETE SET NULL,
+  FOREIGN KEY (processed_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Intake table for application intakes
+CREATE TABLE intake (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  start_date DATE,
+  end_date DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Pending students table
+CREATE TABLE pending_students (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(150) NOT NULL,
+  email VARCHAR(150) NOT NULL,
+  programme_id INT,
+  intake_id INT,
+  documents JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE SET NULL,
+  FOREIGN KEY (intake_id) REFERENCES intake(id) ON DELETE SET NULL
+);
+
+-- Registered students table
+CREATE TABLE registered_students (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  student_id INT NOT NULL,
+  student_name VARCHAR(150) NOT NULL,
+  student_email VARCHAR(255) NOT NULL,
+  student_number VARCHAR(20) UNIQUE,
+  programme_name VARCHAR(255),
+  intake_name VARCHAR(255),
+  payment_amount DECIMAL(10,2),
+  registration_type ENUM('course', 'first_time') NOT NULL,
+  status ENUM('pending_notification', 'email_sent') DEFAULT 'pending_notification',
+  email_sent_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- System settings table
+CREATE TABLE system_settings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  setting_key VARCHAR(100) UNIQUE NOT NULL,
+  setting_value TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Maintenance emergency access table
+CREATE TABLE maintenance_emergency_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  granted_by INT NOT NULL,
+  granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NULL,
+  reason TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_user_access (user_id)
 );
 
 -- ===================================
