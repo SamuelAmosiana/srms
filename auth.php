@@ -522,11 +522,11 @@ function checkMaintenanceMode($pdo) {
                 <p>While our main system is under maintenance, you can still apply through our temporary application portal:</p>
                 
                 <div class="d-flex flex-wrap justify-content-center">
-                    <a href="/undergraduate_application" class="btn btn-application btn-undergrad">
+                    <a href="https://forms.gle/xCtGQUCJyDr7qV1NA" class="btn btn-application btn-undergrad" target="_blank">
                         <i class="fas fa-graduation-cap btn-icon"></i>
                         Undergraduate Application
                     </a>
-                    <a href="/short_courses_application" class="btn btn-application btn-shortcourse">
+                    <a href="https://forms.gle/ifhQCtbiebTKRLwR8" class="btn btn-application btn-shortcourse" target="_blank">
                         <i class="fas fa-book btn-icon"></i>
                         Short Courses Application
                     </a>
@@ -540,14 +540,14 @@ function checkMaintenanceMode($pdo) {
                         <i class="fas fa-phone contact-icon"></i>
                         <div class="contact-details">
                             <h4>Phone</h4>
-                            <p>+260 977 123 456</p>
+                            <p>0770359518</p><br>
                         </div>
                     </div>
                     <div class="contact-item">
                         <i class="fas fa-envelope contact-icon"></i>
                         <div class="contact-details">
                             <h4>Email</h4>
-                            <p>info@lsc.ac.zm</p>
+                            <p>admissions@lsuczm.com</p>
                         </div>
                     </div>
                     <div class="contact-item">
