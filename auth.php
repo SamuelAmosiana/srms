@@ -521,11 +521,11 @@ function checkMaintenanceMode($pdo) {
                 <p>While our main system is under maintenance, you can still apply through our temporary application portal:</p>
                 
                 <div class="d-flex flex-wrap justify-content-center">
-                    <a href="/undergraduate_application.php" class="btn btn-application btn-undergrad">
+                    <a href="/undergraduate_application" class="btn btn-application btn-undergrad">
                         <i class="fas fa-graduation-cap btn-icon"></i>
                         Undergraduate Application
                     </a>
-                    <a href="/short_courses_application.php" class="btn btn-application btn-shortcourse">
+                    <a href="/short_courses_application" class="btn btn-application btn-shortcourse">
                         <i class="fas fa-book btn-icon"></i>
                         Short Courses Application
                     </a>

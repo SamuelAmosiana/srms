@@ -1,5 +1,9 @@
 <?php
 require 'config.php';
+require 'auth.php';
+
+// Check maintenance mode
+checkMaintenanceMode($pdo);
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

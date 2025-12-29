@@ -1,5 +1,9 @@
 <?php
 require 'config.php';
+require 'auth.php';
+
+// Check maintenance mode
+checkMaintenanceMode($pdo);
 
 // Fetch all programmes from the database
 // Showing all programmes as both certificate and diploma programmes are relevant for undergraduate applications
