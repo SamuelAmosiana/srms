@@ -1,6 +1,6 @@
 <?php
 require_once 'config.php';
-require_once 'generate_acceptance_letter_docx.php';
+require_once 'generate_acceptance_letter_dompdf.php';
 
 // This script regenerates an acceptance letter for a specific application ID
 // Usage: http://yoursite.com/srms/regenerate_letter.php?application_id=39
@@ -28,7 +28,7 @@ try {
     }
     
     // Generate the acceptance letter
-    $letter_path = generateAcceptanceLetterDOCX($application, $pdo);
+    $letter_path = generateAcceptanceLetterDOMPDF($application, $pdo);
     
     echo "Letter regenerated successfully!<br>";
     echo "File path: " . $letter_path . "<br>";

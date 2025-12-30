@@ -1,0 +1,19 @@
+{
+    "name": "lsc/srms",
+    "description": "LSC Student Record Management System",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "dompdf/dompdf": "^2.0"
+    },
+    "authors": [
+        {
+            "name": "LSC Developer"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "LSC\\SRMS\\": "src/"
+        }
+    }
+}

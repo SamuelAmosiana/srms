@@ -5,6 +5,9 @@ require '../auth.php';
 // Include the new acceptance letter with fees function
 require_once '../finance/generate_acceptance_letter_with_fees.php';
 
+// Include the new DOMPDF acceptance letter generator
+require_once '../generate_acceptance_letter_dompdf.php';
+
 // Check if user is logged in and has enrollment officer role
 if (!currentUserId()) {
     header('Location: ../login.php');
@@ -45,9 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("UPDATE applications SET status = 'approved', processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([$current_user_id, $application_id]);
                     
-                    // Generate acceptance letter in DOCX format
-                    require_once '../generate_acceptance_letter_docx.php';
-                    $letter_path = generateAcceptanceLetterDOCX($application, $pdo);
+                    // Generate acceptance letter in PDF format using DOMPDF
+                    $letter_path = generateAcceptanceLetterDOMPDF($application, $pdo);
                     
                     // Send acceptance letter email with instruction to use email for first-time login
                     $login_details = [
