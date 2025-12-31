@@ -2,40 +2,44 @@
 require 'config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $password = $_POST['password'];
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-    $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE username = ? AND is_active = 1 LIMIT 1");
-    $stmt->execute([$username]);
-    $user = $stmt->fetch();
+    if (!empty($username) && !empty($password)) {
+        $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE username = ? AND is_active = 1 LIMIT 1");
+        $stmt->execute([$username]);
+        $user = $stmt->fetch();
 
-    if ($user && password_verify($password, $user['password_hash'])) {
-        session_regenerate_id(true);
-        $_SESSION['user_id'] = $user['id'];
+        if ($user && password_verify($password, $user['password_hash'])) {
+            session_regenerate_id(true);
+            $_SESSION['user_id'] = $user['id'];
 
-        $r = $pdo->prepare("SELECT r.name FROM roles r JOIN user_roles ur ON r.id = ur.role_id WHERE ur.user_id = ?");
-        $r->execute([$user['id']]);
-        $_SESSION['roles'] = $r->fetchAll(PDO::FETCH_COLUMN);
+            $r = $pdo->prepare("SELECT r.name FROM roles r JOIN user_roles ur ON r.id = ur.role_id WHERE ur.user_id = ?");
+            $r->execute([$user['id']]);
+            $_SESSION['roles'] = $r->fetchAll(PDO::FETCH_COLUMN);
 
-        // redirect based on role
-        if (in_array('Super Admin', $_SESSION['roles'])) {
-            header('Location: admin/dashboard.php');
-        } elseif (in_array('Lecturer', $_SESSION['roles'])) {
-            header('Location: lecturer/dashboard.php');
-        } elseif (in_array('Sub Admin (Finance)', $_SESSION['roles'])) {
-            header('Location: finance/dashboard.php');
-        } elseif (in_array('Enrollment Officer', $_SESSION['roles'])) {
-            header('Location: enrollment/dashboard.php');
-        } elseif (in_array('Academics Coordinator', $_SESSION['roles'])) {
-            header('Location: academics/dashboard.php');
-        } elseif (in_array('HR Manager', $_SESSION['roles'])) {
-            header('Location: human_resource/dashboard.php');
+            // redirect based on role
+            if (in_array('Super Admin', $_SESSION['roles'])) {
+                header('Location: admin/dashboard.php');
+            } elseif (in_array('Lecturer', $_SESSION['roles'])) {
+                header('Location: lecturer/dashboard.php');
+            } elseif (in_array('Sub Admin (Finance)', $_SESSION['roles'])) {
+                header('Location: finance/dashboard.php');
+            } elseif (in_array('Enrollment Officer', $_SESSION['roles'])) {
+                header('Location: enrollment/dashboard.php');
+            } elseif (in_array('Academics Coordinator', $_SESSION['roles'])) {
+                header('Location: academics/dashboard.php');
+            } elseif (in_array('HR Manager', $_SESSION['roles'])) {
+                header('Location: human_resource/dashboard.php');
+            } else {
+                echo "Role not recognized";
+            }
+            exit;
         } else {
-            echo "Role not recognized";
+            $error = "Invalid username or password";
         }
-        exit;
     } else {
-        $error = "Invalid username or password";
+        $error = "Username and password are required";
     }
 }
 ?>

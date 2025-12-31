@@ -1,5 +1,4 @@
 
-text/x-generic email_config.php ( PHP script, ASCII text, with CRLF line terminators )
 <?php
 /**
  * Email Configuration for Namecheap Hosting (LSUCLMS)

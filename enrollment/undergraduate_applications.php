@@ -8,6 +8,9 @@ require_once '../finance/generate_acceptance_letter_with_fees.php';
 // Include the new DOMPDF acceptance letter generator
 require_once '../generate_acceptance_letter_dompdf.php';
 
+// Include the email functionality (contains sendAcceptanceLetterEmail function)
+require_once '../generate_acceptance_letter_docx.php';
+
 // Check if user is logged in and has enrollment officer role
 if (!currentUserId()) {
     header('Location: ../login.php');
