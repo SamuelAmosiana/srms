@@ -7,6 +7,9 @@ error_reporting(E_ALL);
 require '../config.php';
 require '../auth.php';
 
+// Include email configuration
+require_once '../email_config.php';
+
 // Include the new acceptance letter with fees function
 require_once '../finance/generate_acceptance_letter_with_fees.php';
 
