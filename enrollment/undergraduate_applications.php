@@ -66,7 +66,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $login_details = [
                         'instruction' => 'Use your email address (' . $application['email'] . ') to login to the First Time Student Registration portal'
                     ];
-                    sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo);
+                    
+                    // Check if the function exists before calling it
+                    if (function_exists('sendAcceptanceLetterEmail')) {
+                        sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo);
+                    } else {
+                        error_log('sendAcceptanceLetterEmail function is not available');
+                        $message = "Application approved successfully! Acceptance letter generated but email could not be sent.";
+                        $messageType = "warning";
+                        break;
+                    }
                     
                     $message = "Application approved successfully! Acceptance letter generated and email sent to applicant with instructions to login using their email address.";
                     $messageType = "success";

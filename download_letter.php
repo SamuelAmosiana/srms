@@ -21,7 +21,9 @@ if (!file_exists($filepath)) {
     // Try to regenerate the letter if it doesn't exist
     $file_parts = explode('_', $filename);
     if (count($file_parts) >= 3 && $file_parts[0] === 'acceptance' && $file_parts[1] === 'letter') {
-        $application_id = (int)str_replace('.docx', '', $file_parts[2]);
+        // Remove both .pdf and .docx extensions
+        $app_id_part = str_replace(['.pdf', '.docx'], '', $file_parts[2]);
+        $application_id = (int)$app_id_part;
         if ($application_id > 0) {
             // Redirect to regenerate script
             header('Location: regenerate_letter.php?application_id=' . $application_id);
@@ -32,7 +34,7 @@ if (!file_exists($filepath)) {
 }
 
 // Check file extension for security
-$allowed_extensions = ['docx', 'txt'];
+$allowed_extensions = ['docx', 'txt', 'pdf'];
 $file_extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 
 if (!in_array($file_extension, $allowed_extensions)) {
