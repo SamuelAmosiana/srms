@@ -4,12 +4,9 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Determine the project root directory based on the current file location
-$project_root = dirname(__DIR__);
-
-// Include configuration files using the project root
-require_once $project_root . '/config.php';
-require_once $project_root . '/email_config.php';
+// Include configuration files using the correct path
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/email_config.php';
 
 // Try to load PHPMailer if available
 $phpmailer_available = false;
@@ -167,7 +164,7 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     
     // Generate download link
     $letter_filename = basename($letter_path);
-    $download_link = "https://" . $_SERVER['HTTP_HOST'] . "/srms/download_letter.php?file=" . urlencode($letter_filename);
+    $download_link = "https://" . $_SERVER['HTTP_HOST'] . "/download_letter.php?file=" . urlencode($letter_filename);
     
     // Create email content
     $subject = "Admission Acceptance - Lusaka South College";
