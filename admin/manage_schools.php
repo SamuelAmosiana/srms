@@ -18,6 +18,25 @@ $admin = $stmt->fetch();
 // Handle form submissions
 $message = '';
 $messageType = '';
+$uploadResults = [];
+
+// Handle sample file download
+if (isset($_GET['download_sample'])) {
+    downloadSampleSchoolFile();
+    exit;
+}
+
+// Handle CSV upload
+if ($_POST && isset($_POST['action']) && $_POST['action'] === 'upload_schools') {
+    if (isset($_FILES['school_file']) && $_FILES['school_file']['error'] === UPLOAD_ERR_OK) {
+        $uploadResults = processSchoolUpload($_FILES['school_file'], $pdo);
+        $message = "Upload completed! {$uploadResults['success']} schools created, {$uploadResults['errors']} errors.";
+        $messageType = $uploadResults['errors'] > 0 ? 'warning' : 'success';
+    } else {
+        $message = 'Please select a valid CSV file to upload.';
+        $messageType = 'error';
+    }
+}
 
 if ($_POST) {
     try {
@@ -166,6 +185,97 @@ try {
 } catch (Exception $e) {
     // Columns might already exist
 }
+
+function downloadSampleSchoolFile() {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="school_upload_sample.csv"');
+    header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+    
+    $output = fopen('php://output', 'w');
+    fputs($output, "\xEF\xBB\xBF"); // BOM for UTF-8
+    
+    // CSV Headers
+    $headers = ['name', 'description', 'established_year', 'contact_email', 'contact_phone', 'address'];
+    fputcsv($output, $headers);
+    
+    // Sample data
+    $samples = [
+        ['School of Engineering', 'Engineering and technology programs', '2020', 'engineering@lsc.ac.zm', '+260971234567', 'Lusaka Campus'],
+        ['School of Business', 'Business and management programs', '2019', 'business@lsc.ac.zm', '+260971234568', 'Lusaka Campus'],
+        ['School of Computing', 'Information technology and computer science programs', '2021', 'computing@lsc.ac.zm', '+260971234569', 'Lusaka Campus'],
+        ['School of Health Sciences', 'Medical and health sciences programs', '2018', 'health@lsc.ac.zm', '+260971234570', 'Lusaka Campus']
+    ];
+    
+    foreach ($samples as $row) {
+        fputcsv($output, $row);
+    }
+    fclose($output);
+}
+
+function processSchoolUpload($file, $pdo) {
+    $results = ['success' => 0, 'errors' => 0, 'details' => []];
+    
+    if (!in_array(strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)), ['csv'])) {
+        throw new Exception('Only CSV files are allowed.');
+    }
+    
+    $handle = fopen($file['tmp_name'], 'r');
+    if (!$handle) throw new Exception('Could not read the uploaded file.');
+    
+    // Skip BOM if present
+    $bom = fread($handle, 3);
+    if ($bom !== "\xEF\xBB\xBF") rewind($handle);
+    
+    $headers = fgetcsv($handle);
+    $expectedHeaders = ['name', 'description', 'established_year', 'contact_email', 'contact_phone', 'address'];
+    
+    // Validate headers
+    foreach ($expectedHeaders as $expected) {
+        if (!in_array($expected, $headers)) {
+            fclose($handle);
+            throw new Exception("Missing required column: $expected");
+        }
+    }
+    
+    $rowNumber = 1;
+    while (($data = fgetcsv($handle)) !== false) {
+        $rowNumber++;
+        try {
+            $schoolData = array_combine($headers, $data);
+            
+            // Validate required fields
+            if (empty($schoolData['name'])) {
+                throw new Exception("Missing required field 'name' in row $rowNumber");
+            }
+            
+            // Check school name uniqueness
+            $stmt = $pdo->prepare("SELECT id FROM school WHERE name = ?");
+            $stmt->execute([$schoolData['name']]);
+            if ($stmt->fetchColumn()) throw new Exception("School name '{$schoolData['name']}' already exists in row $rowNumber");
+            
+            // Insert school
+            $stmt = $pdo->prepare("INSERT INTO school (name, description, established_year, contact_email, contact_phone, address) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $schoolData['name'],
+                $schoolData['description'] ?: null,
+                $schoolData['established_year'] ? (int)$schoolData['established_year'] : null,
+                $schoolData['contact_email'] ?: null,
+                $schoolData['contact_phone'] ?: null,
+                $schoolData['address'] ?: null
+            ]);
+            
+            $results['success']++;
+            $results['details'][] = "Row $rowNumber: Successfully created school '{$schoolData['name']}'";
+            
+        } catch (Exception $e) {
+            $results['errors']++;
+            $results['details'][] = "Row $rowNumber: " . $e->getMessage();
+        }
+    }
+    
+    fclose($handle);
+    return $results;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -313,6 +423,37 @@ try {
                 <?php echo htmlspecialchars($message); ?>
             </div>
         <?php endif; ?>
+        
+        <!-- Upload Results -->
+        <?php if (!empty($uploadResults['details'])): ?>
+            <div class="results-section">
+                <div class="results-card">
+                    <h2><i class="fas fa-chart-line"></i> Upload Results</h2>
+                    <div class="results-summary">
+                        <div class="result-stat success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><?php echo $uploadResults['success']; ?> Successful</span>
+                        </div>
+                        <div class="result-stat error">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <span><?php echo $uploadResults['errors']; ?> Errors</span>
+                        </div>
+                    </div>
+                    
+                    <div class="results-details">
+                        <h3>Detailed Results</h3>
+                        <div class="results-log">
+                            <?php foreach ($uploadResults['details'] as $detail): ?>
+                                <div class="log-item <?php echo strpos($detail, 'Successfully') !== false ? 'success' : 'error'; ?>">
+                                    <i class="fas fa-<?php echo strpos($detail, 'Successfully') !== false ? 'check' : 'times'; ?>"></i>
+                                    <?php echo htmlspecialchars($detail); ?>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <!-- Navigation Actions -->
         <div class="action-bar">
@@ -350,6 +491,50 @@ try {
                                 <i class="fas fa-refresh"></i> Reset
                             </a>
                         </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Bulk Upload Section -->
+        <div class="upload-section">
+            <div class="upload-card">
+                <h2><i class="fas fa-upload"></i> Bulk Upload Schools</h2>
+                
+                <div class="upload-instructions">
+                    <p>Download the sample CSV template, fill in your school data, and upload it to add multiple schools at once.</p>
+                    <a href="?download_sample=1" class="btn btn-blue">
+                        <i class="fas fa-download"></i> Download Sample CSV Template
+                    </a>
+                </div>
+                
+                <form method="POST" enctype="multipart/form-data" class="upload-form">
+                    <input type="hidden" name="action" value="upload_schools">
+                    
+                    <div class="file-upload-area">
+                        <div class="file-upload-zone" onclick="document.getElementById('school_file').click()">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>Click to select CSV file</h3>
+                            <p>or drag and drop your CSV file here</p>
+                            <span class="file-types">Supported: .csv files only</span>
+                        </div>
+                        <input type="file" id="school_file" name="school_file" accept=".csv" required style="display: none;">
+                        <div class="selected-file" id="selected-file" style="display: none;">
+                            <i class="fas fa-file-csv"></i>
+                            <span class="file-name"></span>
+                            <button type="button" onclick="clearFileSelection()" class="remove-file">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-green">
+                            <i class="fas fa-upload"></i> Upload Schools
+                        </button>
+                        <button type="button" onclick="resetForm()" class="btn btn-orange">
+                            <i class="fas fa-refresh"></i> Reset
+                        </button>
                     </div>
                 </form>
             </div>
@@ -511,6 +696,52 @@ try {
                 showAddForm();
             });
         <?php endif; ?>
+        
+        // File upload handling
+        document.getElementById('school_file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.querySelector('.file-upload-zone').style.display = 'none';
+                document.getElementById('selected-file').style.display = 'flex';
+                document.querySelector('.file-name').textContent = file.name;
+            }
+        });
+
+        function clearFileSelection() {
+            document.getElementById('school_file').value = '';
+            document.querySelector('.file-upload-zone').style.display = 'flex';
+            document.getElementById('selected-file').style.display = 'none';
+        }
+
+        function resetForm() {
+            clearFileSelection();
+            document.querySelector('form[method="POST"][enctype="multipart/form-data"]').reset();
+        }
+
+        // Drag and drop functionality
+        const uploadZone = document.querySelector('.file-upload-zone');
+        
+        ['dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, function(e) {
+                e.preventDefault();
+                if (eventName === 'dragover') {
+                    this.classList.add('dragover');
+                } else if (eventName === 'dragleave') {
+                    this.classList.remove('dragover');
+                } else if (eventName === 'drop') {
+                    this.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].name.endsWith('.csv')) {
+                        document.getElementById('school_file').files = files;
+                        this.style.display = 'none';
+                        document.getElementById('selected-file').style.display = 'flex';
+                        document.querySelector('.file-name').textContent = files[0].name;
+                    } else {
+                        alert('Please select a CSV file.');
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>
