@@ -30,12 +30,49 @@ if (isset($_GET['download_sample'])) {
 if ($_POST && isset($_POST['action']) && $_POST['action'] === 'upload_schools') {
     if (isset($_FILES['school_file']) && $_FILES['school_file']['error'] === UPLOAD_ERR_OK) {
         $uploadResults = processSchoolUpload($_FILES['school_file'], $pdo);
-        $message = "Upload completed! {$uploadResults['success']} schools created, {$uploadResults['errors']} errors.";
-        $messageType = $uploadResults['errors'] > 0 ? 'warning' : 'success';
+        
+        // Redirect to prevent duplicate uploads on page refresh
+        $success = $uploadResults['success'];
+        $errors = $uploadResults['errors'];
+        $redirectUrl = $_SERVER['PHP_SELF'] . '?upload_success=' . $success . '&upload_errors=' . $errors;
+        header('Location: ' . $redirectUrl);
+        exit;
     } else {
         $message = 'Please select a valid CSV file to upload.';
         $messageType = 'error';
     }
+}
+
+// Handle upload success message after redirect
+if (isset($_GET['upload_success']) && isset($_GET['upload_errors'])) {
+    $success = (int)$_GET['upload_success'];
+    $errors = (int)$_GET['upload_errors'];
+    $message = "Upload completed! $success schools created, $errors errors.";
+    $messageType = $errors > 0 ? 'warning' : 'success';
+    
+    // Refresh the schools list after successful upload
+    $query = "SELECT s.*, 
+              COUNT(DISTINCT d.id) as department_count,
+              COUNT(DISTINCT sp.user_id) as student_count
+              FROM school s 
+              LEFT JOIN department d ON s.id = d.school_id
+              LEFT JOIN student_profile sp ON s.id = sp.school_id
+              WHERE 1=1";
+    
+    $params = [];
+    
+    if ($searchQuery) {
+        $query .= " AND (s.name LIKE ? OR s.description LIKE ?)";
+        $searchParam = "%$searchQuery%";
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+    }
+    
+    $query .= " GROUP BY s.id ORDER BY s.name";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    $schools = $stmt->fetchAll();
 }
 
 if ($_POST) {
@@ -194,7 +231,7 @@ function downloadSampleSchoolFile() {
     $output = fopen('php://output', 'w');
     fputs($output, "\xEF\xBB\xBF"); // BOM for UTF-8
     
-    // CSV Headers
+    // CSV Headers - ID is auto-generated, so we don't include it in the template
     $headers = ['name', 'description', 'established_year', 'contact_email', 'contact_phone', 'address'];
     fputcsv($output, $headers);
     
