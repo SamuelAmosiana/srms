@@ -87,14 +87,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get short courses applications - updated logic to match actual programme names
+// Get short courses applications - updated logic to match qualification level
 $stmt = $pdo->prepare("
     SELECT a.*, a.phone, p.name as programme_name, i.name as intake_name
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'pending' 
-    AND a.application_type = 'short_course'
+    AND (p.qualification_level = 'Certificate' OR p.name LIKE '%Certificate%' OR p.name LIKE '%Short Course%')
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
@@ -107,7 +107,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'approved' 
-    AND a.application_type = 'short_course'
+    AND (p.qualification_level = 'Certificate' OR p.name LIKE '%Certificate%' OR p.name LIKE '%Short Course%')
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
@@ -120,7 +120,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN programme p ON a.programme_id = p.id
     LEFT JOIN intake i ON a.intake_id = i.id
     WHERE a.status = 'rejected' 
-    AND a.application_type = 'short_course'
+    AND (p.qualification_level = 'Certificate' OR p.name LIKE '%Certificate%' OR p.name LIKE '%Short Course%')
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
