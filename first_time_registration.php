@@ -53,6 +53,17 @@ if ($email) {
             ];
         }
     }
+    
+    // If no record in pending_students or applications, check student_profile for existing students
+    if (!$student_data) {
+        $stmt = $pdo->prepare("SELECT sp.full_name, u.email, sp.programme_id, sp.intake_id FROM student_profile sp JOIN users u ON sp.user_id = u.id WHERE u.email = ?");
+        $stmt->execute([$email]);
+        $existing_student = $stmt->fetch();
+        
+        if ($existing_student) {
+            $student_data = $existing_student;
+        }
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -336,6 +347,9 @@ try {
                                    value="<?php echo htmlspecialchars($student_data['full_name'] ?? ''); ?>"
                                    placeholder="Enter your full name"
                                    <?php echo $student_data ? 'readonly class="readonly-field"' : ''; ?>>
+                            <?php if ($student_data): ?>
+                                <small>This information was pre-filled from your application.</small>
+                            <?php endif; ?>
                         </div>
                         
                         <div class="form-group">
@@ -345,7 +359,7 @@ try {
                                    placeholder="Enter your email address" 
                                    <?php echo $email ? 'readonly class="readonly-field"' : ''; ?>>
                             <?php if ($email): ?>
-                                <small>This email was pre-filled from your invitation link.</small>
+                                <small>This email was pre-filled from your application.</small>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -365,6 +379,7 @@ try {
                             </select>
                             <?php if ($student_data): ?>
                                 <input type="hidden" name="programme_id" value="<?php echo htmlspecialchars($student_data['programme_id'] ?? ''); ?>">
+                                <small>Your selected programme was pre-filled from your application.</small>
                             <?php endif; ?>
                         </div>
                         
@@ -381,6 +396,7 @@ try {
                             </select>
                             <?php if ($student_data): ?>
                                 <input type="hidden" name="intake_id" value="<?php echo htmlspecialchars($student_data['intake_id'] ?? ''); ?>">
+                                <small>Your selected intake was pre-filled from your application.</small>
                             <?php endif; ?>
                         </div>
                         
@@ -464,8 +480,7 @@ try {
         }
         
         // Programme change handler
-        document.getElementById('programme_id').addEventListener('change', function() {
-            const programmeId = this.value;
+        function loadCourses(programmeId) {
             const courseList = document.getElementById('courseList');
             const courseListPlaceholder = document.getElementById('courseListPlaceholder');
             const courseListContent = document.getElementById('courseListContent');
@@ -512,6 +527,11 @@ try {
                 courseList.innerHTML = '';
                 courseList.appendChild(courseListPlaceholder);
             }
+        }
+        
+        document.getElementById('programme_id').addEventListener('change', function() {
+            const programmeId = this.value;
+            loadCourses(programmeId);
         });
         
         // Initialize payment method if already selected
@@ -528,7 +548,7 @@ try {
             // If programme is already selected (pre-filled), load courses
             const programmeId = document.getElementById('programme_id').value;
             if (programmeId) {
-                document.getElementById('programme_id').dispatchEvent(new Event('change'));
+                loadCourses(programmeId);
             }
         });
     </script>
