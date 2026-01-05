@@ -1,6 +1,61 @@
 <?php
 require '../config.php';
 require '../auth.php';
+require_once '../email_config.php';
+
+// Try to load PHPMailer if available
+$phpmailer_available = false;
+if (file_exists(__DIR__ . '/../lib/PHPMailer/PHPMailer.php')) {
+    require_once __DIR__ . '/../lib/PHPMailer/PHPMailer.php';
+    require_once __DIR__ . '/../lib/PHPMailer/SMTP.php';
+    require_once __DIR__ . '/../lib/PHPMailer/Exception.php';
+    $phpmailer_available = true;
+}
+
+/**
+ * Send email using PHPMailer with Namecheap SMTP settings
+ * 
+ * @param string $to Recipient email address
+ * @param string $subject Email subject
+ * @param string $body Email body
+ * @return bool Whether email was sent successfully
+ */
+function sendEmailWithPHPMailer($to, $subject, $body) {
+    try {
+        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host = SMTP_HOST;
+        $mail->SMTPAuth = true;
+        $mail->Username = SMTP_USERNAME;
+        $mail->Password = SMTP_PASSWORD;
+        $mail->SMTPSecure = SMTP_SECURE;
+        $mail->Port = SMTP_PORT;
+        
+        // Recipients
+        $mail->setFrom(EMAIL_FROM, EMAIL_FROM_NAME);
+        $mail->addAddress($to);
+        $mail->addReplyTo(EMAIL_REPLY_TO);
+        
+        // Content
+        $mail->isHTML(false);  // Set to true if you want to send HTML emails
+        $mail->Subject = $subject;
+        $mail->Body = $body;
+        
+        // Send email
+        $mail->send();
+        
+        // Log success
+        error_log("Email sent successfully to: " . $to);
+        return true;
+        
+    } catch (Exception $e) {
+        // Log error
+        error_log("Failed to send email to: " . $to . ". Error: " . $mail->ErrorInfo);
+        return false;
+    }
+}
 
 // Check if user is logged in and has enrollment officer role
 if (!currentUserId()) {
@@ -49,12 +104,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $stmt = $pdo->prepare("UPDATE registered_students SET status = 'email_sent', email_sent_at = NOW() WHERE id = ?");
             $stmt->execute([$student_id]);
             
-            // Here you would typically send an actual email
-            // For now, we'll just log that the email should be sent
-            error_log("Email should be sent to: " . $student['student_email'] . " with student number: " . $student['student_number']);
+            // Send registration completion email to student
+            $subject = "Registration Complete - Lusaka South College";
             
-            $message = "Email sent successfully to " . htmlspecialchars($student['student_name']);
-            $messageType = 'success';
+            $body = "Dear " . $student['student_name'] . ",\n\n";
+            $body .= "Congratulations! Your registration has been completed successfully.\n\n";
+            $body .= "You can now access your student portal using the following credentials:\n";
+            $body .= "Student Number (Username): " . $student['student_number'] . "\n";
+            $body .= "Password: " . $student['student_number'] . "\n";  // Using student number as default password
+            $body .= "Proceed and Login using the link: https://lsuclms.com/student_login\n\n";
+            $body .= "IMPORTANT: Please change your password immediately after your first login for security purposes.\n";
+            $body .= "Anyone with your student number can access your portal if password not changed immediately.\n\n";
+            $body .= "Your registered programme: " . $student['programme_name'] . "\n";
+            $body .= "Intake: " . $student['intake_name'] . "\n\n";
+            $body .= "Welcome to Lusaka South College!\n\n";
+            $body .= "Best regards,\n";
+            $body .= "LSC Enrollment Office";
+            
+            // Send email using PHPMailer if available, otherwise fall back to mail()
+            if ($phpmailer_available) {
+                $email_success = sendEmailWithPHPMailer($student['student_email'], $subject, $body);
+            } else {
+                // Send email using PHP's mail function
+                $headers = "From: " . EMAIL_FROM . "\r\n";
+                $headers .= "Reply-To: " . EMAIL_REPLY_TO . "\r\n";
+                $headers .= "MIME-Version: 1.0\r\n";
+                $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+                
+                $email_success = mail($student['student_email'], $subject, $body, $headers);
+                
+                // Log email details for debugging
+                error_log("Email attempt to: " . $student['student_email']);
+                if (!$email_success) {
+                    error_log("Failed to send email to: " . $student['student_email'] . ". This is likely due to SMTP configuration issues.");
+                }
+            }
+            
+            if ($email_success) {
+                $message = "Email sent successfully to " . htmlspecialchars($student['student_name']);
+                $messageType = 'success';
+            } else {
+                $message = "Student record updated but failed to send email to " . htmlspecialchars($student['student_name']) . ". Please check email configuration.";
+                $messageType = 'warning';
+            }
         } else {
             $message = "Student not found or email already sent.";
             $messageType = 'error';
