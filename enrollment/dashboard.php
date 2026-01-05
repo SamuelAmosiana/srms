@@ -55,8 +55,8 @@ $stats = [];
 $stmt = $pdo->prepare("
     SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN p.qualification_level IN ('Diploma', 'Bachelor', 'Master', 'PhD') THEN 1 ELSE 0 END) as undergrad,
-        SUM(CASE WHEN p.qualification_level = 'Certificate' OR p.name LIKE '%Certificate%' OR p.name LIKE '%Short Course%' THEN 1 ELSE 0 END) as short_courses
+        SUM(CASE WHEN a.application_type = 'undergraduate' THEN 1 ELSE 0 END) as undergrad,
+        SUM(CASE WHEN a.application_type = 'short_course' THEN 1 ELSE 0 END) as short_courses
     FROM applications a
     LEFT JOIN programme p ON a.programme_id = p.id
     WHERE a.status = 'pending'
@@ -78,8 +78,8 @@ $stats['rejected_applications'] = $stmt->fetchColumn();
 $stmt = $pdo->prepare("
     SELECT a.*, p.name as programme_name, i.name as intake_name,
            CASE 
-               WHEN p.qualification_level IN ('Diploma', 'Bachelor', 'Master', 'PhD') THEN 'undergraduate'
-               WHEN p.qualification_level = 'Certificate' OR p.name LIKE '%Certificate%' OR p.name LIKE '%Short Course%' THEN 'short_course'
+               WHEN a.application_type = 'undergraduate' THEN 'undergraduate'
+               WHEN a.application_type = 'short_course' THEN 'short_course'
                ELSE 'other'
            END as category
     FROM applications a

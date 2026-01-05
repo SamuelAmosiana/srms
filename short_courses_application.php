@@ -20,11 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $goals = trim($_POST['goals']);
     
     try {
-        // Get programme ID (for short courses, we'll use a generic approach)
-        $stmt = $pdo->prepare("SELECT id FROM programme WHERE id = ? AND category = 'short_course' LIMIT 1");
-        $stmt->execute([$course]);
+        // Get programme ID (for short courses, we'll use the selected programme)
+        $programme_id = $course; // Directly use the selected programme ID from the form
+        
+        // Verify that the programme exists
+        $stmt = $pdo->prepare("SELECT id FROM programme WHERE id = ? LIMIT 1");
+        $stmt->execute([$programme_id]);
         $programme = $stmt->fetch();
-        $programme_id = $programme ? $programme['id'] : null;
+        
+        if (!$programme) {
+            $programme_id = null; // Set to null if programme doesn't exist
+        }
         
         // Get intake ID
         $stmt = $pdo->prepare("SELECT id FROM intake WHERE name LIKE ? LIMIT 1");
