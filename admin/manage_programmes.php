@@ -26,10 +26,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
     header('Content-Disposition: attachment; filename="programmes_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['Code', 'Name', 'School', 'Duration', 'Category', 'Students', 'Courses', 'Created']);
+    fputcsv($output, ['Code', 'Name', 'School', 'Duration', 'Duration Unit', 'Category', 'Students', 'Courses', 'Created']);
     
     $export_query = "
-        SELECT p.code, p.name, s.name as school_name, p.duration,
+        SELECT p.code, p.name, s.name as school_name, p.duration, p.duration_unit,
                (SELECT COUNT(*) FROM student_profile sp WHERE sp.programme_id = p.id) as student_count,
                (SELECT COUNT(*) FROM course c WHERE c.programme_id = p.id) as course_count,
                p.category,
@@ -46,6 +46,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_programmes') {
             $row['name'],
             $row['school_name'] ?: 'Not assigned',
             $row['duration'],
+            $row['duration_unit'] ?: 'years',
             $row['category'] ?: 'undergraduate',
             $row['student_count'],
             $row['course_count'],
@@ -179,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             
                             // Validate header - check both old and new format
                             $validHeader = ($header[0] === 'Code' && $header[1] === 'Name' && $header[2] === 'School');
-                            $validNewHeader = ($header[0] === 'Code' && $header[1] === 'Name' && $header[2] === 'School' && $header[3] === 'Duration' && $header[4] === 'Category');
+                            $validNewHeader = ($header[0] === 'Code' && $header[1] === 'Name' && $header[2] === 'School' && $header[3] === 'Duration' && $header[4] === 'Duration Unit' && $header[5] === 'Category');
                             
                             if (!$validHeader && !$validNewHeader) {
                                 $message = "Invalid CSV format. Please use the correct template.";
@@ -194,17 +195,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         $schoolName = trim($row[2]);
                                         
                                         // Handle both old and new CSV formats
-                                        if (count($header) >= 6) { // New format with category
-                                            $duration = isset($row[3]) ? (int)$row[3] : 0;
+                                        if (count($header) >= 7) { // New format with category and duration_unit
+                                            $duration = isset($row[3]) ? trim($row[3]) : '1';
                                             $category = isset($row[4]) ? trim($row[4]) : 'undergraduate';
-                                        } else { // Old format without category
-                                            $duration = isset($row[3]) ? (int)$row[3] : 0;
+                                            $duration_unit = isset($row[5]) ? trim($row[5]) : 'years';
+                                        } elseif (count($header) >= 6) { // Format with category but no duration_unit
+                                            $duration = isset($row[3]) ? trim($row[3]) : '1';
+                                            $category = isset($row[4]) ? trim($row[4]) : 'undergraduate';
+                                            $duration_unit = 'years'; // Default to years
+                                        } else { // Old format without category or duration_unit
+                                            $duration = isset($row[3]) ? trim($row[3]) : '1';
                                             $category = 'undergraduate'; // Default to undergraduate
+                                            $duration_unit = 'years'; // Default to years
                                         }
                                         
                                         // Validate category
                                         if (!in_array($category, ['undergraduate', 'short_course'])) {
                                             $category = 'undergraduate'; // Default fallback
+                                        }
+                                        
+                                        // Validate duration_unit
+                                        if (!in_array($duration_unit, ['months', 'years'])) {
+                                            $duration_unit = 'years'; // Default to years
+                                        }
+                                        
+                                        // Validate duration
+                                        if (!is_numeric($duration) || $duration <= 0) {
+                                            $duration = '1'; // Default to 1
                                         }
                                         
                                         // Validate required fields
@@ -241,8 +258,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         
                                         if ($existing) {
                                             // Update existing programme
-                                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, school_id = ?, duration = ?, category = ?, updated_at = NOW() WHERE id = ?");
-                                            if ($stmt->execute([$name, $school_id, $duration, $category, $existing['id']])) {
+                                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, school_id = ?, duration = ?, duration_unit = ?, category = ?, updated_at = NOW() WHERE id = ?");
+                                            if ($stmt->execute([$name, $school_id, $duration, $duration_unit, $category, $existing['id']])) {
                                                 $importReport[] = "Line $lineNumber: Updated programme '$code'";
                                                 $updatedCount++;
                                             } else {
@@ -251,8 +268,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                             }
                                         } else {
                                             // Insert new programme
-                                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, category, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                                            if ($stmt->execute([$name, $code, $school_id, $duration, $category])) {
+                                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, duration_unit, category, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                                            if ($stmt->execute([$name, $code, $school_id, $duration, $duration_unit, $category])) {
                                                 $importReport[] = "Line $lineNumber: Imported programme '$code'";
                                                 $importedCount++;
                                             } else {
@@ -290,11 +307,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $code = strtoupper(trim($_POST['code']));
                 $school_id = $_POST['school_id'];
                 $duration = trim($_POST['duration']);
+                $duration_unit = $_POST['duration_unit'] ?? 'years'; // New field for duration unit
                 $description = trim($_POST['description']);
                 $category = $_POST['category']; // New field for programme category
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($school_id) || empty($duration) || empty($category)) {
+                if (empty($name) || empty($code) || empty($school_id) || empty($duration) || empty($duration_unit) || empty($category)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -313,8 +331,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, description, category, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-                            if ($stmt->execute([$name, $code, $school_id, $duration, $description, $category])) {
+                            $stmt = $pdo->prepare("INSERT INTO programme (name, code, school_id, duration, duration_unit, description, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+                            if ($stmt->execute([$name, $code, $school_id, $duration, $duration_unit, $description, $category])) {
                                 $message = "Programme added successfully!";
                                 $messageType = 'success';
                             } else {
@@ -335,11 +353,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $code = strtoupper(trim($_POST['code']));
                 $school_id = $_POST['school_id'];
                 $duration = trim($_POST['duration']);
+                $duration_unit = $_POST['duration_unit'] ?? 'years'; // New field for duration unit
                 $description = trim($_POST['description']);
                 $category = $_POST['category']; // New field for programme category
                 
                 // Validate inputs
-                if (empty($name) || empty($code) || empty($school_id) || empty($duration) || empty($category)) {
+                if (empty($name) || empty($code) || empty($school_id) || empty($duration) || empty($duration_unit) || empty($category)) {
                     $message = "Please fill in all required fields!";
                     $messageType = 'error';
                 } elseif (strlen($code) > 20) {
@@ -358,8 +377,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $messageType = 'error';
                     } else {
                         try {
-                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, code = ?, school_id = ?, duration = ?, description = ?, category = ?, updated_at = NOW() WHERE id = ?");
-                            if ($stmt->execute([$name, $code, $school_id, $duration, $description, $category, $id])) {
+                            $stmt = $pdo->prepare("UPDATE programme SET name = ?, code = ?, school_id = ?, duration = ?, duration_unit = ?, description = ?, category = ?, updated_at = NOW() WHERE id = ?");
+                            if ($stmt->execute([$name, $code, $school_id, $duration, $duration_unit, $description, $category, $id])) {
                                 $message = "Programme updated successfully!";
                                 $messageType = 'success';
                             } else {
@@ -453,7 +472,8 @@ try {
     $pdo->exec("ALTER TABLE programme ADD CONSTRAINT FK_programme_school FOREIGN KEY (school_id) REFERENCES school(id) ON DELETE SET NULL");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS description TEXT");
-    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration INT");
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration DECIMAL(5,2)"); // Changed to decimal to support months
+    $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS duration_unit ENUM('months', 'years') DEFAULT 'years'"); // Added duration unit column
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     $pdo->exec("ALTER TABLE programme ADD COLUMN IF NOT EXISTS category ENUM('undergraduate', 'short_course') DEFAULT 'undergraduate'");
@@ -713,7 +733,7 @@ if (isset($_GET['view'])) {
     <div class="form-section" id="importForm" style="display: none;">
         <div class="form-card">
             <h2><i class="fas fa-file-import"></i> Import Programmes from CSV</h2>
-            <p>Upload a CSV file with programme data. The file should have columns: Code, Name, School, Duration, Category (undergraduate or short_course)</p>
+            <p>Upload a CSV file with programme data. The file should have columns: Code, Name, School, Duration, Duration Unit (months or years), Category (undergraduate or short_course)</p>
             <form method="POST" enctype="multipart/form-data" class="import-form">
                 <input type="hidden" name="action" value="import_programmes">
                 <div class="form-row">
@@ -800,13 +820,22 @@ if (isset($_GET['view'])) {
                     </div>
                     
                     <div class="form-group">
-                        <label for="duration">Duration (Years) *</label>
-                        <input type="number" id="duration" name="duration" required min="1" max="10" 
+                        <label for="duration">Duration *</label>
+                        <input type="number" id="duration" name="duration" required min="0.1" step="0.1" 
                                value="<?php echo htmlspecialchars($editProgramme['duration'] ?? ''); ?>">
                     </div>
                 </div>
                 
                 <div class="form-row">
+                    <div class="form-group">
+                        <label for="duration_unit">Duration Unit *</label>
+                        <select id="duration_unit" name="duration_unit" required>
+                            <option value="">-- Select Unit --</option>
+                            <option value="months" <?php echo isset($editProgramme['duration_unit']) && $editProgramme['duration_unit'] == 'months' ? 'selected' : ''; ?>>Months</option>
+                            <option value="years" <?php echo isset($editProgramme['duration_unit']) && $editProgramme['duration_unit'] == 'years' ? 'selected' : ''; ?>>Years</option>
+                        </select>
+                    </div>
+                    
                     <div class="form-group">
                         <label for="category">Programme Category *</label>
                         <select id="category" name="category" required>
@@ -815,11 +844,7 @@ if (isset($_GET['view'])) {
                             <option value="short_course" <?php echo isset($editProgramme['category']) && $editProgramme['category'] == 'short_course' ? 'selected' : ''; ?>>Short Course</option>
                         </select>
                     </div>
-                        
-                        <div class="form-group">
-                            <!-- Empty div for spacing -->
-                        </div>
-                    </div>
+                </div>
                     
                     <div class="form-row">
                         <div class="form-group full-width">
@@ -849,7 +874,7 @@ if (isset($_GET['view'])) {
                 <span><i class="fas fa-graduation-cap"></i> <?php echo htmlspecialchars($viewProgramme['name']); ?></span>
                 <span>Code: <?php echo htmlspecialchars($viewProgramme['code']); ?></span>
                 <span>School: <?php echo htmlspecialchars($viewProgramme['school_name'] ?? 'N/A'); ?></span>
-                <span>Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> Years</span>
+                <span>Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> <?php echo htmlspecialchars($viewProgramme['duration_unit'] ?? 'Years'); ?></span>
                 <span>Category: <?php echo $viewProgramme['category'] == 'undergraduate' ? 'Undergraduate' : 'Short Course'; ?></span>
                 <span><?php echo htmlspecialchars($viewProgramme['description'] ?? 'No description available'); ?></span>
             </div>
@@ -862,7 +887,7 @@ if (isset($_GET['view'])) {
                     <h2><?php echo htmlspecialchars($viewProgramme['name']); ?></h2>
                     <p class="department-code">Code: <?php echo htmlspecialchars($viewProgramme['code']); ?></p>
                     <p class="school-info">School: <?php echo htmlspecialchars($viewProgramme['school_name'] ?? 'N/A'); ?></p>
-                    <p class="school-info">Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> Years</p>
+                    <p class="school-info">Duration: <?php echo htmlspecialchars($viewProgramme['duration']); ?> <?php echo htmlspecialchars($viewProgramme['duration_unit'] ?? 'Years'); ?></p>
                     <p class="school-info">Category: 
                         <?php if ($viewProgramme['category'] == 'undergraduate'): ?>
                             <span class="count-badge green">Undergraduate</span>
@@ -1076,7 +1101,7 @@ if (isset($_GET['view'])) {
                                     <th>Code</th>
                                     <th>Name</th>
                                     <th>School</th>
-                                    <th>Duration (Years)</th>
+                                    <th>Duration</th>
                                     <th>Category</th>
                                     <th>Students</th>
                                     <th>Courses</th>
@@ -1090,7 +1115,7 @@ if (isset($_GET['view'])) {
                                         <td><?php echo htmlspecialchars($programme['code']); ?></td>
                                         <td><strong><?php echo htmlspecialchars($programme['name']); ?></strong></td>
                                         <td><?php echo htmlspecialchars($programme['school_name'] ?? 'N/A'); ?></td>
-                                        <td><?php echo $programme['duration']; ?></td>
+                                        <td><?php echo $programme['duration']; ?> <?php echo $programme['duration_unit'] ?? 'Years'; ?></td>
                                         <td>
                                             <?php if ($programme['category'] == 'undergraduate'): ?>
                                                 <span class="count-badge green">Undergraduate</span>
@@ -1167,9 +1192,9 @@ if (isset($_GET['view'])) {
         
         function downloadTemplate() {
             // Create CSV content
-            let csvContent = "Code,Name,School,Duration,Category\n";
-            csvContent += "BSC-CS,Bachelor of Science in Computer Science,School of Computing,4,undergraduate\n";
-            csvContent += "SHORT-CS,Short Course in Computer Science,School of Computing,1,short_course\n";
+            let csvContent = "Code,Name,School,Duration,Duration Unit,Category\n";
+            csvContent += "BSC-CS,Bachelor of Science in Computer Science,School of Computing,4,years,undergraduate\n";
+            csvContent += "SHORT-CS,Short Course in Computer Science,School of Computing,6,months,short_course\n";
             
             // Create blob and download
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
