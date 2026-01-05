@@ -2,11 +2,68 @@
 require '../config.php';
 require '../auth.php';
 
+// Include email configuration
+require_once '../email_config.php';
+
 // Include the new acceptance letter with fees function
 require_once '../finance/generate_acceptance_letter_with_fees.php';
 
 // Include the new DOMPDF acceptance letter generator
 require_once '../generate_acceptance_letter_dompdf.php';
+
+// Try to load PHPMailer if available
+$phpmailer_available = false;
+if (file_exists(__DIR__ . '/../lib/PHPMailer/PHPMailer.php')) {
+    require_once __DIR__ . '/../lib/PHPMailer/PHPMailer.php';
+    require_once __DIR__ . '/../lib/PHPMailer/SMTP.php';
+    require_once __DIR__ . '/../lib/PHPMailer/Exception.php';
+    $phpmailer_available = true;
+}
+
+/**
+ * Send email using PHPMailer with Namecheap SMTP settings
+ * 
+ * @param string $to Recipient email address
+ * @param string $subject Email subject
+ * @param string $body Email body
+ * @return bool Whether email was sent successfully
+ */
+function sendEmailWithPHPMailer($to, $subject, $body) {
+    try {
+        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host = SMTP_HOST;
+        $mail->SMTPAuth = true;
+        $mail->Username = SMTP_USERNAME;
+        $mail->Password = SMTP_PASSWORD;
+        $mail->SMTPSecure = SMTP_SECURE;
+        $mail->Port = SMTP_PORT;
+        
+        // Recipients
+        $mail->setFrom(EMAIL_FROM, EMAIL_FROM_NAME);
+        $mail->addAddress($to);
+        $mail->addReplyTo(EMAIL_REPLY_TO);
+        
+        // Content
+        $mail->isHTML(false);  // Set to true if you want to send HTML emails
+        $mail->Subject = $subject;
+        $mail->Body = $body;
+        
+        // Send email
+        $mail->send();
+        
+        // Log success
+        error_log("Email sent successfully to: " . $to);
+        return true;
+        
+    } catch (Exception $e) {
+        // Log error
+        error_log("Failed to send email to: " . $to . ". Error: " . $mail->ErrorInfo);
+        return false;
+    }
+}
 
 // Check if user is logged in and has enrollment officer role
 if (!currentUserId()) {
@@ -58,15 +115,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $application['documents']
                     ]);
                     
-                    // Generate acceptance letter in PDF format using DOMPDF
-                    $letter_path = generateAcceptanceLetterDOMPDF($application, $pdo);
+                    // Send approval notification email to applicant
+                    $subject = "Application Received - Lusaka South College";
                     
-                    // Send acceptance letter email with download link
-                    // For short courses, we might want to use a different approach or skip auto-email
-                    // For now, we'll just generate the letter without sending email
+                    $body = "Dear " . $application['full_name'] . ",\n\n";
+                    $body .= "Your application has been received and approved successfully.\n\n";
+                    $body .= "You are now required to proceed with the registration process by contacting our Enrollment Office.\n\n";
+                    $body .= "Contact Information:\n";
+                    $body .= "Phone: +260 770 359 518\n";
+                    $body .= "Email: admissions@lsuczm.com\n\n";
+                    $body .= "Please contact us to complete your registration.\n\n";
+                    $body .= "Best regards,\n";
+                    $body .= "LSC Enrollment Office";
                     
-                    $message = "Application approved successfully! Acceptance letter generated and email processing completed.";
-                    $messageType = "success";
+                    // Send email using PHPMailer if available, otherwise fall back to mail()
+                    $email_success = false;
+                    
+                    if ($phpmailer_available) {
+                        error_log("Attempting to send email via PHPMailer to: " . $application['email']);
+                        $email_success = sendEmailWithPHPMailer($application['email'], $subject, $body);
+                    } else {
+                        error_log("PHPMailer not available, attempting to send email via mail() function to: " . $application['email']);
+                        // Send email using PHP's mail function
+                        $headers = "From: " . EMAIL_FROM . "\r\n";
+                        $headers .= "Reply-To: " . EMAIL_REPLY_TO . "\r\n";
+                        $headers .= "MIME-Version: 1.0\r\n";
+                        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+                        
+                        $email_success = mail($application['email'], $subject, $body, $headers);
+                        
+                        if (!$email_success) {
+                            error_log("mail() function failed for: " . $application['email']);
+                        }
+                    }
+                    
+                    if ($email_success) {
+                        $message = "Application approved successfully! Approval notification email sent to applicant.";
+                        $messageType = "success";
+                    } else {
+                        $message = "Application approved successfully, but failed to send notification email to applicant. Please check email configuration.";
+                        $messageType = "warning";
+                    }
                     break;
                     
                 case 'reject':
@@ -125,6 +214,7 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute();
 $rejectedShortCoursesApplications = $stmt->fetchAll();
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -271,7 +361,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
                                         <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
-                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td>
@@ -325,7 +415,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
                                         <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
-                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>
@@ -370,7 +460,7 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
                                         <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
-                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>

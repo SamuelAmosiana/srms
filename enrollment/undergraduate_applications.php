@@ -283,7 +283,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
                                         <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
-                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td>
@@ -337,7 +337,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
                                         <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
-                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>
@@ -382,7 +382,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                                         <td><?php echo htmlspecialchars($app['full_name']); ?></td>
                                         <td><?php echo htmlspecialchars($app['email']); ?></td>
                                         <td><?php echo htmlspecialchars($app['phone'] ?? ''); ?></td>
-                                        <td><?php echo htmlspecialchars($app['programme_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($app['programme_name'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($app['intake_name']); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['created_at'])); ?></td>
                                         <td><?php echo date('Y-m-d', strtotime($app['updated_at'] ?? $app['created_at'])); ?></td>
