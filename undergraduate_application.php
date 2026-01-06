@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
     $nrc = trim($_POST['nrc']);
+    $gender = trim($_POST['gender']);
     $dob = $_POST['dateofbirth'];
     $address = trim($_POST['address']);
     $program = $_POST['program'];
@@ -49,6 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'path' => 'uploads/' . time() . '_previousschool_' . $_FILES['previousschool']['name']
         ];
         move_uploaded_file($_FILES['previousschool']['tmp_name'], $documents[count($documents)-1]['path']);
+    }
+    
+    if (isset($_FILES['nrc_copy']) && $_FILES['nrc_copy']['error'] == 0) {
+        $documents[] = [
+            'name' => $_FILES['nrc_copy']['name'],
+            'path' => 'uploads/' . time() . '_nrc_copy_' . $_FILES['nrc_copy']['name']
+        ];
+        move_uploaded_file($_FILES['nrc_copy']['tmp_name'], $documents[count($documents)-1]['path']);
     }
     
     try {
@@ -80,7 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $programme_id,
             $intake_id,
             $mode_of_learning,
-            json_encode(array_merge($documents, ['recommended_by' => $recommended_by])) // Include recommended by in documents
+            json_encode(array_merge($documents, [
+                'recommended_by' => $recommended_by,
+                'gender' => $gender,
+                'nrc_number' => $nrc
+            ])) // Include recommended by, gender and NRC in documents
         ]);
         
         $success = "Your application has been submitted successfully! Our enrollment team will review your application and contact you soon.";
@@ -274,6 +287,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="form-group">
                         <label for="ug-nrc">National Registration Card/Passport *</label>
                         <input type="text" id="ug-nrc" name="nrc" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ug-gender">Gender *</label>
+                        <select id="ug-gender" name="gender" required>
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                           
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ug-nrc-copy">Attach NRC Copy</label>
+                        <input type="file" id="ug-nrc-copy" name="nrc_copy">
                     </div>
                     <div class="form-group">
                         <label for="ug-dob">Date of Birth *</label>

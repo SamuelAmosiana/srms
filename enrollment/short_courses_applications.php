@@ -116,17 +116,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                     
                     // Send approval notification email to applicant
-                    $subject = "Application Received - Lusaka South College";
+                    $subject = "Admission Acceptance - Lusaka South College";
                     
-                    $body = "Dear " . $application['full_name'] . ",\n\n";
-                    $body .= "Your application has been received and approved successfully.\n\n";
-                    $body .= "You are now required to proceed with the registration process by contacting our Enrollment Office.\n\n";
-                    $body .= "Contact Information:\n";
-                    $body .= "Phone: +260 770 359 518\n";
-                    $body .= "Email: admissions@lsuczm.com\n\n";
-                    $body .= "Please contact us to complete your registration.\n\n";
+                    $body = "Dear " . $application['full_name'] . "\n\n";
+                    $body .= "Congratulations! We are pleased to inform you that your application for admission at Lusaka South College has been accepted.\n\n";
+                    $body .= "Programme: " . $application['programme_name'] . "\n";
+                    $body .= "Intake: " . ($application['intake_name'] ? explode(' ', $application['intake_name'])[0] : 'N/A') . "\n";
+                    $body .= "Phone: " . ($application['phone'] ?? 'N/A') . "\n\n";
+                    
+                    $body .= "FEE STRUCTURE\n";
+                    $body .= "=============\n\n";
+                    
+                    // Calculate fees for short course
+                    $stmt_fees = $pdo->prepare("
+                        SELECT SUM(pf.fee_amount) as total_fees
+                        FROM programme_fees pf 
+                        WHERE pf.programme_id = ? AND pf.is_active = 1
+                    ");
+                    $stmt_fees->execute([$application['programme_id']]);
+                    $total_fees_result = $stmt_fees->fetch();
+                    $total_fees = $total_fees_result['total_fees'] ?? 0;
+                    
+                    $body .= "TOTAL FEES: K" . number_format($total_fees, 2) . "\n\n";
+                    
+                    $body .= "YOUR STUDENT LOGIN DETAILS\n";
+                    $body .= "==========================\n";
+                    $body .= "To login the student portal Use your email address (" . $application['email'] . ") to login to the First Time Student Registration portal\n";
+                    $body .= "Portal URL/Link : https://" . $_SERVER['HTTP_HOST'] . "/first_time_login\n\n";
+                    
+                    $body .= "Please proceed with the registration process as outlined in the student portal with 60% payment. You can download the student portal user manual on our website www.lsuczm.com under download section for guidance.\n\n";
+                    
+                    $body .= "STUDENT FEES PAYMENT PROCESS\n";
+                    $body .= "==========================\n";
+                    $body .= "Payment can be made through the Bank physical or online transfer as follows:\n";
+                    $body .= "Account Name: Lusaka South College\n";
+                    $body .= "Account Number: 5947236500193 (ZMW)\n";
+                    $body .= "Bank: ZANACO\n";
+                    $body .= "Branch Name: Acacia Park\n";
+                    $body .= "Branch Code: 086\n";
+                    $body .= "Sort Code: 010086\n";
+                    $body .= "Swift Code: ZNCOZMLU\n";
+                    $body .= "Or\n";
+                    $body .= "Mobile Money (Zambians Only)\n";
+                    $body .= "Dial: *767*1*111001301*Amount#\n\n";
+                    $body .= "or through our online payment portal.\n\n";
+                    
+                    $body .= "For any queries regarding your admission, please Contact/WhatsApp the Admissions Office +260 770359518 or email: admissions@lsuczm.com Or visit our main campus in Foxdale Lusaka at the Corner of Zambezi and Mutumbi Road.\n\n";
+                    
+                    $body .= "We look forward to welcoming you to Lusaka South College.\n\n";
                     $body .= "Best regards,\n";
-                    $body .= "LSC Enrollment Office";
+                    $body .= "Admissions Office\n";
+                    $body .= "Lusaka South College";
                     
                     // Send email using PHPMailer if available, otherwise fall back to mail()
                     $email_success = false;

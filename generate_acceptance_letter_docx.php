@@ -162,56 +162,28 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     // Calculate total fees
     $total_fees = $total_one_time + $total_per_term + $total_per_year;
     
-    // Generate download link
-    $letter_filename = basename($letter_path);
-    $download_link = "https://" . $_SERVER['HTTP_HOST'] . "/download_letter.php?file=" . urlencode($letter_filename);
-    
     // Create email content
     $subject = "Admission Acceptance - Lusaka South College";
     
-    $body = "Dear " . $application['full_name'] . ",\n\n";
-    $body .= "Congratulations! We are pleased to inform you that your application for admission has been accepted.\n\n";
+    $body = "Dear " . $application['full_name'] . "\n\n";
+    $body .= "Congratulations! We are pleased to inform you that your application for admission at Lusaka South College has been accepted.\n\n";
     $body .= "Programme: " . $application['programme_name'] . "\n";
-    $body .= "Intake: " . $application['intake_name'] . "\n";
+    $body .= "Intake: " . ($application['intake_name'] ? explode(' ', $application['intake_name'])[0] : 'N/A') . "\n";
     $body .= "Phone: " . ($application['phone'] ?? 'N/A') . "\n\n";
     
     $body .= "FEE STRUCTURE\n";
     $body .= "=============\n\n";
     
-    if (!empty($grouped_fees['one_time'])) {
-        $body .= "ONE-TIME FEES:\n";
-        foreach ($grouped_fees['one_time'] as $fee) {
-            $body .= "- " . $fee['fee_name'] . ": K" . number_format($fee['fee_amount'], 2) . "\n";
-        }
-        $body .= "Total One-Time Fees: K" . number_format($total_one_time, 2) . "\n\n";
-    }
-    
-    if (!empty($grouped_fees['per_term'])) {
-        $body .= "PER TERM FEES:\n";
-        foreach ($grouped_fees['per_term'] as $fee) {
-            $body .= "- " . $fee['fee_name'] . ": K" . number_format($fee['fee_amount'], 2) . "\n";
-        }
-        $body .= "Total Per Term Fees: K" . number_format($total_per_term, 2) . "\n\n";
-    }
-    
-    if (!empty($grouped_fees['per_year'])) {
-        $body .= "PER YEAR FEES:\n";
-        foreach ($grouped_fees['per_year'] as $fee) {
-            $body .= "- " . $fee['fee_name'] . ": K" . number_format($fee['fee_amount'], 2) . "\n";
-        }
-        $body .= "Total Per Year Fees: K" . number_format($total_per_year, 2) . "\n\n";
-    }
-    
     $body .= "TOTAL FEES: K" . number_format($total_fees, 2) . "\n\n";
     
-    $body .= "LOGIN DETAILS\n";
-    $body .= "=============\n";
+    $body .= "YOUR STUDENT LOGIN DETAILS\n";
+    $body .= "==========================\n";
     
     // Handle different types of login details
     if (isset($login_details['instruction'])) {
         // For first-time applicants who need to use email for login
         $body .= $login_details['instruction'] . "\n";
-        $body .= "Portal URL: https://" . $_SERVER['HTTP_HOST'] . "/first_time_login\n\n";
+        $body .= "Portal URL/Link : https://" . $_SERVER['HTTP_HOST'] . "/first_time_login\n\n";
     } else {
         // For existing students with username/password
         $username = $login_details['username'] ?? 'N/A';
@@ -221,13 +193,25 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
         $body .= "Portal URL: " . PORTAL_URL . "\n\n";
     }
     
-    $body .= "To download your acceptance letter, please click the link below:\n";
-    $body .= $download_link . "\n\n";
+    $body .= "Please proceed with the registration process as outlined in the student portal with 60% payment. You can download the student portal user manual on our website www.lsuczm.com under download section for guidance.\n\n";
     
-    $body .= "Please proceed with the registration process as outlined in the student portal.\n";
-    $body .= "Payment can be made at the Finance Office or through our online payment portal.\n\n";
+    $body .= "STUDENT FEES PAYMENT PROCESS\n";
+    $body .= "==========================\n";
+    $body .= "Payment can be made through the Bank physical or online transfer as follows:\n";
+    $body .= "Account Name: Lusaka South College\n";
+    $body .= "Account Number: 5947236500193 (ZMW)\n";
+    $body .= "Bank: ZANACO\n";
+    $body .= "Branch Name: Acacia Park\n";
+    $body .= "Branch Code: 086\n";
+    $body .= "Sort Code: 010086\n";
+    $body .= "Swift Code: ZNCOZMLU\n";
+    $body .= "Or\n";
+    $body .= "Mobile Money (Zambians Only)\n";
+    $body .= "Dial: *767*1*111001301*Amount#\n\n";
+    $body .= "or through our online payment portal.\n\n";
     
-    $body .= "For any queries regarding fees, please contact the Admissions Office at admissions@lsuczm.com.\n\n";
+    $body .= "For any queries regarding your admission, please Contact/WhatsApp the Admissions Office +260 770359518 or email: admissions@lsuczm.com Or visit our main campus in Foxdale Lusaka at the Corner of Zambezi and Mutumbi Road.\n\n";
+    
     $body .= "We look forward to welcoming you to Lusaka South College.\n\n";
     $body .= "Best regards,\n";
     $body .= "Admissions Office\n";
