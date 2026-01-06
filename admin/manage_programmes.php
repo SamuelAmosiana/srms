@@ -156,6 +156,123 @@ $importReport = []; // For storing import results
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
+            case 'add_student_to_programme':
+                $programme_id = $_POST['programme_id'];
+                $student_id = $_POST['student_id'];
+                
+                try {
+                    // Check if student exists and get user_id
+                    $stmt = $pdo->prepare("SELECT user_id FROM student_profile WHERE user_id = ?");
+                    $stmt->execute([$student_id]);
+                    $existing = $stmt->fetch();
+                    
+                    if (!$existing) {
+                        throw new Exception("Student not found!");
+                    }
+                    
+                    // Update student's programme_id
+                    $stmt = $pdo->prepare("UPDATE student_profile SET programme_id = ? WHERE user_id = ?");
+                    if ($stmt->execute([$programme_id, $student_id])) {
+                        $message = "Student added to programme successfully!";
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception("Failed to add student to programme!");
+                    }
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
+            case 'add_lecturer_to_programme':
+                $programme_id = $_POST['programme_id'];
+                $lecturer_id = $_POST['lecturer_id'];
+                $course_id = $_POST['course_id'];
+                $academic_year = $_POST['academic_year'];
+                $semester = $_POST['semester'];
+                
+                try {
+                    // Check if lecturer and course exist
+                    $stmt = $pdo->prepare("SELECT user_id FROM staff_profile WHERE user_id = ?");
+                    $stmt->execute([$lecturer_id]);
+                    $lecturer_exists = $stmt->fetch();
+                    
+                    if (!$lecturer_exists) {
+                        throw new Exception("Lecturer not found!");
+                    }
+                    
+                    $stmt = $pdo->prepare("SELECT id FROM course WHERE id = ?");
+                    $stmt->execute([$course_id]);
+                    $course_exists = $stmt->fetch();
+                    
+                    if (!$course_exists) {
+                        throw new Exception("Course not found!");
+                    }
+                    
+                    // Check if this lecturer is already assigned to this course for the same intake/semester
+                    $check_stmt = $pdo->prepare("SELECT id FROM course_assignment WHERE course_id = ? AND lecturer_id = ? AND academic_year = ? AND semester = ? AND is_active = 1");
+                    $check_stmt->execute([$course_id, $lecturer_id, $academic_year, $semester]);
+                    
+                    if ($check_stmt->fetch()) {
+                        throw new Exception("This lecturer is already assigned to this course for the selected intake and semester!");
+                    }
+                    
+                    // Assign lecturer to course
+                    $assign_stmt = $pdo->prepare("INSERT INTO course_assignment (course_id, lecturer_id, academic_year, semester, is_active) VALUES (?, ?, ?, ?, 1)");
+                    $assign_stmt->execute([$course_id, $lecturer_id, $academic_year, $semester]);
+                    
+                    $message = "Lecturer assigned to course successfully!";
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
+            case 'add_course_to_programme':
+                $programme_id = $_POST['programme_id'];
+                $course_code = strtoupper(trim($_POST['course_code']));
+                $course_name = trim($_POST['course_name']);
+                $course_credits = $_POST['course_credits'];
+                $course_description = trim($_POST['course_description']);
+                $course_term = trim($_POST['course_term']);
+                
+                // Validate inputs
+                if (empty($course_code) || empty($course_name) || empty($course_credits)) {
+                    $message = "Please fill in all required fields!";
+                    $messageType = 'error';
+                } elseif (strlen($course_code) > 20) {
+                    $message = "Course code is too long (max 20 characters)!";
+                    $messageType = 'error';
+                } elseif (!is_numeric($course_credits) || $course_credits <= 0) {
+                    $message = "Credits must be a positive number!";
+                    $messageType = 'error';
+                } else {
+                    try {
+                        // Check if course code already exists
+                        $check_stmt = $pdo->prepare("SELECT id FROM course WHERE code = ?");
+                        $check_stmt->execute([$course_code]);
+                        
+                        if ($check_stmt->rowCount() > 0) {
+                            $message = "Course code already exists!";
+                            $messageType = 'error';
+                        } else {
+                            $stmt = $pdo->prepare("INSERT INTO course (name, code, programme_id, credits, description, term) VALUES (?, ?, ?, ?, ?, ?)");
+                            if ($stmt->execute([$course_name, $course_code, $programme_id, $course_credits, $course_description, $course_term])) {
+                                $message = "Course added to programme successfully!";
+                                $messageType = 'success';
+                            } else {
+                                $message = "Failed to add course to programme!";
+                                $messageType = 'error';
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
+                
             case 'import_programmes':
                 if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] == 0) {
                     $file = $_FILES['csv_file'];
@@ -600,6 +717,25 @@ if (isset($_GET['view'])) {
         } else {
             $programmeLecturers = [];
         }
+        
+        // Get all students who are not in this programme (for adding students form)
+        $existing_student_ids = array_column($programmeStudents, 'user_id');
+        $exclude_ids = $existing_student_ids ? implode(',', array_map('intval', $existing_student_ids)) : '0';
+        $available_students = $pdo->query("SELECT sp.user_id, sp.full_name, sp.student_number FROM student_profile sp WHERE sp.user_id NOT IN ($exclude_ids) ORDER BY sp.full_name")->fetchAll();
+        
+        // Get all courses that are not in this programme (for adding courses form)
+        $existing_course_ids = array_column($programmeCourses, 'id');
+        $exclude_course_ids = $existing_course_ids ? implode(',', array_map('intval', $existing_course_ids)) : '0';
+        $available_courses = $pdo->query("SELECT id, name, code FROM course WHERE programme_id IS NULL OR programme_id != $programme_id AND id NOT IN ($exclude_course_ids) ORDER BY name")->fetchAll();
+        
+        // Get all lecturers from the system (for adding lecturers form)
+        $all_lecturers = $pdo->query("SELECT sp.user_id, sp.full_name, sp.staff_id FROM staff_profile sp WHERE sp.user_id IN (SELECT user_id FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE r.name = 'Lecturer') ORDER BY sp.full_name")->fetchAll();
+        
+        // Get all intakes for assignment dropdown
+        $intakes = $pdo->query("SELECT * FROM intake ORDER BY start_date DESC")->fetchAll();
+        
+        // Get all courses in this programme (for lecturer assignment)
+        $programme_courses = $programmeCourses;
     }
 }
 
@@ -1034,6 +1170,34 @@ if (isset($_GET['view'])) {
                         <input type="text" class="search-input" placeholder="Search students..." onkeyup="filterTable(this, 'studentsTable')">
                     </div>
                 </div>
+                
+                <!-- Add Student to Programme Form -->
+                <div class="form-card" style="margin-bottom: 20px;">
+                    <h3><i class="fas fa-user-plus"></i> Add Student to Programme</h3>
+                    <form method="POST" class="school-form">
+                        <input type="hidden" name="action" value="add_student_to_programme">
+                        <input type="hidden" name="programme_id" value="<?php echo $viewProgramme['id']; ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="student_id">Select Student *</label>
+                                <select id="student_id" name="student_id" required>
+                                    <option value="">-- Select Student --</option>
+                                    <?php foreach ($available_students as $student): ?>
+                                        <option value="<?php echo $student['user_id']; ?>">
+                                            <?php echo htmlspecialchars($student['full_name']); ?> (<?php echo htmlspecialchars($student['student_number']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group" style="display: flex; align-items: flex-end;">
+                                <button type="submit" class="btn btn-green">
+                                    <i class="fas fa-plus"></i> Add Student
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
                 <?php if (empty($programmeStudents)): ?>
                     <div class="empty-state">
                         <i class="fas fa-users"></i>
@@ -1078,6 +1242,52 @@ if (isset($_GET['view'])) {
                         </button>
                         <input type="text" class="search-input" placeholder="Search courses..." onkeyup="filterTable(this, 'coursesTable')">
                     </div>
+                </div>
+                
+                <!-- Add Course to Programme Form -->
+                <div class="form-card" style="margin-bottom: 20px;">
+                    <h3><i class="fas fa-book-plus"></i> Add Course to Programme</h3>
+                    <form method="POST" class="school-form">
+                        <input type="hidden" name="action" value="add_course_to_programme">
+                        <input type="hidden" name="programme_id" value="<?php echo $viewProgramme['id']; ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="course_code">Course Code *</label>
+                                <input type="text" id="course_code" name="course_code" required maxlength="20" style="text-transform: uppercase;" placeholder="e.g. CS101">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="course_name">Course Name *</label>
+                                <input type="text" id="course_name" name="course_name" required maxlength="150" placeholder="e.g. Introduction to Computer Science">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="course_credits">Credits *</label>
+                                <input type="number" id="course_credits" name="course_credits" required min="1" max="20" value="3" placeholder="e.g. 3">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="course_term">Term</label>
+                                <input type="text" id="course_term" name="course_term" maxlength="50" placeholder="e.g. First Semester">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="course_description">Description</label>
+                                <textarea id="course_description" name="course_description" rows="3" placeholder="Brief description of the course"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-green">
+                                <i class="fas fa-plus"></i> Add Course
+                            </button>
+                        </div>
+                    </form>
                 </div>
                 <?php if (empty($programmeCourses)): ?>
                     <div class="empty-state">
@@ -1137,6 +1347,64 @@ if (isset($_GET['view'])) {
                         </button>
                         <input type="text" class="search-input" placeholder="Search lecturers..." onkeyup="filterTable(this, 'lecturersTable')">
                     </div>
+                </div>
+                
+                <!-- Assign Lecturer to Course Form -->
+                <div class="form-card" style="margin-bottom: 20px;">
+                    <h3><i class="fas fa-chalkboard-teacher"></i> Assign Lecturer to Course</h3>
+                    <form method="POST" class="school-form">
+                        <input type="hidden" name="action" value="add_lecturer_to_programme">
+                        <input type="hidden" name="programme_id" value="<?php echo $viewProgramme['id']; ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="lecturer_id">Select Lecturer *</label>
+                                <select id="lecturer_id" name="lecturer_id" required>
+                                    <option value="">-- Select Lecturer --</option>
+                                    <?php foreach ($all_lecturers as $lecturer): ?>
+                                        <option value="<?php echo $lecturer['user_id']; ?>">
+                                            <?php echo htmlspecialchars($lecturer['full_name']); ?> (<?php echo htmlspecialchars($lecturer['staff_id']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="course_id">Select Course *</label>
+                                <select id="course_id" name="course_id" required>
+                                    <option value="">-- Select Course --</option>
+                                    <?php foreach ($programme_courses as $course): ?>
+                                        <option value="<?php echo $course['id']; ?>">
+                                            <?php echo htmlspecialchars($course['name']); ?> (<?php echo htmlspecialchars($course['code']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="academic_year">Academic Year *</label>
+                                <input type="text" id="academic_year" name="academic_year" required placeholder="e.g. 2024/2025">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="semester">Semester *</label>
+                                <select id="semester" name="semester" required>
+                                    <option value="">-- Select Semester --</option>
+                                    <option value="First">First</option>
+                                    <option value="Second">Second</option>
+                                    <option value="Third">Third (Summer)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-green">
+                                <i class="fas fa-user-plus"></i> Assign Lecturer
+                            </button>
+                        </div>
+                    </form>
                 </div>
                 <?php if (empty($programmeLecturers)): ?>
                     <div class="empty-state">
