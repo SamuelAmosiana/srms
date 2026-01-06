@@ -217,6 +217,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'error';
                 }
                 break;
+            
+            case 'add_student_to_course':
+                $course_id = $_POST['course_id'];
+                $student_id = $_POST['student_id'];
+                
+                try {
+                    // Check if student exists
+                    $stmt = $pdo->prepare("SELECT user_id FROM student_profile WHERE user_id = ?");
+                    $stmt->execute([$student_id]);
+                    $existing = $stmt->fetch();
+                    
+                    if (!$existing) {
+                        throw new Exception("Student not found!");
+                    }
+                    
+                    // Check if student is already enrolled in this course
+                    $check_stmt = $pdo->prepare("SELECT id FROM course_enrollment WHERE course_id = ? AND student_user_id = ?");
+                    $check_stmt->execute([$course_id, $student_id]);
+                    
+                    if ($check_stmt->fetch()) {
+                        throw new Exception("Student is already enrolled in this course!");
+                    }
+                    
+                    // Add student to course
+                    $enroll_stmt = $pdo->prepare("INSERT INTO course_enrollment (course_id, student_user_id, status) VALUES (?, ?, 'active')");
+                    $enroll_stmt->execute([$course_id, $student_id]);
+                    
+                    $message = "Student added to course successfully!";
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
         }
     }
 }
@@ -365,6 +399,11 @@ if (isset($_GET['view'])) {
         $intakes_stmt = $pdo->prepare("SELECT * FROM intake ORDER BY start_date DESC");
         $intakes_stmt->execute();
         $intakes = $intakes_stmt->fetchAll();
+        
+        // Get all students who are not in this course (for adding students form)
+        $existing_enrollment_ids = array_column($courseEnrollments, 'student_id');
+        $exclude_ids = $existing_enrollment_ids ? implode(',', array_map('intval', $existing_enrollment_ids)) : '0';
+        $available_students = $pdo->query("SELECT sp.user_id, sp.full_name, sp.student_number FROM student_profile sp WHERE sp.user_id NOT IN ($exclude_ids) ORDER BY sp.full_name")->fetchAll();
     }
 }
 
@@ -743,6 +782,35 @@ try {
                         <input type="text" class="search-input" placeholder="Search enrollments..." onkeyup="filterTable(this, 'enrollmentsTable')">
                     </div>
                 </div>
+                
+                <!-- Add Student to Course Form -->
+                <div class="form-card" style="margin-bottom: 20px;">
+                    <h3><i class="fas fa-user-plus"></i> Add Student to Course</h3>
+                    <form method="POST" class="school-form">
+                        <input type="hidden" name="action" value="add_student_to_course">
+                        <input type="hidden" name="course_id" value="<?php echo $viewCourse['id']; ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="student_search">Search Student *</label>
+                                <input type="text" id="student_search" placeholder="Type to search student..." autocomplete="off">
+                                <select id="student_id" name="student_id" required style="margin-top: 5px;">
+                                    <option value="">-- Select Student --</option>
+                                    <?php foreach ($available_students as $student): ?>
+                                        <option value="<?php echo $student['user_id']; ?>" data-search="<?php echo htmlspecialchars($student['full_name'] . ' ' . $student['student_number']); ?>">
+                                            <?php echo htmlspecialchars($student['full_name']); ?> (<?php echo htmlspecialchars($student['student_number']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group" style="display: flex; align-items: flex-end;">
+                                <button type="submit" class="btn btn-green">
+                                    <i class="fas fa-plus"></i> Add Student
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
                 <?php if (empty($courseEnrollments)): ?>
                     <div class="empty-state">
                         <i class="fas fa-users"></i>
@@ -837,11 +905,12 @@ try {
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="lecturer_id">Select Lecturer *</label>
-                            <select id="lecturer_id" name="lecturer_id" required>
+                            <label for="lecturer_search">Select Lecturer *</label>
+                            <input type="text" id="lecturer_search" placeholder="Type to search lecturer..." autocomplete="off">
+                            <select id="lecturer_id" name="lecturer_id" required style="margin-top: 5px;">
                                 <option value="">-- Select Lecturer --</option>
                                 <?php foreach ($availableLecturers as $lecturer): ?>
-                                    <option value="<?php echo $lecturer['user_id']; ?>">
+                                    <option value="<?php echo $lecturer['user_id']; ?>" data-search="<?php echo htmlspecialchars($lecturer['full_name'] . ' ' . $lecturer['staff_id']); ?>">
                                         <?php echo htmlspecialchars($lecturer['full_name']); ?> 
                                         (<?php echo htmlspecialchars($lecturer['staff_id']); ?>)
                                     </option>
@@ -850,11 +919,12 @@ try {
                         </div>
                         
                         <div class="form-group">
-                            <label for="academic_year">Intake *</label>
-                            <select id="academic_year" name="academic_year" required>
+                            <label for="intake_search">Intake *</label>
+                            <input type="text" id="intake_search" placeholder="Type to search intake..." autocomplete="off">
+                            <select id="academic_year" name="academic_year" required style="margin-top: 5px;">
                                 <option value="">-- Select Intake --</option>
                                 <?php foreach ($intakes as $intake): ?>
-                                    <option value="<?php echo htmlspecialchars($intake['name']); ?>">
+                                    <option value="<?php echo htmlspecialchars($intake['name']); ?>" data-search="<?php echo htmlspecialchars($intake['name']); ?>">
                                         <?php echo htmlspecialchars($intake['name']); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -1029,6 +1099,75 @@ try {
             
             window.location.href = url;
         }
+        
+        // Searchable dropdown functionality for lecturer and intake selection
+        document.addEventListener('DOMContentLoaded', function() {
+            // Lecturer search functionality
+            const lecturerSearch = document.getElementById('lecturer_search');
+            const lecturerSelect = document.getElementById('lecturer_id');
+            
+            if (lecturerSearch && lecturerSelect) {
+                lecturerSearch.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const options = lecturerSelect.options;
+                    
+                    for (let i = 1; i < options.length; i++) { // Start from 1 to skip the "-- Select Lecturer --" option
+                        const option = options[i];
+                        const searchValue = option.getAttribute('data-search').toLowerCase();
+                        
+                        if (searchValue.includes(searchTerm)) {
+                            option.style.display = '';
+                        } else {
+                            option.style.display = 'none';
+                        }
+                    }
+                });
+            }
+            
+            // Intake search functionality
+            const intakeSearch = document.getElementById('intake_search');
+            const intakeSelect = document.getElementById('academic_year');
+            
+            if (intakeSearch && intakeSelect) {
+                intakeSearch.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const options = intakeSelect.options;
+                    
+                    for (let i = 1; i < options.length; i++) { // Start from 1 to skip the "-- Select Intake --" option
+                        const option = options[i];
+                        const searchValue = option.getAttribute('data-search').toLowerCase();
+                        
+                        if (searchValue.includes(searchTerm)) {
+                            option.style.display = '';
+                        } else {
+                            option.style.display = 'none';
+                        }
+                    }
+                });
+            }
+            
+            // Student search functionality
+            const studentSearch = document.getElementById('student_search');
+            const studentSelect = document.getElementById('student_id');
+            
+            if (studentSearch && studentSelect) {
+                studentSearch.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const options = studentSelect.options;
+                    
+                    for (let i = 1; i < options.length; i++) { // Start from 1 to skip the "-- Select Student --" option
+                        const option = options[i];
+                        const searchValue = option.getAttribute('data-search').toLowerCase();
+                        
+                        if (searchValue.includes(searchTerm)) {
+                            option.style.display = '';
+                        } else {
+                            option.style.display = 'none';
+                        }
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>
