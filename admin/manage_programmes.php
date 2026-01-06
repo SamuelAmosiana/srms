@@ -426,6 +426,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 // Get filters
 $searchQuery = $_GET['search'] ?? '';
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$perPage = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10; // Default to 10 per page
+
+// Ensure perPage is at least 5
+$perPage = max(5, $perPage);
+
+// Calculate offset for pagination
+$offset = ($page - 1) * $perPage;
 
 // Build query with filters
 $query = "
@@ -448,6 +456,32 @@ if ($searchQuery) {
 }
 
 $query .= " ORDER BY s.name, p.name";
+
+// Get total count for pagination
+$countQuery = "
+    SELECT COUNT(*) 
+    FROM programme p 
+    LEFT JOIN school s ON p.school_id = s.id 
+    WHERE 1=1";
+
+$countParams = [];
+
+if ($searchQuery) {
+    $countQuery .= " AND (p.name LIKE ? OR p.code LIKE ? OR p.description LIKE ? OR s.name LIKE ?)";
+    $searchParam = "%$searchQuery%";
+    $countParams[] = $searchParam;
+    $countParams[] = $searchParam;
+    $countParams[] = $searchParam;
+    $countParams[] = $searchParam;
+}
+
+$countStmt = $pdo->prepare($countQuery);
+$countStmt->execute($countParams);
+$totalProgrammes = $countStmt->fetchColumn();
+$totalPages = ceil($totalProgrammes / $perPage);
+
+// Add LIMIT and OFFSET to the main query
+$query .= " LIMIT " . (int)$perPage . " OFFSET " . (int)$offset;
 
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
@@ -607,6 +641,55 @@ if (isset($_GET['view'])) {
             nav.top-nav, aside.sidebar, .content-header, .action-bar, .filters-section, .school-header-card, .stats-grid, .section-header { display: none !important; }
             .print-programme-summary span { display: block; margin: 2px 0; }
             .print-section-title { display: block !important; text-align: left; }
+        }
+        
+        .pagination-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        
+        .pagination-info, .pagination-settings, .pagination-nav {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .pagination-settings label {
+            margin: 0;
+        }
+        
+        .pagination-settings select {
+            padding: 5px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background-color: white;
+        }
+        
+        .pagination-nav .page-info {
+            margin: 0 15px;
+            font-weight: bold;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid #007bff;
+            color: #007bff;
+        }
+        
+        .btn-outline:hover {
+            background-color: #007bff;
+            color: white;
         }
     </style>
 </head>
@@ -1090,7 +1173,39 @@ if (isset($_GET['view'])) {
             <div class="table-section">
                 <div class="table-card">
                     <div class="table-header">
-                        <h2><i class="fas fa-list"></i> Programmes List (<?php echo count($programmes); ?> programmes)</h2>
+                        <h2><i class="fas fa-list"></i> Programmes List (<?php echo $totalProgrammes; ?> programmes)</h2>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls">
+                        <div class="pagination-info">
+                            Showing <?php echo min($perPage, $totalProgrammes - ($page - 1) * $perPage); ?> of <?php echo $totalProgrammes; ?> programmes
+                        </div>
+                        <div class="pagination-settings">
+                            <label for="per_page">Per Page:</label>
+                            <select id="per_page" onchange="changePerPage()">
+                                <option value="5" <?php echo $perPage == 5 ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $perPage == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="20" <?php echo $perPage == 20 ? 'selected' : ''; ?>>20</option>
+                                <option value="50" <?php echo $perPage == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $perPage == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </div>
+                        <div class="pagination-nav">
+                            <?php if ($totalPages > 1): ?>
+                                <?php if ($page > 1): ?>
+                                    <a href="?page=1&per_page=<?php echo $perPage; ?>&search=<?php echo urlencode($searchQuery); ?>" class="btn btn-sm btn-outline">First</a>
+                                    <a href="?page=<?php echo $page - 1; ?>&per_page=<?php echo $perPage; ?>&search=<?php echo urlencode($searchQuery); ?>" class="btn btn-sm btn-outline">Previous</a>
+                                <?php endif; ?>
+                                
+                                <span class="page-info">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
+                                
+                                <?php if ($page < $totalPages): ?>
+                                    <a href="?page=<?php echo $page + 1; ?>&per_page=<?php echo $perPage; ?>&search=<?php echo urlencode($searchQuery); ?>" class="btn btn-sm btn-outline">Next</a>
+                                    <a href="?page=<?php echo $totalPages; ?>&per_page=<?php echo $perPage; ?>&search=<?php echo urlencode($searchQuery); ?>" class="btn btn-sm btn-outline">Last</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     
                     <div class="table-responsive">
@@ -1246,6 +1361,18 @@ if (isset($_GET['view'])) {
             });
         });
         <?php endif; ?>
+        
+        // Change number of items per page
+        function changePerPage() {
+            const perPage = document.getElementById('per_page').value;
+            const searchQuery = document.getElementById('search').value;
+            
+            // Construct the URL with current filters and new per_page value
+            let url = `?page=1&per_page=${perPage}`;
+            if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+            
+            window.location.href = url;
+        }
     </script>
 </main>
 </body>
