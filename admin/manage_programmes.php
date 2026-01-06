@@ -827,6 +827,7 @@ if (isset($_GET['view'])) {
             background-color: #007bff;
             color: white;
         }
+        
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
@@ -1180,11 +1181,12 @@ if (isset($_GET['view'])) {
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="student_id">Select Student *</label>
-                                <select id="student_id" name="student_id" required>
+                                <label for="student_search">Search Student *</label>
+                                <input type="text" id="student_search" placeholder="Type to search student..." autocomplete="off">
+                                <select id="student_id" name="student_id" required style="margin-top: 5px;">
                                     <option value="">-- Select Student --</option>
                                     <?php foreach ($available_students as $student): ?>
-                                        <option value="<?php echo $student['user_id']; ?>">
+                                        <option value="<?php echo $student['user_id']; ?>" data-search="<?php echo htmlspecialchars($student['full_name'] . ' ' . $student['student_number']); ?>">
                                             <?php echo htmlspecialchars($student['full_name']); ?> (<?php echo htmlspecialchars($student['student_number']); ?>)
                                         </option>
                                     <?php endforeach; ?>
@@ -1641,6 +1643,29 @@ if (isset($_GET['view'])) {
             
             window.location.href = url;
         }
+        
+        // Searchable dropdown functionality for student selection
+        document.addEventListener('DOMContentLoaded', function() {
+            // Student search functionality
+            const studentSearch = document.getElementById('student_search');
+            const studentSelect = document.getElementById('student_id');
+            
+            studentSearch.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const options = studentSelect.options;
+                
+                for (let i = 1; i < options.length; i++) { // Start from 1 to skip the "-- Select Student --" option
+                    const option = options[i];
+                    const searchValue = option.getAttribute('data-search').toLowerCase();
+                    
+                    if (searchValue.includes(searchTerm)) {
+                        option.style.display = '';
+                    } else {
+                        option.style.display = 'none';
+                    }
+                }
+            });
+        });
     </script>
 </main>
 </body>
