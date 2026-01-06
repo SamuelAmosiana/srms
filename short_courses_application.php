@@ -215,14 +215,14 @@ try {
         <?php endif; ?>
         
         <div class="form-info">
-            <h4>Available Short Courses</h4>
+            <h4>Available Short Courses Sections</h4>
             <ul>
-                <li>Digital Marketing & Social Media</li>
-                <li>Project Management Certification</li>
-                <li>Computer Applications (Microsoft Office)</li>
-                <li>Financial Management & Accounting</li>
-                <li>Leadership & Management Skills</li>
-                <li>Web Development & Design</li>
+                <li>ICT SECTION</li>
+                <li>CONSTRUCTION, ENGINEERING AND BUILD ENVIRONMENT SECTION</li>
+                <li>BUSINESS AND MANAGEMENT SECTION</li>
+                <li>AGRICULTURE AND HOSPITALITY</li>
+                <li>HEALTH CARE MANAGEMENT</li>
+                
             </ul>
         </div>
         

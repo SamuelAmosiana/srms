@@ -237,6 +237,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h4>Application Requirements</h4>
             <ul>
                 <li>Completed Grade 12 Certificate or equivalent</li>
+                <li>Grade 7 & 9 for Trade Certificates Programmes</li>
                 <li>Official transcripts from previous institutions</li>
                 <li>Copy of National Registration Card/Passport</li>
                 <li>Two passport-size photographs</li>
