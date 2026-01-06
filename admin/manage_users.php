@@ -15,6 +15,73 @@ $stmt = $pdo->prepare("SELECT ap.full_name, ap.staff_id FROM admin_profile ap WH
 $stmt->execute([currentUserId()]);
 $admin = $stmt->fetch();
 
+// Handle AJAX requests for export
+if (isset($_GET['action']) && $_GET['action'] === 'export_users') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="users_' . date('Y-m-d') . '.csv"');
+    
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['ID', 'Username', 'Full Name', 'Email', 'Role', 'Identifier', 'Status', 'Created']);
+    
+    // Build query with filters for export
+    $export_query = "SELECT u.id as user_id, u.username, u.is_active, u.created_at, r.name as role_name,
+              COALESCE(ap.full_name, sp.full_name, stp.full_name) as full_name,
+              u.email,
+              COALESCE(ap.staff_id, sp.student_number, stp.staff_id) as identifier
+              FROM users u 
+              JOIN user_roles ur ON u.id = ur.user_id
+              JOIN roles r ON ur.role_id = r.id 
+              LEFT JOIN admin_profile ap ON u.id = ap.user_id
+              LEFT JOIN student_profile sp ON u.id = sp.user_id
+              LEFT JOIN staff_profile stp ON u.id = stp.user_id
+              WHERE 1=1";
+
+    $export_params = [];
+
+    $roleFilter = $_GET['role'] ?? '';
+    $statusFilter = $_GET['status'] ?? '';
+    $searchQuery = $_GET['search'] ?? '';
+
+    if ($roleFilter) {
+        $export_query .= " AND r.name = ?";
+        $export_params[] = $roleFilter;
+    }
+
+    if ($statusFilter !== '') {
+        $export_query .= " AND u.is_active = ?";
+        $export_params[] = $statusFilter;
+    }
+
+    if ($searchQuery) {
+        $export_query .= " AND (u.username LIKE ? OR COALESCE(ap.full_name, sp.full_name, stp.full_name) LIKE ? OR u.email LIKE ?)";
+        $searchParam = "%$searchQuery%";
+        $export_params[] = $searchParam;
+        $export_params[] = $searchParam;
+        $export_params[] = $searchParam;
+    }
+
+    $export_query .= " ORDER BY u.created_at DESC";
+
+    $export_stmt = $pdo->prepare($export_query);
+    $export_stmt->execute($export_params);
+    $export_users = $export_stmt->fetchAll();
+
+    foreach ($export_users as $user) {
+        fputcsv($output, [
+            $user['user_id'],
+            $user['username'],
+            $user['full_name'] ?? 'N/A',
+            $user['email'] ?? 'N/A',
+            $user['role_name'],
+            $user['identifier'] ?? 'N/A',
+            $user['is_active'] ? 'Active' : 'Inactive',
+            date('Y-m-d', strtotime($user['created_at']))
+        ]);
+    }
+    fclose($output);
+    exit();
+}
+
 // Handle form submissions
 $message = '';
 $messageType = '';
@@ -806,6 +873,24 @@ try {
             </div>
         </div>
 
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <div class="action-left">
+                <!-- Export and Print buttons with current filters -->
+                <a href="?action=export_users&role=<?php echo urlencode($roleFilter); ?>&status=<?php echo urlencode($statusFilter); ?>&search=<?php echo urlencode($searchQuery); ?>" class="btn btn-blue">
+                    <i class="fas fa-download"></i> Export CSV
+                </a>
+                <button onclick="printUsers()" class="btn btn-green">
+                    <i class="fas fa-print"></i> Print
+                </button>
+            </div>
+            <div class="action-right">
+                <button onclick="showAddForm()" class="btn btn-green">
+                    <i class="fas fa-plus"></i> Add New User
+                </button>
+            </div>
+        </div>
+
         <!-- Users Table -->
         <div class="table-section">
             <div class="table-card">
@@ -814,7 +899,7 @@ try {
                 </div>
                 
                 <div class="table-responsive">
-                    <table class="users-table">
+                    <table class="users-table" id="usersTable">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -929,6 +1014,92 @@ try {
         document.addEventListener('DOMContentLoaded', function() {
             toggleFields();
         });
+        
+        // Print functionality
+        function printUsers() {
+            // Create a new window with the filtered user data
+            const printWindow = window.open('', '_blank');
+            
+            // Get current filter values
+            const roleFilter = document.getElementById('role').value;
+            const statusFilter = document.getElementById('status').value;
+            const searchQuery = document.getElementById('search').value;
+            
+            // Create the print content with filters
+            let printContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Users Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        h1 { color: #333; text-align: center; }
+                        .filters { margin-bottom: 20px; text-align: center; }
+                        .filters p { margin: 5px 0; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                        tr:nth-child(even) { background-color: #f9f9f9; }
+                        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Users Report</h1>
+                    <div class="filters">
+                        <p><strong>Generated on:</strong> ${new Date().toLocaleString()}</p>
+                        <p><strong>Filters Applied:</strong></p>
+                        <p>Role: ${roleFilter || 'All'} | Status: ${statusFilter === '1' ? 'Active' : statusFilter === '0' ? 'Inactive' : 'All'} | Search: ${searchQuery || 'None'}</p>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Identifier</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            
+            // Get all rows from the current table (excluding the header row)
+            const table = document.getElementById('usersTable');
+            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+            
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                printContent += '<tr>';
+                for (let j = 0; j < cells.length - 1; j++) { // Exclude the last column (Actions)
+                    printContent += '<td>' + cells[j].innerHTML + '</td>';
+                }
+                printContent += '</tr>';
+            }
+            
+            printContent += `
+                        </tbody>
+                    </table>
+                    <div class="footer">
+                        <p>Generated by LSC SRMS System</p>
+                    </div>
+                </body>
+                </html>`;
+            
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        }
+        
+        // Show add form function
+        function showAddForm() {
+            // Scroll to the form section
+            document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('username').focus();
+        }
     </script>
 </body>
 </html>
