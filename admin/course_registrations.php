@@ -170,6 +170,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+            
+            case 'define_intake_courses':
+                $intake_id = $_POST['intake_id'];
+                $term = trim($_POST['term']);
+                $programme_id = !empty($_POST['programme_id']) ? $_POST['programme_id'] : null;
+                $course_ids = $_POST['course_ids'] ?? [];
+                
+                if (empty($intake_id) || empty($term) || empty($course_ids)) {
+                    $message = "Please fill in all required fields and select at least one course!";
+                    $messageType = 'error';
+                } else {
+                    try {
+                        $pdo->beginTransaction();
+                        
+                        // Insert each selected course for the intake and term
+                        foreach ($course_ids as $course_id) {
+                            $stmt = $pdo->prepare("INSERT INTO intake_courses (intake_id, term, course_id, programme_id) VALUES (?, ?, ?, ?)");
+                            $stmt->execute([$intake_id, $term, $course_id, $programme_id]);
+                        }
+                        
+                        $pdo->commit();
+                        
+                        $message = "Courses defined successfully!";
+                        $messageType = 'success';
+                    } catch (Exception $e) {
+                        $pdo->rollBack();
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
         }
     }
 }
@@ -224,11 +255,17 @@ try {
     $programmes = [];
 }
 
-// Get all courses for selection
+// Get all courses for selection (for debugging purposes)
 try {
     $courses = $pdo->query("SELECT * FROM course ORDER BY name")->fetchAll();
+    // Debug: Check if courses have programme_id
+    $debug_course = $pdo->query("SELECT id, name, programme_id FROM course LIMIT 1")->fetch();
+    if ($debug_course) {
+        error_log("Course debug - ID: {$debug_course['id']}, Name: {$debug_course['name']}, Programme ID: {$debug_course['programme_id']}");
+    }
 } catch (Exception $e) {
     $courses = [];
+    error_log("Error fetching courses: " . $e->getMessage());
 }
 
 // Get defined intake courses (for display or edit) - handle both old and new schema
@@ -737,17 +774,12 @@ try {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Courses *</label>
-                        <div class="checkbox-list">
-                            <?php if (!empty($courses)): ?>
-                                <?php foreach ($courses as $course): ?>
-                                    <label>
-                                        <input type="checkbox" name="course_ids[]" value="<?php echo $course['id']; ?>">
-                                        <?php echo htmlspecialchars($course['name'] . ' (' . $course['code'] . ')'); ?>
-                                    </label><br>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
+                        <label for="course_ids">Courses *</label>
+                        <select id="course_ids" name="course_ids[]" multiple required size="6">
+                            <option value="">-- Select Courses --</option>
+                            <!-- Courses will be loaded based on selected programme -->
+                        </select>
+                        <small class="form-text">Hold Ctrl/Cmd to select multiple courses</small>
                     </div>
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Courses</button>
                 </form>
@@ -929,16 +961,11 @@ try {
                 </div>
                 <div class="form-group">
                     <label for="add_course_ids">Courses *</label>
-                    <div class="checkbox-list">
-                        <?php if (!empty($courses)): ?>
-                            <?php foreach ($courses as $course): ?>
-                                <label>
-                                    <input type="checkbox" name="course_ids[]" value="<?php echo $course['id']; ?>">
-                                    <?php echo htmlspecialchars($course['name'] . ' (' . $course['code'] . ')'); ?>
-                                </label><br>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
+                    <select id="add_course_ids" name="course_ids[]" multiple required size="6">
+                        <option value="">-- Select Courses --</option>
+                        <!-- Courses will be loaded based on selected programme -->
+                    </select>
+                    <small class="form-text">Hold Ctrl/Cmd to select multiple courses</small>
                 </div>
                 <button type="submit" class="btn btn-primary">Add Course</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal('addDefinedCourseModal')">Cancel</button>
@@ -1109,6 +1136,136 @@ try {
                     contentDiv.innerHTML = `<p>Error loading student details: ${error.message}</p>`;
                 });
         }
+        
+        // Dynamic course loading based on selected programme
+        document.addEventListener('DOMContentLoaded', function() {
+            const programmeSelect = document.getElementById('programme_id');
+            const courseSelect = document.getElementById('course_ids');
+            
+            // Function to load courses based on selected programme
+            function loadCoursesForProgramme(programmeId) {
+                console.log('Loading courses for programme ID:', programmeId, typeof programmeId);
+                
+                // Convert to integer to ensure it's a proper ID, and handle potential issues
+                let programmeIdInt;
+                if (typeof programmeId === 'string') {
+                    programmeIdInt = parseInt(programmeId.trim());
+                } else {
+                    programmeIdInt = parseInt(programmeId);
+                }
+                
+                console.log('Converted programme ID:', programmeIdInt, typeof programmeIdInt);
+                
+                if (!programmeIdInt || programmeIdInt <= 0) {
+                    courseSelect.innerHTML = '<option value="">-- Select Courses --</option>';
+                    console.log('Programme ID is invalid:', programmeId, programmeIdInt);
+                    return;
+                }
+                
+                // Show loading state
+                courseSelect.innerHTML = '<option value="">Loading courses...</option>';
+                
+                // Make AJAX request to get courses for the selected programme
+                fetch(`get_courses_by_programme.php?programme_id=${programmeIdInt}`)
+                    .then(response => {
+                        console.log('Response status:', response.status);
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Received data:', data);
+                        if (data.error) {
+                            courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+                            console.error('Error:', data.error);
+                        } else {
+                            courseSelect.innerHTML = '<option value="">-- Select Courses --</option>';
+                            
+                            if (data.courses && data.courses.length > 0) {
+                                data.courses.forEach(course => {
+                                    const option = document.createElement('option');
+                                    option.value = course.id;
+                                    option.textContent = `${course.name} (${course.code})`;
+                                    courseSelect.appendChild(option);
+                                });
+                            } else {
+                                courseSelect.innerHTML = '<option value="">No courses available for this programme</option>';
+                                console.log('No courses found for this programme');
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+                        console.error('Fetch error:', error);
+                    });
+            }
+            
+            // Add event listener to programme selection
+            if (programmeSelect) {
+                programmeSelect.addEventListener('change', function() {
+                    loadCoursesForProgramme(this.value);
+                });
+            }
+            
+            // Also add event listener to the add modal's programme selection
+            const addProgrammeSelect = document.getElementById('add_programme_id');
+            const addCourseSelect = document.getElementById('add_course_ids');
+            
+            if (addProgrammeSelect && addCourseSelect) {
+                addProgrammeSelect.addEventListener('change', function() {
+                    console.log('Loading courses for add modal programme ID:', this.value, typeof this.value);
+                    
+                    // Convert to integer to ensure it's a proper ID, and handle potential issues
+                    let programmeIdInt;
+                    if (typeof this.value === 'string') {
+                        programmeIdInt = parseInt(this.value.trim());
+                    } else {
+                        programmeIdInt = parseInt(this.value);
+                    }
+                    
+                    console.log('Add modal - Converted programme ID:', programmeIdInt, typeof programmeIdInt);
+                    
+                    if (!programmeIdInt || programmeIdInt <= 0) {
+                        addCourseSelect.innerHTML = '<option value="">-- Select Courses --</option>';
+                        console.log('Add modal - Programme ID is invalid:', this.value, programmeIdInt);
+                        return;
+                    }
+                    
+                    // Show loading state
+                    addCourseSelect.innerHTML = '<option value="">Loading courses...</option>';
+                    
+                    // Make AJAX request to get courses for the selected programme
+                    fetch(`get_courses_by_programme.php?programme_id=${programmeIdInt}`)
+                        .then(response => {
+                            console.log('Add modal - Response status:', response.status);
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Add modal - Received data:', data);
+                            if (data.error) {
+                                addCourseSelect.innerHTML = '<option value="">Error loading courses</option>';
+                                console.error('Error:', data.error);
+                            } else {
+                                addCourseSelect.innerHTML = '<option value="">-- Select Courses --</option>';
+                                
+                                if (data.courses && data.courses.length > 0) {
+                                    data.courses.forEach(course => {
+                                        const option = document.createElement('option');
+                                        option.value = course.id;
+                                        option.textContent = `${course.name} (${course.code})`;
+                                        addCourseSelect.appendChild(option);
+                                    });
+                                } else {
+                                    addCourseSelect.innerHTML = '<option value="">No courses available for this programme</option>';
+                                    console.log('Add modal - No courses found for this programme');
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            addCourseSelect.innerHTML = '<option value="">Error loading courses</option>';
+                            console.error('Add modal - Fetch error:', error);
+                        });
+                });
+            }
+        });
 
     </script>
 </body>
