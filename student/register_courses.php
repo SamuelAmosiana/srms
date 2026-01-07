@@ -151,6 +151,22 @@ if ($student['intake_id']) {
     $terms = ['General'];
 }
 
+// Get currently registered courses for the student in the current academic year
+$academic_year = date('Y');
+$registered_courses_stmt = $pdo->prepare("
+    SELECT ce.course_id
+    FROM course_enrollment ce
+    WHERE ce.student_user_id = ? AND ce.academic_year = ?
+");
+$registered_courses_stmt->execute([currentUserId(), $academic_year]);
+$registered_courses = $registered_courses_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+
+// Convert to associative array for quick lookup
+$registered_courses_map = [];
+foreach ($registered_courses as $course_id) {
+    $registered_courses_map[$course_id] = true;
+}
+
 // Fetch programme fees
 $stmt = $pdo->prepare("SELECT * FROM programme_fees WHERE programme_id = ? AND is_active = 1");
 $stmt->execute([$student['programme_id']]);
@@ -371,6 +387,16 @@ foreach ($programme_fees as $fee) {
             font-size: 0.9em;
             color: #666;
         }
+        
+        .course-item.registered {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        
+        .course-status {
+            color: #28a745;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body class="student-layout" data-theme="light">
@@ -582,14 +608,17 @@ foreach ($programme_fees as $fee) {
                                     <?php else: ?>
                                         <div class="courses-list">
                                             <?php foreach ($courses_by_term[$term] as $course): ?>
-                                                <div class="course-item">
+                                                <div class="course-item <?php echo isset($registered_courses_map[$course['course_id']]) ? 'registered' : ''; ?>">
                                                     <label>
-                                                        <input type="checkbox" name="courses[]" value="<?php echo $course['course_id']; ?>">
+                                                        <input type="checkbox" name="courses[]" value="<?php echo $course['course_id']; ?>" <?php echo isset($registered_courses_map[$course['course_id']]) ? 'checked' : ''; ?>>
                                                         <div class="course-details">
                                                             <span class="course-code"><?php echo htmlspecialchars($course['course_code']); ?></span> - 
                                                             <span class="course-name"><?php echo htmlspecialchars($course['course_name']); ?></span>
                                                             <br>
                                                             <span class="course-credits"><?php echo htmlspecialchars($course['credits']); ?> Credits</span>
+                                                            <?php if (isset($registered_courses_map[$course['course_id']])): ?>
+                                                                <span class="course-status"> - <strong>Registered</strong></span>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </label>
                                                 </div>
