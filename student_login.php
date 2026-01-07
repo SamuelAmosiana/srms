@@ -93,6 +93,101 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
         
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            body {
+                position: relative;
+            }
+            
+            .login-container {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                margin: 0;
+                padding: 20px;
+                width: 90%;
+                max-width: 90%;
+                min-width: 300px;
+            }
+            
+            .logo {
+                max-width: 120px;
+            }
+            
+            .logo-text {
+                font-size: 20px;
+            }
+            
+            .form-group input {
+                padding: 12px;
+            }
+            
+            .btn {
+                padding: 12px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .login-container {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                margin: 0;
+                padding: 15px;
+                width: 95%;
+                max-width: 95%;
+                min-width: 280px;
+            }
+            
+            .logo {
+                max-width: 100px;
+            }
+            
+            .logo-text {
+                font-size: 18px;
+            }
+            
+            .container h1 {
+                font-size: 22px;
+            }
+            
+            .container h2 {
+                font-size: 18px;
+            }
+        }
+        
+        @media (max-width: 400px) {
+            .login-container {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                margin: 0;
+                padding: 12px;
+                width: 98%;
+                max-width: 98%;
+                min-width: 250px;
+            }
+            
+            .logo {
+                max-width: 80px;
+            }
+            
+            .logo-text {
+                font-size: 16px;
+            }
+            
+            .form-group input {
+                padding: 10px;
+            }
+            
+            .btn {
+                padding: 10px;
+            }
+        }
+        
         .logo-container {
             text-align: center;
             margin-bottom: 30px;
