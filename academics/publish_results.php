@@ -83,6 +83,87 @@ $courses = $stmt->fetchAll();
 // Fetch academic years for dropdown
 $stmt = $pdo->query("SELECT DISTINCT academic_year FROM academic_calendars ORDER BY academic_year DESC");
 $academic_years = $stmt->fetchAll();
+
+// Fetch statistics for result cards
+
+// Count of results pending (courses without results uploaded)
+try {
+    $stmt = $pdo->prepare(
+        "SELECT c.id, c.name as course_name, p.name as programme_name, CONCAT(sp.full_name, ' (', u.username, ')') as lecturer_name 
+         FROM course c 
+         LEFT JOIN programme p ON c.programme_id = p.id 
+         LEFT JOIN lecturer_courses lc ON c.id = lc.course_id 
+         LEFT JOIN users u ON lc.lecturer_id = u.id 
+         LEFT JOIN staff_profile sp ON u.id = sp.user_id
+         WHERE c.id NOT IN (SELECT DISTINCT enrollment.course_id FROM results r JOIN course_enrollment enrollment ON r.enrollment_id = enrollment.id) 
+         AND p.category = 'undergraduate'
+         GROUP BY c.id"
+    );
+    $stmt->execute();
+    $results_pending = $stmt->fetchAll();
+    $results_pending_count = count($results_pending);
+} catch (Exception $e) {
+    $results_pending_count = 0;
+    $results_pending = [];
+}
+
+// Count of published results (results publishing schedules that have passed)
+try {
+    $stmt = $pdo->prepare(
+        "SELECT rp.*, p.name as programme_name, c.name as course_name, CONCAT(ap.full_name, ' (', ap.staff_id, ')') as creator_name 
+         FROM result_publishing rp 
+         LEFT JOIN programme p ON rp.programme_id = p.id 
+         LEFT JOIN course c ON rp.course_id = c.id 
+         LEFT JOIN admin_profile ap ON rp.created_by = ap.user_id 
+         WHERE rp.publish_date <= NOW() 
+         ORDER BY rp.publish_date DESC"
+    );
+    $stmt->execute();
+    $published_results = $stmt->fetchAll();
+    $published_results_count = count($published_results);
+} catch (Exception $e) {
+    $published_results_count = 0;
+    $published_results = [];
+}
+
+// Count of results due for publication (scheduled to be published soon)
+try {
+    $stmt = $pdo->prepare(
+        "SELECT rp.*, p.name as programme_name, c.name as course_name, CONCAT(ap.full_name, ' (', ap.staff_id, ')') as creator_name 
+         FROM result_publishing rp 
+         LEFT JOIN programme p ON rp.programme_id = p.id 
+         LEFT JOIN course c ON rp.course_id = c.id 
+         LEFT JOIN admin_profile ap ON rp.created_by = ap.user_id 
+         WHERE rp.publish_date >= CURDATE() AND rp.publish_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) 
+         AND rp.publish_date > NOW()
+         ORDER BY rp.publish_date ASC"
+    );
+    $stmt->execute();
+    $due_for_publication = $stmt->fetchAll();
+    $due_for_publication_count = count($due_for_publication);
+} catch (Exception $e) {
+    $due_for_publication_count = 0;
+    $due_for_publication = [];
+}
+
+// Count of overdue publications (past due dates)
+try {
+    $stmt = $pdo->prepare(
+        "SELECT rp.*, p.name as programme_name, c.name as course_name, CONCAT(ap.full_name, ' (', ap.staff_id, ')') as creator_name 
+         FROM result_publishing rp 
+         LEFT JOIN programme p ON rp.programme_id = p.id 
+         LEFT JOIN course c ON rp.course_id = c.id 
+         LEFT JOIN admin_profile ap ON rp.created_by = ap.user_id 
+         WHERE rp.publish_date < CURDATE() AND rp.publish_date <= NOW()
+         ORDER BY rp.publish_date ASC"
+    );
+    $stmt->execute();
+    $overdue_publications = $stmt->fetchAll();
+    $overdue_publications_count = count($overdue_publications);
+} catch (Exception $e) {
+    $overdue_publications_count = 0;
+    $overdue_publications = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -205,7 +286,7 @@ $academic_years = $stmt->fetchAll();
         }
         
         .btn-success:hover {
-            background-color: #218838;
+            background-color: var(--dark-green);
         }
         
         .form-actions {
@@ -524,43 +605,58 @@ $academic_years = $stmt->fetchAll();
         <?php endif; ?>
         
         <div class="result-stats">
-            <div class="stat-card">
+            <div class="stat-card clickable-card" id="results-pending-card" onclick="showCardDetails('results-pending')">
                 <div class="stat-icon bg-blue">
                     <i class="fas fa-chart-bar"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>12</h3>
+                    <h3><?php echo $results_pending_count; ?></h3>
                     <p>Results Pending</p>
                 </div>
             </div>
             
-            <div class="stat-card">
+            <div class="stat-card clickable-card" id="published-results-card" onclick="showCardDetails('published-results')">
                 <div class="stat-icon bg-green">
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>89%</h3>
+                    <h3><?php echo $published_results_count; ?></h3>
                     <p>Published Results</p>
                 </div>
             </div>
             
-            <div class="stat-card">
+            <div class="stat-card clickable-card" id="due-publication-card" onclick="showCardDetails('due-publication')">
                 <div class="stat-icon bg-orange">
                     <i class="fas fa-clock"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>2</h3>
+                    <h3><?php echo $due_for_publication_count; ?></h3>
                     <p>Due for Publication</p>
                 </div>
             </div>
             
-            <div class="stat-card">
+            <div class="stat-card clickable-card" id="overdue-publication-card" onclick="showCardDetails('overdue-publication')">
                 <div class="stat-icon bg-purple">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
                 <div class="stat-content">
-                    <h3>3</h3>
+                    <h3><?php echo $overdue_publications_count; ?></h3>
                     <p>Overdue Publications</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal to display card details -->
+        <div id="card-details-modal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title">Card Details</h3>
+                    <span class="close" onclick="closeModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-details-content">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -729,7 +825,240 @@ $academic_years = $stmt->fetchAll();
         <?php endif; ?>
     </main>
 
-    <script>
+        <!-- Add styles for interactive cards -->
+        <style>
+        .clickable-card {
+            cursor: pointer;
+        }
+        
+        .clickable-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 16px var(--shadow);
+        }
+        
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: var(--white);
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 900px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            background-color: var(--primary-green);
+            color: white;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #ccc;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .details-table th,
+        .details-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .details-table th {
+            background-color: var(--primary-green);
+            color: white;
+            font-weight: 600;
+        }
+        
+        .details-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .details-table tr:hover {
+            background-color: rgba(34, 139, 34, 0.05);
+        }
+        </style>
+        
+        <script>
+        // Function to show card details in modal
+        function showCardDetails(cardType) {
+            let title = '';
+            let content = '';
+            
+            switch(cardType) {
+                case 'results-pending':
+                    title = 'Results Pending';
+                    content = `
+                        <p>Courses in undergraduate programmes whose results have not been uploaded yet by respective lecturers:</p>
+                        <table class="details-table">
+                            <thead>
+                                <tr>
+                                    <th>Course</th>
+                                    <th>Programme</th>
+                                    <th>Lecturer</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($results_pending as $item): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($item['course_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['programme_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['lecturer_name'] ?? 'Not assigned'); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($results_pending)): ?>
+                                <tr>
+                                    <td colspan="3">No pending results found</td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    `;
+                    break;
+                    
+                case 'published-results':
+                    title = 'Published Results';
+                    content = `
+                        <p>Courses whose results have been published:</p>
+                        <table class="details-table">
+                            <thead>
+                                <tr>
+                                    <th>Programme</th>
+                                    <th>Course</th>
+                                    <th>Publish Date</th>
+                                    <th>Published By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($published_results as $item): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($item['programme_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['course_name']); ?></td>
+                                    <td><?php echo date('M j, Y', strtotime($item['publish_date'])); ?></td>
+                                    <td><?php echo htmlspecialchars($item['creator_name']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($published_results)): ?>
+                                <tr>
+                                    <td colspan="4">No published results found</td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    `;
+                    break;
+                    
+                case 'due-publication':
+                    title = 'Results Due for Publication';
+                    content = `
+                        <p>Courses whose results have been uploaded by lecturers and are awaiting publication by academic officers:</p>
+                        <table class="details-table">
+                            <thead>
+                                <tr>
+                                    <th>Programme</th>
+                                    <th>Course</th>
+                                    <th>Scheduled Publish Date</th>
+                                    <th>Scheduled By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($due_for_publication as $item): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($item['programme_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['course_name']); ?></td>
+                                    <td><?php echo date('M j, Y', strtotime($item['publish_date'])); ?></td>
+                                    <td><?php echo htmlspecialchars($item['creator_name']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($due_for_publication)): ?>
+                                <tr>
+                                    <td colspan="4">No results due for publication</td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    `;
+                    break;
+                    
+                case 'overdue-publication':
+                    title = 'Overdue Publications';
+                    content = `
+                        <p>Courses with overdue publication schedules:</p>
+                        <table class="details-table">
+                            <thead>
+                                <tr>
+                                    <th>Programme</th>
+                                    <th>Course</th>
+                                    <th>Overdue Date</th>
+                                    <th>Scheduled By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($overdue_publications as $item): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($item['programme_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['course_name']); ?></td>
+                                    <td><?php echo date('M j, Y', strtotime($item['publish_date'])); ?></td>
+                                    <td><?php echo htmlspecialchars($item['creator_name']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($overdue_publications)): ?>
+                                <tr>
+                                    <td colspan="4">No overdue publications</td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    `;
+                    break;
+            }
+            
+            document.getElementById('modal-title').innerHTML = title;
+            document.getElementById('modal-details-content').innerHTML = content;
+            document.getElementById('card-details-modal').style.display = 'block';
+        }
+        
+        // Function to close modal
+        function closeModal() {
+            document.getElementById('card-details-modal').style.display = 'none';
+        }
+        
         // Toggle theme function
         function toggleTheme() {
             const body = document.body;
