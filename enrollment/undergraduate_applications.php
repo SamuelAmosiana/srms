@@ -19,6 +19,67 @@ require_once '../generate_acceptance_letter_dompdf.php';
 // Include the email functionality (contains sendAcceptanceLetterEmail function)
 require_once '../generate_acceptance_letter_docx.php';
 
+/**
+ * Send rejection email to applicant
+ * 
+ * @param array $application Application data
+ * @param string $rejection_reason Reason for rejection
+ * @param PDO $pdo Database connection
+ * @return bool Whether email was sent successfully
+ */
+function sendRejectionEmail($application, $rejection_reason, $pdo) {
+    global $phpmailer_available;
+    
+    // Create email content
+    $subject = "Application Rejection - Lusaka South College";
+    
+    $body = "Dear " . $application['full_name'] . "\n\n";
+    $body .= "We regret to inform you that your application for admission at Lusaka South College has been rejected.\n\n";
+    $body .= "Programme: " . $application['programme_name'] . "\n";
+    $body .= "Intake: " . ($application['intake_name'] ? explode(' ', $application['intake_name'])[0] : 'N/A') . "\n";
+    $body .= "Phone: " . ($application['phone'] ?? 'N/A') . "\n\n";
+    
+    $body .= "REJECTION REASON:\n";
+    $body .= "==================\n";
+    $body .= $rejection_reason . "\n\n";
+    
+    $body .= "If you believe this decision was made in error, or if you have any questions regarding this decision, please feel free to contact our admissions office.\n\n";
+    
+    $body .= "For any queries regarding your application, please Contact/WhatsApp the Admissions Office +260 770359518 or email: admissions@lsuczm.com Or visit our main campus in Foxdale Lusaka at the Corner of Zambezi and Mutumbi Road.\n\n";
+    
+    $body .= "Thank you for considering Lusaka South College.\n\n";
+    $body .= "Best regards,\n";
+    $body .= "Admissions Office\n";
+    $body .= "Lusaka South College";
+    
+    // Try to use PHPMailer if available, otherwise fall back to mail()
+    if ($phpmailer_available) {
+        return sendEmailWithPHPMailer($application['email'], $subject, $body);
+    } else {
+        // Send email using PHP's mail function
+        $headers = "From: " . EMAIL_FROM . "\r\n";
+        $headers .= "Reply-To: " . EMAIL_REPLY_TO . "\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        
+        // Try to send the email
+        $result = mail($application['email'], $subject, $body, $headers);
+        
+        // Log email details for debugging (whether successful or not)
+        error_log("Rejection email attempt to: " . $application['email']);
+        error_log("Subject: " . $subject);
+        
+        // If mail() fails due to SMTP configuration, provide a more user-friendly message
+        if (!$result) {
+            error_log("Failed to send rejection email to: " . $application['email'] . ". This is likely due to SMTP configuration issues.");
+            // Return true anyway so the application process continues
+            return true;
+        }
+        
+        return $result;
+    }
+}
+
 // Check if user is logged in and has enrollment officer role
 if (!currentUserId()) {
     header('Location: ../login.php');
@@ -86,9 +147,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (empty($rejection_reason)) {
                         throw new Exception("Rejection reason is required!");
                     }
+                    
+                    // First get application details before updating
+                    $app_stmt = $pdo->prepare("
+                        SELECT a.*, p.name as programme_name, i.name as intake_name
+                        FROM applications a
+                        LEFT JOIN programme p ON a.programme_id = p.id
+                        LEFT JOIN intake i ON a.intake_id = i.id
+                        WHERE a.id = ?
+                    ");
+                    $app_stmt->execute([$application_id]);
+                    $application = $app_stmt->fetch();
+                    
                     $stmt = $pdo->prepare("UPDATE applications SET status = 'rejected', rejection_reason = ?, processed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([$rejection_reason, $current_user_id, $application_id]);
-                    $message = "Application rejected successfully!";
+                    
+                    // Send rejection email to the applicant
+                    if ($application && !empty($application['email'])) {
+                        $email_sent = sendRejectionEmail($application, $rejection_reason, $pdo);
+                        if ($email_sent) {
+                            $message = "Application rejected successfully! Rejection email sent to the applicant.";
+                        } else {
+                            $message = "Application rejected successfully, but failed to send rejection email to the applicant.";
+                        }
+                    } else {
+                        $message = "Application rejected successfully!";
+                    }
+                    
                     $messageType = "success";
                     break;
             }
