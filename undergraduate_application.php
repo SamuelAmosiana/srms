@@ -5,9 +5,9 @@ require 'auth.php';
 // Check maintenance mode
 checkMaintenanceMode($pdo);
 
-// Fetch only undergraduate programmes from the database
+// Fetch undergraduate and certificate/diploma programmes from the database
 try {
-    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE category = 'undergraduate' ORDER BY name");
+    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE category = 'undergraduate' OR category IS NULL ORDER BY name");
     $stmt->execute();
     $programmes = $stmt->fetchAll();
 } catch (Exception $e) {
