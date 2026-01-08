@@ -195,7 +195,7 @@ $stmt = $pdo->prepare("
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
-$undergraduateApplications = $stmt->fetchAll();
+$undergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get approved undergraduate applications
 $stmt = $pdo->prepare("
@@ -208,7 +208,7 @@ $stmt = $pdo->prepare("
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
-$approvedUndergraduateApplications = $stmt->fetchAll();
+$approvedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get rejected undergraduate applications
 $stmt = $pdo->prepare("
@@ -221,7 +221,7 @@ $stmt = $pdo->prepare("
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
-$rejectedUndergraduateApplications = $stmt->fetchAll();
+$rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -233,6 +233,90 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .modal-body .application-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .modal-body .detail-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .modal-body .detail-item {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 8px;
+        }
+
+        .modal-body .detail-item strong {
+            font-size: 12px;
+            color: #6C757D;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .modal-body .detail-item span {
+            font-size: 14px;
+            color: #212529;
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .modal-body .application-details {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal-body .detail-row {
+                flex-direction: column;
+            }
+        }
+
+        /* Additional styles for documents section */
+        #documents_section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #DEE2E6;
+        }
+
+        #documents_section ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #documents_section ul li {
+            padding: 8px 0;
+            border-bottom: 1px solid #DEE2E6;
+            display: flex;
+            align-items: center;
+        }
+
+        #documents_section ul li:last-child {
+            border-bottom: none;
+        }
+
+        #documents_section ul li a {
+            color: #228B22;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #documents_section ul li a:hover {
+            text-decoration: underline;
+        }
+
+        #documents_section ul li a i {
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body class="admin-layout" data-theme="light">
     <!-- Top Navigation Bar -->
@@ -490,15 +574,83 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                 <span class="close" onclick="closeModal('viewModal')">&times;</span>
             </div>
             <div class="modal-body">
-                <p><strong>Name:</strong> <span id="view_name"></span></p>
-                <p><strong>Email:</strong> <span id="view_email"></span></p>
-                <p><strong>Phone:</strong> <span id="view_phone"></span></p>
-                <p><strong>Programme:</strong> <span id="view_programme"></span></p>
-                <p><strong>Intake:</strong> <span id="view_intake"></span></p>
-                <p><strong>Submitted:</strong> <span id="view_submitted"></span></p>
-                <div id="documents_section">
-                    <strong>Documents:</strong>
-                    <ul id="documents_list"></ul>
+                <div class="application-details">
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Name:</strong> <span id="view_name"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Email:</strong> <span id="view_email"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Phone:</strong> <span id="view_phone"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Programme:</strong> <span id="view_programme"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Intake:</strong> <span id="view_intake"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Submitted:</strong> <span id="view_submitted"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Mode of Learning:</strong> <span id="view_mode_of_learning"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>NRC Number:</strong> <span id="view_nrc_number"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Gender:</strong> <span id="view_gender"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Date of Birth:</strong> <span id="view_dob"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Address:</strong> <span id="view_address"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Recommended By:</strong> <span id="view_recommended_by"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Guardian Name:</strong> <span id="view_guardian_name"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Guardian Phone:</strong> <span id="view_guardian_phone"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <strong>Relationship:</strong> <span id="view_relationship"></span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Status:</strong> <span id="view_status"></span>
+                        </div>
+                    </div>
+                    
+                    <div id="documents_section">
+                        <strong>Documents:</strong>
+                        <ul id="documents_list"></ul>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -562,6 +714,48 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
             document.getElementById('view_programme').textContent = app.programme_name || 'N/A';
             document.getElementById('view_intake').textContent = app.intake_name || 'N/A';
             document.getElementById('view_submitted').textContent = app.created_at ? new Date(app.created_at).toLocaleDateString() : 'N/A';
+            document.getElementById('view_mode_of_learning').textContent = app.mode_of_learning || 'N/A';
+            document.getElementById('view_status').textContent = app.status || 'N/A';
+            
+            // Parse documents JSON to extract additional information
+            let nrc_number = 'N/A';
+            let gender = 'N/A';
+            let recommended_by = 'N/A';
+            let guardian_name = 'N/A';
+            let guardian_phone = 'N/A';
+            let relationship = 'N/A';
+            let address = 'N/A';
+            let dob = 'N/A';
+            
+            try {
+                if (app.documents) {
+                    const documents = JSON.parse(app.documents);
+                    
+                    // Extract additional information from documents JSON
+                    if (typeof documents === 'object' && documents !== null) {
+                        nrc_number = documents.nrc_number || 'N/A';
+                        gender = documents.gender || 'N/A';
+                        recommended_by = documents.recommended_by || 'N/A';
+                        guardian_name = documents.guardian_name || 'N/A';
+                        guardian_phone = documents.guardian_phone || 'N/A';
+                        relationship = documents.relationship || 'N/A';
+                        address = documents.address || 'N/A';
+                        dob = documents.date_of_birth || documents.dob || 'N/A';
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing documents JSON:', e);
+            }
+            
+            // Set the extracted values
+            document.getElementById('view_nrc_number').textContent = nrc_number;
+            document.getElementById('view_gender').textContent = gender;
+            document.getElementById('view_recommended_by').textContent = recommended_by;
+            document.getElementById('view_guardian_name').textContent = guardian_name;
+            document.getElementById('view_guardian_phone').textContent = guardian_phone;
+            document.getElementById('view_relationship').textContent = relationship;
+            document.getElementById('view_address').textContent = address;
+            document.getElementById('view_dob').textContent = dob;
             
             const docsList = document.getElementById('documents_list');
             docsList.innerHTML = '';
@@ -599,7 +793,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll();
                     for (const key in documents) {
                         if (typeof documents[key] === 'object' && documents[key].path) {
                             fileDocs.push(documents[key]);
-                        } else if (key !== 'path' && key !== 'name' && documents[key]) {
+                        } else if (key !== 'path' && key !== 'name' && key !== 'nrc_number' && key !== 'gender' && key !== 'recommended_by' && key !== 'guardian_name' && key !== 'guardian_phone' && key !== 'relationship' && key !== 'address' && key !== 'date_of_birth' && key !== 'dob' && documents[key]) {
                             additionalInfo.push({label: key, value: documents[key]});
                         }
                     }
