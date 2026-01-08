@@ -34,9 +34,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $relationship = $_POST['relationship'];
     $recommended_by = trim($_POST['recommendedby']); // New field
     
+    // Validate required file uploads
+    $has_grade12results = isset($_FILES['grade12results']) && $_FILES['grade12results']['error'] == 0;
+    $has_previousschool = isset($_FILES['previousschool']) && $_FILES['previousschool']['error'] == 0;
+    $has_nrc_copy = isset($_FILES['nrc_copy']) && $_FILES['nrc_copy']['error'] == 0;
+    
+    // Check if required files are uploaded
+    if (!$has_grade12results) {
+        throw new Exception("Grade 12 results file is required");
+    }
+    if (!$has_previousschool) {
+        throw new Exception("Previous school documents file is required");
+    }
+    if (!$has_nrc_copy) {
+        throw new Exception("NRC copy file is required");
+    }
+    
     // Handle file uploads
     $documents = [];
-    if (isset($_FILES['grade12results']) && $_FILES['grade12results']['error'] == 0) {
+    if ($has_grade12results) {
         $documents[] = [
             'name' => $_FILES['grade12results']['name'],
             'path' => 'uploads/' . time() . '_grade12results_' . $_FILES['grade12results']['name']
@@ -44,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         move_uploaded_file($_FILES['grade12results']['tmp_name'], $documents[count($documents)-1]['path']);
     }
     
-    if (isset($_FILES['previousschool']) && $_FILES['previousschool']['error'] == 0) {
+    if ($has_previousschool) {
         $documents[] = [
             'name' => $_FILES['previousschool']['name'],
             'path' => 'uploads/' . time() . '_previousschool_' . $_FILES['previousschool']['name']
@@ -52,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         move_uploaded_file($_FILES['previousschool']['tmp_name'], $documents[count($documents)-1]['path']);
     }
     
-    if (isset($_FILES['nrc_copy']) && $_FILES['nrc_copy']['error'] == 0) {
+    if ($has_nrc_copy) {
         $documents[] = [
             'name' => $_FILES['nrc_copy']['name'],
             'path' => 'uploads/' . time() . '_nrc_copy_' . $_FILES['nrc_copy']['name']
@@ -301,8 +317,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="ug-nrc-copy">Attach NRC Copy</label>
-                        <input type="file" id="ug-nrc-copy" name="nrc_copy">
+                        <label for="ug-nrc-copy">Attach NRC Copy *</label>
+                        <input type="file" id="ug-nrc-copy" name="nrc_copy" required>
                     </div>
                     <div class="form-group">
                         <label for="ug-dob">Date of Birth *</label>
