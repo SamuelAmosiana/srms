@@ -61,9 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch all programmes for short courses
+// Fetch only short course programmes
 try {
-    $stmt = $pdo->prepare("SELECT id, name, code FROM programme ORDER BY name");
+    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE category = 'short_course' ORDER BY name");
     $stmt->execute();
     $programmes = $stmt->fetchAll();
 } catch (Exception $e) {

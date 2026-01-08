@@ -5,10 +5,9 @@ require 'auth.php';
 // Check maintenance mode
 checkMaintenanceMode($pdo);
 
-// Fetch all programmes from the database
-// Showing all programmes as both certificate and diploma programmes are relevant for undergraduate applications
+// Fetch only undergraduate programmes from the database
 try {
-    $stmt = $pdo->prepare("SELECT id, name, code FROM programme ORDER BY name");
+    $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE category = 'undergraduate' ORDER BY name");
     $stmt->execute();
     $programmes = $stmt->fetchAll();
 } catch (Exception $e) {
