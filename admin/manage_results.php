@@ -321,7 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $course_id = $_POST['course_id'];
                 
                 // Get all enrollments for the course
-                $enrollments = $pdo->prepare("SELECT ce.student_id, ce.id as enrollment_id FROM course_enrollment ce WHERE ce.course_id = ?");
+                $enrollments = $pdo->prepare("SELECT ce.student_user_id, ce.id as enrollment_id FROM course_enrollment ce WHERE ce.course_id = ?");
                 $enrollments->execute([$course_id]);
                 $students = $enrollments->fetchAll();
                 
