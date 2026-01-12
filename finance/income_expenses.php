@@ -283,9 +283,21 @@ $net_balance = $total_income - $total_expenses;
         </div>
         
         <?php if ($message): ?>
-            <div class="alert <?php echo $messageType; ?>">
-                <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($message); ?>
+            <div class="alert alert-<?php echo $messageType; ?>" id="notification-message">
+                <i class="fas fa-<?php echo $messageType === 'success' ? 'check-circle' : 'exclamation-circle'; ?>"></i> <?php echo htmlspecialchars($message); ?>
             </div>
+            <script>
+                // Auto-hide success messages after 5 seconds
+                setTimeout(function() {
+                    var msgElement = document.getElementById('notification-message');
+                    if (msgElement && '<?php echo $messageType; ?>' === 'success') {
+                        msgElement.style.opacity = '0';
+                        setTimeout(function() {
+                            msgElement.style.display = 'none';
+                        }, 300);
+                    }
+                }, 5000);
+            </script>
         <?php endif; ?>
         <?php if (!$hasPartyColumns): ?>
             <div class="alert warning">

@@ -26,8 +26,18 @@ try {
 
 // Handle report filtering
 $report_type = $_GET['type'] ?? 'combined';
-$start_date = $_GET['start_date'] ?? date('Y-m-01');
-$end_date = $_GET['end_date'] ?? date('Y-m-t');
+$start_date = $_GET['start_date'] ?? null;
+$end_date = $_GET['end_date'] ?? null;
+
+// If no dates are provided in the URL (first load), show all records by setting empty values
+if ($start_date === null && $end_date === null) {
+    $start_date = ''; // Empty means no date filter
+    $end_date = '';   // Empty means no date filter
+} elseif ($start_date === null) {
+    $start_date = date('Y-m-01');
+} elseif ($end_date === null) {
+    $end_date = date('Y-m-t');
+}
 
 // Export CSV action (respects filters)
 if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
@@ -35,13 +45,28 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
         ? "SELECT type, description, amount, created_at as date, party_type, party_name"
         : "SELECT type, description, amount, created_at as date";
     $where = '';
-    $params = [$start_date, $end_date];
+    $params = [];
     if ($report_type === 'income') {
-        $where = "WHERE type = 'income' AND created_at BETWEEN ? AND ?";
+        if (!empty($start_date) && !empty($end_date)) {
+            $where = "WHERE type = 'income' AND created_at BETWEEN ? AND ?";
+            $params = [$start_date, $end_date];
+        } else {
+            $where = "WHERE type = 'income'";
+        }
     } elseif ($report_type === 'expense') {
-        $where = "WHERE type = 'expense' AND created_at BETWEEN ? AND ?";
+        if (!empty($start_date) && !empty($end_date)) {
+            $where = "WHERE type = 'expense' AND created_at BETWEEN ? AND ?";
+            $params = [$start_date, $end_date];
+        } else {
+            $where = "WHERE type = 'expense'";
+        }
     } else {
-        $where = "WHERE created_at BETWEEN ? AND ?";
+        if (!empty($start_date) && !empty($end_date)) {
+            $where = "WHERE created_at BETWEEN ? AND ?";
+            $params = [$start_date, $end_date];
+        } else {
+            $where = "";
+        }
     }
     $sql = "$select FROM finance_transactions $where ORDER BY created_at DESC";
     $stmt = $pdo->prepare($sql);
@@ -65,22 +90,37 @@ if ($report_type === 'income') {
     $select = $hasPartyColumns
         ? "SELECT type, description, amount, created_at as transaction_date, party_type, party_name"
         : "SELECT type, description, amount, created_at as transaction_date";
-    $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'income' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
-    $stmt->execute([$start_date, $end_date]);
+    if (!empty($start_date) && !empty($end_date)) {
+        $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'income' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
+        $stmt->execute([$start_date, $end_date]);
+    } else {
+        $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'income' ORDER BY created_at DESC");
+        $stmt->execute();
+    }
     $transactions = $stmt->fetchAll();
 } elseif ($report_type === 'expense') {
     $select = $hasPartyColumns
         ? "SELECT type, description, amount, created_at as transaction_date, party_type, party_name"
         : "SELECT type, description, amount, created_at as transaction_date";
-    $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'expense' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
-    $stmt->execute([$start_date, $end_date]);
+    if (!empty($start_date) && !empty($end_date)) {
+        $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'expense' AND created_at BETWEEN ? AND ? ORDER BY created_at DESC");
+        $stmt->execute([$start_date, $end_date]);
+    } else {
+        $stmt = $pdo->prepare("$select FROM finance_transactions WHERE type = 'expense' ORDER BY created_at DESC");
+        $stmt->execute();
+    }
     $transactions = $stmt->fetchAll();
 } else {
     $select = $hasPartyColumns
         ? "SELECT type, description, amount, created_at as transaction_date, party_type, party_name"
         : "SELECT type, description, amount, created_at as transaction_date";
-    $stmt = $pdo->prepare("$select FROM finance_transactions WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC");
-    $stmt->execute([$start_date, $end_date]);
+    if (!empty($start_date) && !empty($end_date)) {
+        $stmt = $pdo->prepare("$select FROM finance_transactions WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC");
+        $stmt->execute([$start_date, $end_date]);
+    } else {
+        $stmt = $pdo->prepare("$select FROM finance_transactions ORDER BY created_at DESC");
+        $stmt->execute();
+    }
     $transactions = $stmt->fetchAll();
 }
 
@@ -222,6 +262,11 @@ foreach ($transactions as $transaction) {
         <!-- Report Filter Form -->
         <div class="form-container no-print">
             <h2>Filter Report</h2>
+            <?php if (empty($_GET['start_date']) && empty($_GET['end_date'])): ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-info-circle"></i> Showing all transactions. Apply date filters to narrow results.
+            </div>
+            <?php endif; ?>
             <form method="GET" action="finance_reports.php">
                 <div class="form-group">
                     <label for="report_type">Report Type</label>
@@ -233,16 +278,26 @@ foreach ($transactions as $transaction) {
                 </div>
                 <div class="form-group">
                     <label for="start_date">Start Date</label>
-                    <input type="date" name="start_date" id="start_date" value="<?php echo htmlspecialchars($start_date); ?>" required>
+                    <?php
+// Set default dates if not provided in URL
+$display_start_date = !empty($start_date) ? htmlspecialchars($start_date) : date('Y-m-01', strtotime('-6 months'));
+$display_end_date = !empty($end_date) ? htmlspecialchars($end_date) : date('Y-m-t');
+?>
+                    <input type="date" name="start_date" id="start_date" value="<?php echo $display_start_date; ?>" required>
                 </div>
                 <div class="form-group">
                     <label for="end_date">End Date</label>
-                    <input type="date" name="end_date" id="end_date" value="<?php echo htmlspecialchars($end_date); ?>" required>
+                    <input type="date" name="end_date" id="end_date" value="<?php echo $display_end_date; ?>" required>
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn green">Generate Report</button>
                     <button type="button" class="btn orange" onclick="window.print()">Print Report</button>
-                    <a class="btn" href="finance_reports.php?action=export_csv&type=<?php echo urlencode($report_type); ?>&start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>">Export CSV</a>
+                    <?php $exportUrl = 'finance_reports.php?action=export_csv&type=' . urlencode($report_type);
+                          if (!empty($start_date) && !empty($end_date)) {
+                              $exportUrl .= '&start_date=' . urlencode($start_date) . '&end_date=' . urlencode($end_date);
+                          }
+                    ?>
+                                        <a class="btn" href="<?php echo $exportUrl; ?>">Export CSV</a>
                 </div>
             </form>
         </div>
