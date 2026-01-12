@@ -351,9 +351,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $status = 'repeat year';
                     }
                     
-                    // Update result
+                    // Update result in both course_enrollment and results tables
                     $update_stmt = $pdo->prepare("UPDATE course_enrollment SET total_score = ?, grade = ?, status = ?, published = 1 WHERE id = ?");
-                    if ($update_stmt->execute([$total_score, $grade, $status, $student['enrollment_id']])) {
+                    $update_stmt->execute([$total_score, $grade, $status, $student['enrollment_id']]);
+                    
+                    // Also update the corresponding results table record
+                    $update_results_stmt = $pdo->prepare("UPDATE results SET grade = ? WHERE enrollment_id = ?");
+                    $update_results_stmt->execute([$grade, $student['enrollment_id']]);
+                    
+                    // Increment published counter if course_enrollment was updated
+                    if ($update_stmt->rowCount() > 0) {
                         $published++;
                     }
                 }
