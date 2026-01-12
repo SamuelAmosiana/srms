@@ -20,3 +20,27 @@ Thumbs.db
 # Composer
 vendor/
 composer.lock
+
+# Configuration files (NEVER commit these!)
+config.php
+db_conn.php
+email_config.php
+.env
+
+# Uploaded files
+uploads/
+letters/
+
+# Server-generated files
+*.log
+error_log
+*.tmp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Development files
+.idea/
+.vscode/
+node_modules/
