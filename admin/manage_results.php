@@ -337,8 +337,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $total_score += ($score['score'] * $score['weight'] / 100);
                     }
                     
-                    // Get grade
-                    $grade_stmt = $pdo->prepare("SELECT grade FROM grading_scale WHERE min_score <= ? AND max_score >= ?");
+                    // Get grade - order by min_score DESC to get the highest applicable grade
+                    $grade_stmt = $pdo->prepare("SELECT grade FROM grading_scale WHERE min_score <= ? AND max_score >= ? ORDER BY min_score DESC LIMIT 1");
                     $grade_stmt->execute([$total_score, $total_score]);
                     $grade = $grade_stmt->fetchColumn() ?: 'F';
                     
