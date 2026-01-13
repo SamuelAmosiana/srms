@@ -424,13 +424,13 @@ $ca_results = $stmt->fetchAll();
             <p>Your academic results and transcript</p>
         </div>
         
-        <?php if ($balance > 0 && !$access_granted): ?>
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i> Your fee balance is K<?php echo number_format($balance, 2); ?>. Access to exam results is restricted. You can only view CA results. Please contact finance to settle your balance.
-            </div>
-        <?php elseif (!$results_access && $access_granted): ?>
+        <?php if ((int)$results_access === 0): ?>
             <div class="alert alert-warning">
                 <i class="fas fa-exclamation-triangle"></i> Access to exam results has been restricted by the Finance Department. Please contact the Finance Department for assistance.
+            </div>
+        <?php elseif ($balance > 0): ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> Your fee balance is K<?php echo number_format($balance, 2); ?>. Access to exam results is restricted until your balance is cleared. You can only view CA results.
             </div>
         <?php endif; ?>
         
@@ -480,6 +480,7 @@ $ca_results = $stmt->fetchAll();
         <?php endif; ?>
         
         <!-- Examination Results & GPA Computation -->
+        <?php if ($access_granted): ?>
         <h2 class="section-title">Examination Results & GPA Computation</h2>
         
         <div class="note">
@@ -587,6 +588,10 @@ $ca_results = $stmt->fetchAll();
         <?php else: ?>
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i> No results available yet.
+            </div>
+        <?php endif; ?>        <?php else: ?>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Exam results and GPA are currently unavailable due to finance restrictions. You can view your Continuous Assessment results above.
             </div>
         <?php endif; ?>
     </main>

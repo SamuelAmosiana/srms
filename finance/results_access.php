@@ -234,7 +234,7 @@ $students = $stmt->fetchAll();
                 <div class="form-group">
                     <label for="bulk_action">Action</label>
                     <select name="bulk_action" id="bulk_action" required>
-                        <option value="grant">Grant Access</option>
+                        <option value="">Select Action</option>`r`n                        <option value="grant">Grant Access</option>
                         <option value="restrict">Restrict Access</option>
                     </select>
                 </div>
@@ -284,7 +284,7 @@ $students = $stmt->fetchAll();
                                     <input type="hidden" name="student_id" value="<?php echo $student['student_id']; ?>">
                                     <select name="results_access" onchange="if(this.value !== '') this.form.submit();">
                                         <option value="">Select Action</option>
-                                        <option value="1" <?php echo $student['results_access'] ? 'selected' : ''; ?>>Grant Access</option>
+                                        <option value="1">Grant Access</option>
                                         <option value="0" <?php echo !$student['results_access'] ? 'selected' : ''; ?>>Restrict Access</option>
                                     </select>
                                     <input type="hidden" name="update_access" value="1">
