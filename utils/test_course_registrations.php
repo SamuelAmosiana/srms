@@ -1,6 +1,6 @@
 <?php
 // Test if course_registrations.php queries work now
-require_once 'config.php';
+require_once '../config.php';
 
 try {
     echo "Testing course registration queries...\n";

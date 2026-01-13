@@ -1,6 +1,6 @@
 <?php
 // Debug script to understand the user list issue
-require 'config.php';
+require '../config.php';
 
 echo "Debugging User List Issue\n";
 echo "========================\n\n";

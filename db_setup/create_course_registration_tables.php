@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once '../config.php';
 
 try {
     echo "Creating course_registration table...\n";

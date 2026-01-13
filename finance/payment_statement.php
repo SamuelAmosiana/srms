@@ -3,7 +3,7 @@ require '../config.php';
 require '../auth/auth.php';
 
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit;
 }
 

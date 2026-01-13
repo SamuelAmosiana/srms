@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 echo "Creating student accounts from pending students...\n";
 

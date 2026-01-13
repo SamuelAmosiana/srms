@@ -4,7 +4,7 @@ require '../auth/auth.php';
 
 // Check if user is logged in and has sub admin role
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit;
 }
 

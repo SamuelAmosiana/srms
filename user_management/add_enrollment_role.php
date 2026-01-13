@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 try {
     $stmt = $pdo->prepare("INSERT IGNORE INTO roles (name, description) VALUES (?, ?)");

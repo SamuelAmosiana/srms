@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'config.php';
+require_once '../config.php';
 
 $message = '';
 $messageType = '';
@@ -39,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>First Time Login - LSC SRMS</title>
-    <link rel="icon" type="image/jpeg" href="assets/images/school_logo.jpg">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
+    <link rel="stylesheet" href="../assets/css/style.css">
     <style>
         /* Simple icon replacements using CSS */
         .icon-sign-in:before { content: "→"; }
@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body class="login-body">
     <div class="login-container">
         <div class="logo-container">
-            <img src="assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
+            <img src="../assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
             <span class="logo-text">Lusaka South College</span>
             <p>First Time Registration Portal</p>
         </div>
@@ -176,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </form>
         
         <div class="back-link">
-            <a href="student_login.php">← Back to Student Login</a>
+            <a href="../auth/student_login.php">← Back to Student Login</a>
         </div>
         
         <div class="login-footer">

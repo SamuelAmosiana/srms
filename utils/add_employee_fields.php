@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 echo "Adding new fields to employees table...\n";
 

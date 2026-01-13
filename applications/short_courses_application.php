@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 require '../auth/auth.php';
 
 // Check maintenance mode
@@ -75,8 +75,8 @@ try {
 <head>
     <meta charset="UTF-8">
     <title>Short Courses Application - LSC SRMS</title>
-    <link rel="icon" type="image/jpeg" href="assets/images/school_logo.jpg">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
+    <link rel="stylesheet" href="../assets/css/style.css">
     <style>
         .container {
             max-width: 1000px;
@@ -202,7 +202,7 @@ try {
         <p>Enroll in professional development and skill enhancement courses</p>
         
         <div class="back-link">
-            <a href="enroll.php">← Back to Enrollment Options</a> | 
+            <a href="./enroll.php">← Back to Enrollment Options</a> | 
             <a href="https://lsuczm.com/#home">← Home</a>
         </div>
         

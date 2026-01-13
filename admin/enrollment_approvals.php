@@ -8,13 +8,13 @@ require_once '../finance/generate_acceptance_letter_with_fees.php';
 
 // Check if user is logged in and has permission
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 
 // Check if user has admin role or enrollment_approvals permission
 if (!currentUserHasRole('Super Admin', $pdo) && !currentUserHasPermission('enrollment_approvals', $pdo)) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 

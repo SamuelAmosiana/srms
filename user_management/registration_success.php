@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registration Submitted - LSC SRMS</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .success-container {
@@ -79,7 +79,7 @@
         <p>You will receive an email with your student number and login credentials once your registration is approved.</p>
         <p>Please check your email (including spam/junk folder) within 2-3 business days.</p>
         
-        <a href="student_login.php" class="btn btn-primary">
+        <a href="../auth/student_login.php" class="btn btn-primary">
             <i class="fas fa-sign-in-alt"></i> Go to Student Login
         </a>
         

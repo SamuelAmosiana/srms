@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 try {
     $stmt = $pdo->query("SELECT * FROM student_profile WHERE student_number LIKE 'STU-%'");

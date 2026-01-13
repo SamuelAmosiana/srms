@@ -5,13 +5,13 @@ require_once '../auth/auth.php';
 
 // Check if user is logged in and has permission
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 
 // Check if user has admin role or manage_results permission
 if (!currentUserHasRole('Super Admin', $pdo) && !currentUserHasPermission('manage_results', $pdo)) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 

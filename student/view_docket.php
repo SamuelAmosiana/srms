@@ -5,7 +5,7 @@ require '../lib/fpdf/fpdf.php';
 
 // Check if user is logged in and has student role
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit;
 }
 
@@ -24,7 +24,7 @@ $student = $stmt->fetch();
 
 if (!$student) {
     // Student profile not found
-    header('Location: ../student_login.php');
+    header('Location: ../auth/student_login.php');
     exit();
 }
 

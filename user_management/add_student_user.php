@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 try {
     $hash = password_hash('LSC000002', PASSWORD_DEFAULT);

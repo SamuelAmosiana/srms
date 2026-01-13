@@ -82,7 +82,7 @@ function sendRejectionEmail($application, $rejection_reason, $pdo) {
 
 // Check if user is logged in and has enrollment officer role
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit;
 }
 

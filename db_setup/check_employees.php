@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 echo "Checking for employees in the database:\n";
 

@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once '../config.php';
 try {
     echo "Course Table Structure:\n";
     $stmt = $pdo->query('DESCRIBE course');

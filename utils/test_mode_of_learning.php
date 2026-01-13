@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 try {
     // Test inserting a sample application with mode_of_learning

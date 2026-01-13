@@ -1,6 +1,6 @@
 <?php
 // create_user.php (example)
-require 'config.php';
+require 'config.php'; // Note: This file is in root directory, so path is correct
 
 $username = $_POST['username']; // e.g. email
 $password = $_POST['password'];

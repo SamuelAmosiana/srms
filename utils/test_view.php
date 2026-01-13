@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 require '../auth/auth.php';
 
 // Check if user is logged in

@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <title>Enroll - LSC SRMS</title>
     <link rel="icon" type="image/jpeg" href="assets/images/school_logo.jpg">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
     <style>
         .container {
             max-width: 1200px;
@@ -98,20 +98,20 @@
                 <div class="icon">🎓</div>
                 <h3>Undergraduate Programs</h3>
                 <p>Apply for diploma and certificate programs for first-time university students.</p>
-                <a href="undergraduate_application.php" class="btn">Apply Now</a>
+                <a href="./undergraduate_application.php" class="btn">Apply Now</a>
             </div>
             
             <div class="enrollment-card">
                 <div class="icon">📚</div>
                 <h3>Short Courses</h3>
                 <p>Professional development and skill enhancement courses for career growth.</p>
-                <a href="short_courses_application.php" class="btn">Enroll Now</a>
+                <a href="./short_courses_application.php" class="btn">Enroll Now</a>
             </div>
             
         </div>
         
         <div class="back-link">
-            <a href="index.php">← Back to Home</a>
+            <a href="../index.php">← Back to Home</a>
         </div>
     </div>
 </body>

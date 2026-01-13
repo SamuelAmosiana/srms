@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -49,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Portal</title>
-    <link rel="icon" type="image/jpeg" href="assets/images/school_logo.jpg">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
 <div class="container">
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit">🚀 Login</button>
     </form>
     <div class="back-link">
-        <a href="index.php">← Back to Home</a>
+        <a href="../index.php">← Back to Home</a>
     </div>
 </div>
 </body>

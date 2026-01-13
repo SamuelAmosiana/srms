@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 echo "Adding KYC fields to employees table...\n";
 

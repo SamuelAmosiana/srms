@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once '../config.php';
 require_once 'generate_acceptance_letter_dompdf.php';
 
 // This script regenerates an acceptance letter for a specific application ID

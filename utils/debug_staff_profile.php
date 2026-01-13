@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 echo "<h2>Debugging Staff Profile Issue</h2>\n";
 

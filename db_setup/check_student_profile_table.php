@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once '../config.php';
 try {
     $stmt = $pdo->query('DESCRIBE student_profile');
     $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);

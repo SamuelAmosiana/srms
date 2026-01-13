@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 $stmt = $pdo->prepare("SELECT id, username, password_hash FROM users WHERE username = ?");
 $stmt->execute(['LSC000002']);

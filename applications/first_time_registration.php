@@ -2,7 +2,7 @@
 // Remove all login requirements and session checks
 // This will be an independent registration form accessed via direct link
 
-require_once 'config.php';
+require_once '../config.php';
 
 // Ensure pending_students table has all required columns
 try {
@@ -147,9 +147,9 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>First Time Registration - LSC SRMS</title>
-    <link rel="icon" type="image/jpeg" href="assets/images/school_logo.jpg">
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/student-dashboard.css">
+    <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/student-dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .registration-container {
@@ -301,7 +301,7 @@ try {
     <nav class="top-nav">
         <div class="nav-left">
             <div class="logo-container">
-                <img src="assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
+                <img src="../assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
                 <span class="logo-text">LSC SRMS</span>
             </div>
         </div>

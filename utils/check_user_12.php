@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 $stmt = $pdo->prepare('SELECT username FROM users WHERE id = 12');
 $stmt->execute();

@@ -1,6 +1,6 @@
 <?php
 // Comprehensive test for the complete acceptance letter generation flow
-require_once 'config.php';
+require_once '../config.php';
 require_once 'generate_acceptance_letter_dompdf.php';
 
 echo "<h2>Testing Complete Acceptance Letter Generation Flow</h2>\n";

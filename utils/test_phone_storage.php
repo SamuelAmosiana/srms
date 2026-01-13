@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 try {
     // Get a sample application record to see how phone is stored

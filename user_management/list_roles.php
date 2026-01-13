@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM roles ORDER BY name");

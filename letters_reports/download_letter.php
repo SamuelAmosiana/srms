@@ -1,5 +1,5 @@
 ﻿<?php
-require 'config.php';
+require '../config.php';
 require '../auth/auth.php';
 
 // Resolve requested filename from multiple URL styles

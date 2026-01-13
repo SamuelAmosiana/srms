@@ -5,7 +5,7 @@
 </head>
 <body>
 <?php
-require 'config.php';
+require '../config.php';
 
 echo "<h2>Database Content Check</h2>";
 

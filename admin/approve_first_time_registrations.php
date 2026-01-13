@@ -6,13 +6,13 @@ require_once '../send_temporary_credentials.php';
 
 // Check if user is logged in and has permission
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 
 // Check if user has admin role
 if (!currentUserHasRole('Super Admin', $pdo) && !currentUserHasRole('Sub Admin (Finance)', $pdo)) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 

@@ -6,13 +6,13 @@ require_once '../lib/fpdf/fpdf.php'; // Include FPDF for PDF generation
 
 // Check if user is logged in and has permission
 if (!currentUserId()) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 
 // Check if user has admin role or reports permission
 if (!currentUserHasRole('Super Admin', $pdo) && !currentUserHasPermission('reports', $pdo)) {
-    header('Location: ../login.php');
+    header('Location: ../auth/login.php');
     exit();
 }
 
