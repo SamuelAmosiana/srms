@@ -1,6 +1,6 @@
 <?php
 require '../config.php';
-require '../auth.php';
+require '../auth/auth.php';
 require '../lib/fpdf/fpdf.php';
 
 // Check if user is logged in and has student role

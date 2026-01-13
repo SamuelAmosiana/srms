@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require '../config.php';
 
 // Create emergency access table if it doesn't exist
 try {

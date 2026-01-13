@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once '../auth.php';
+require_once '../auth/auth.php';
 
 // Include the new acceptance letter with fees function
 require_once '../finance/generate_acceptance_letter_with_fees.php';

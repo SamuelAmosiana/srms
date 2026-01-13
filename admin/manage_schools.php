@@ -1,6 +1,6 @@
 <?php
 require '../config.php';
-require '../auth.php';
+require '../auth/auth.php';
 
 // Check if user is logged in and has admin role
 if (!currentUserId()) {

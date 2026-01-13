@@ -1,6 +1,6 @@
 session_start();
 require_once '../config.php';
-require_once '../auth.php';
+require_once '../auth/auth.php';
 
 // Initialize variables
 $pending_registrations = [];

@@ -1,6 +1,6 @@
 <?php
 require '../config.php';
-require '../auth.php';
+require '../auth/auth.php';
 require_once '../email_config.php';
 
 // Try to load PHPMailer if available

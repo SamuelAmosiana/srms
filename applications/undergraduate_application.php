@@ -1,6 +1,6 @@
 <?php
 require 'config.php';
-require 'auth.php';
+require '../auth/auth.php';
 
 // Check maintenance mode
 checkMaintenanceMode($pdo);

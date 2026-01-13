@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once '../auth.php';
+require_once '../auth/auth.php';
 
 // Check if user is logged in
 if (!currentUserId()) {
