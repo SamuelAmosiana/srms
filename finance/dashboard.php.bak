@@ -107,18 +107,15 @@ $stmt = $pdo->query("SELECT COUNT(*) as count FROM student_profile");
 $stats['total_students'] = $stmt->fetch()['count'];
 
 // Total fees collected (assuming a payments table exists; adjust query as needed)
-$stmt = $pdo->query("SELECT COALESCE(SUM(amount),0) as total FROM finance_transactions WHERE type = 'income'");
+$stmt = $pdo->query("SELECT SUM(amount) as total FROM payments WHERE status = 'paid'");
 $stats['total_fees_collected'] = $stmt->fetch()['total'] ?? 0;
 
 // Total outstanding fees (assuming a fees table; adjust query as needed)
-$stmt = $pdo->query("SELECT COALESCE(SUM(pf.fee_amount),0) as total_due
-    FROM student_profile sp
-    JOIN programme_fees pf ON pf.programme_id = sp.programme_id
-    WHERE (pf.is_active = 1 OR pf.is_active IS NULL)");
+$stmt = $pdo->query("SELECT SUM(balance) as total FROM student_fees");
 $stats['total_outstanding'] = $stmt->fetch()['total'] ?? 0;
 
 // Total expenses (assuming an expenses table; adjust query as needed)
-$stmt = $pdo->query("SELECT COALESCE(SUM(amount),0) as total FROM finance_transactions WHERE type = 'expense'");
+$stmt = $pdo->query("SELECT SUM(amount) as total FROM expenses");
 $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
 ?>
 <!DOCTYPE html>
