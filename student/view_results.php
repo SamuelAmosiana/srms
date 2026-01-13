@@ -20,12 +20,13 @@ $stmt = $pdo->prepare("SELECT name FROM programme WHERE id = ?");
 $stmt->execute([$student['programme_id']]);
 $programme = $stmt->fetch()['name'] ?? 'N/A';
 
-// Get fee balance and access (using balance column from student_profile)
-$stmt = $pdo->prepare("SELECT balance FROM student_profile WHERE user_id = ?");
+// Get fee balance and results access (using balance and results_access columns from student_profile)
+$stmt = $pdo->prepare("SELECT balance, results_access FROM student_profile WHERE user_id = ?");
 $stmt->execute([currentUserId()]);
-$fees = $stmt->fetch();
-$balance = $fees['balance'] ?? 0;
-$access_granted = ($balance == 0); // Grant access if balance is zero
+$student_data = $stmt->fetch();
+$balance = $student_data['balance'] ?? 0;
+$results_access = $student_data['results_access'] ?? 1; // Default to granted if column doesn't exist
+$access_granted = ($balance == 0 && $results_access == 1); // Grant access if balance is zero AND results access is granted
 
 // Fetch all results grouped by academic year with course credits and admin comments
 $results_by_year = [];
@@ -426,6 +427,10 @@ $ca_results = $stmt->fetchAll();
         <?php if ($balance > 0 && !$access_granted): ?>
             <div class="alert alert-warning">
                 <i class="fas fa-exclamation-triangle"></i> Your fee balance is K<?php echo number_format($balance, 2); ?>. Access to exam results is restricted. You can only view CA results. Please contact finance to settle your balance.
+            </div>
+        <?php elseif (!$results_access && $access_granted): ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> Access to exam results has been restricted by the Finance Department. Please contact the Finance Department for assistance.
             </div>
         <?php endif; ?>
         

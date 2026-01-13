@@ -9,7 +9,16 @@ if (!currentUserId()) {
 
 requireRole('Sub Admin (Finance)', $pdo);
 
-$student_number = $_GET['student_number'] ?? '';
+// Accept student_number or fallback aliases commonly used in links
+$student_number = $_GET['student_number'] ?? ($_GET['student_id'] ?? '');
+
+// If not provided but user_id is given, resolve to student_number
+if ($student_number === '' && isset($_GET['user_id']) && ctype_digit((string)$_GET['user_id'])) {
+    $tmpStmt = $pdo->prepare("SELECT student_number FROM student_profile WHERE user_id = ?");
+    $tmpStmt->execute([$_GET['user_id']]);
+    $student_number = (string)($tmpStmt->fetchColumn() ?: '');
+}
+
 if ($student_number === '') {
     http_response_code(400);
     echo 'Missing student_number';

@@ -25,13 +25,29 @@ try {
 // Handle single student results access update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_access'])) {
     $student_id = $_POST['student_id'];
-    $results_access = $_POST['results_access'] === '1' ? 1 : 0;
+    $results_access_input = $_POST['results_access'];
     
-    // Update results access
-    $stmt = $pdo->prepare("UPDATE student_profile SET results_access = ? WHERE student_number = ?");
-    $stmt->execute([$results_access, $student_id]);
-    
-    $success_message = "Results access updated successfully!";
+    // Only update if a valid action is selected (not empty)
+    if ($results_access_input !== '') {
+        $results_access = $results_access_input === '1' ? 1 : 0;
+        
+        try {
+            // Update results access
+            $stmt = $pdo->prepare("UPDATE student_profile SET results_access = ? WHERE student_number = ?");
+            $result = $stmt->execute([$results_access, $student_id]);
+            
+            if ($stmt->rowCount() > 0) {
+                $success_message = "Results access updated successfully!";
+            } else {
+                $error_message = "No rows were updated. Student ID may not exist.";
+            }
+        } catch (Exception $e) {
+            $error_message = "Error updating results access: " . $e->getMessage();
+        }
+    } else {
+        // If no action was selected (empty value), just continue without updating
+        // No message needed as no action was taken
+    }
 }
 
 // Handle bulk results access update
@@ -40,11 +56,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_update_access'])
     $bulk_action = $_POST['bulk_action'] === 'grant' ? 1 : 0;
     
     if (!empty($student_ids)) {
-        $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
-        $stmt = $pdo->prepare("UPDATE student_profile SET results_access = ? WHERE student_number IN ($placeholders)");
-        $stmt->execute(array_merge([$bulk_action], $student_ids));
-        
-        $success_message = "Bulk results access updated successfully!";
+        try {
+            $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
+            $stmt = $pdo->prepare("UPDATE student_profile SET results_access = ? WHERE student_number IN ($placeholders)");
+            $result = $stmt->execute(array_merge([$bulk_action], $student_ids));
+            
+            if ($stmt->rowCount() > 0) {
+                $success_message = "Bulk results access updated successfully! ({$stmt->rowCount()} students affected)";
+            } else {
+                $error_message = "No rows were updated. Student IDs may not exist.";
+            }
+        } catch (Exception $e) {
+            $error_message = "Error updating bulk results access: " . $e->getMessage();
+        }
     } else {
         $error_message = "No students selected for bulk update.";
     }
@@ -258,7 +282,8 @@ $students = $stmt->fetchAll();
                             <td>
                                 <form method="POST" action="results_access.php">
                                     <input type="hidden" name="student_id" value="<?php echo $student['student_id']; ?>">
-                                    <select name="results_access" onchange="this.form.submit()">
+                                    <select name="results_access" onchange="if(this.value !== '') this.form.submit();">
+                                        <option value="">Select Action</option>
                                         <option value="1" <?php echo $student['results_access'] ? 'selected' : ''; ?>>Grant Access</option>
                                         <option value="0" <?php echo !$student['results_access'] ? 'selected' : ''; ?>>Restrict Access</option>
                                     </select>
