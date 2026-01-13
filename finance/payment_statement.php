@@ -10,7 +10,12 @@ if (!currentUserId()) {
 requireRole('Sub Admin (Finance)', $pdo);
 
 // Accept student_number or fallback aliases commonly used in links
-$student_number = $_GET['student_number'] ?? ($_GET['student_id'] ?? '');
+$student_number = $_GET['student_number']
+    ?? ($_GET['student_id']
+    ?? ($_GET['sid']
+    ?? ($_GET['sn']
+    ?? ($_GET['student']
+    ?? ($_GET['id'] ?? '')))));
 
 // If not provided but user_id is given, resolve to student_number
 if ($student_number === '' && isset($_GET['user_id']) && ctype_digit((string)$_GET['user_id'])) {
@@ -19,9 +24,47 @@ if ($student_number === '' && isset($_GET['user_id']) && ctype_digit((string)$_G
     $student_number = (string)($tmpStmt->fetchColumn() ?: '');
 }
 
+// Support pretty URL: /finance/payment_statement/LSC000123
+if ($student_number === '' && !empty($_SERVER['REQUEST_URI'])) {
+    if (preg_match('#/payment_statement(?:\.php)?/([^/?]+)#', $_SERVER['REQUEST_URI'], $m)) {
+        $student_number = urldecode($m[1]);
+    }
+}
+
+// Support bare query string like /payment_statement?LSC000123
+if ($student_number === '' && !empty($_SERVER['QUERY_STRING']) && strpos($_SERVER['QUERY_STRING'],'=') === false) {
+    $student_number = urldecode($_SERVER['QUERY_STRING']);
+}
+
 if ($student_number === '') {
-    http_response_code(400);
-    echo 'Missing student_number';
+    // Render a simple input to allow manual entry when no identifier provided
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Payment Statement - Enter Student Number</title>
+        <link rel="stylesheet" href="../assets/css/style.css">
+        <link rel="stylesheet" href="../assets/css/admin-dashboard.css">
+    </head>
+    <body class="admin-layout" data-theme="light" style="padding:20px;">
+        <div class="form-container" style="max-width:520px;margin:40px auto;">
+            <h2>Open Payment Statement</h2>
+            <form method="GET" action="">
+                <div class="form-group">
+                    <label for="student_number">Student Number</label>
+                    <input type="text" name="student_number" id="student_number" placeholder="e.g., LSC000123" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn green">View Statement</button>
+                    <a class="btn" href="view_students.php">Back to Students</a>
+                </div>
+            </form>
+        </div>
+    </body>
+    </html>
+    <?php
     exit;
 }
 
@@ -64,8 +107,30 @@ if (empty($transactions) && $partyCols) {
     $transactions = $stmt->fetchAll();
 }
 
-// Totals derived from transactions and profile balance
-$total_due = null; $total_paid = null; $computed_balance = null; // not using student_fees here
+// Totals derived from transactions and programme fees
+$total_due = null; $total_paid = null; $computed_balance = null;
+
+// Sum of payments (income transactions tied to this student)
+$sum_paid = 0.0;
+foreach ($transactions as $t) { $sum_paid += (float)$t['amount']; }
+$total_paid = $sum_paid;
+
+// Compute total due from active programme fees for the student's programme
+if (!empty($student['student_number'])) {
+    $dueStmt = $pdo->prepare("SELECT COALESCE(SUM(pf.fee_amount),0) as total_due
+        FROM student_profile sp
+        JOIN programme_fees pf ON pf.programme_id = sp.programme_id
+        WHERE sp.student_number = ? AND (pf.is_active = 1 OR pf.is_active IS NULL)");
+    $dueStmt->execute([$student['student_number']]);
+    $total_due = (float)($dueStmt->fetch()['total_due'] ?? 0);
+}
+
+// Prefer profile balance if available; otherwise compute as due - paid (not below zero)
+if (isset($student['balance']) && $student['balance'] !== null) {
+    $computed_balance = (float)$student['balance'];
+} elseif ($total_due !== null) {
+    $computed_balance = max(0.0, $total_due - $total_paid);
+}
 
 // If CSV export requested
 if (isset($_GET['action']) && $_GET['action'] === 'csv') {
@@ -93,9 +158,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'csv') {
     exit;
 }
 
-// Calculate sum paid from transactions for display
-$sum_paid = 0.0;
-foreach ($transactions as $t) { $sum_paid += (float)$t['amount']; }
+// Calculate sum paid and current balance for display/footer
 $current_balance = isset($student['balance']) ? (float)$student['balance'] : ($computed_balance ?? null);
 ?>
 <!DOCTYPE html>
