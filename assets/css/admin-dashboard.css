@@ -92,7 +92,7 @@ html {
     padding: 30px 40px;
     margin-bottom: 20px;
     box-shadow: 0 2px 8px var(--shadow);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);`r`n    -webkit-backdrop-filter: blur(10px);
 }
 
 .header-content {
@@ -219,7 +219,7 @@ html {
     box-shadow: 0 2px 8px var(--shadow);
     margin-bottom: 20px;
     overflow: hidden;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);`r`n    -webkit-backdrop-filter: blur(10px);
 }
 
 .panel-header {
@@ -301,7 +301,7 @@ html {
     gap: 20px;
     transition: all 0.3s ease;
     min-height: 120px;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);`r`n    -webkit-backdrop-filter: blur(10px);
 }
 
 .stat-card:hover {
@@ -1071,7 +1071,7 @@ html {
     grid-template-columns: 200px 180px 1fr auto;
     gap: 15px;
     align-items: flex-end;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);`r`n    -webkit-backdrop-filter: blur(10px);
 }
 
 @media (max-width: 1024px) {
@@ -1348,7 +1348,7 @@ html {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);`r`n    -webkit-backdrop-filter: blur(10px);
     animation: fadeIn 0.3s ease;
 }
 
@@ -1368,7 +1368,7 @@ html {
     animation: slideDown 0.3s ease;
     max-height: 90vh;
     overflow-y: auto;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);`r`n    -webkit-backdrop-filter: blur(10px);
 }
 
 @keyframes slideDown {
@@ -1459,7 +1459,7 @@ html {
     padding: 40px;
     box-shadow: 0 2px 8px var(--shadow);
     margin-bottom: 25px;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);`r`n    -webkit-backdrop-filter: blur(10px);
 }
 
 @media (max-width: 768px) {
@@ -1993,7 +1993,7 @@ html {
     align-items: center;
     gap: 10px;
     cursor: pointer;
-    user-select: none;
+    user-select: none;`r`n    -webkit-user-select: none;
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -2116,7 +2116,7 @@ html {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);`r`n    -webkit-backdrop-filter: blur(10px);
 }
 
 .modal-content {
@@ -2252,7 +2252,7 @@ html {
     align-items: center;
     gap: 12px;
     cursor: pointer;
-    user-select: none;
+    user-select: none;`r`n    -webkit-user-select: none;
     color: var(--text-dark);
     font-weight: 500;
 }

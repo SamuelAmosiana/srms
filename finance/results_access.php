@@ -122,7 +122,7 @@ $students = $stmt->fetchAll();
                 <img src="../assets/images/lsc-logo.png" alt="LSC Logo" class="logo" onerror="this.style.display='none'">
                 <span class="logo-text">LSC SRMS</span>
             </div>
-            <button class="sidebar-toggle" onclick="toggleSidebar()">
+            <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" title="Toggle sidebar">
                 <i class="fas fa-bars"></i>
             </button>
         </div>
@@ -143,7 +143,7 @@ $students = $stmt->fetchAll();
                 </button>
                 
                 <div class="dropdown">
-                    <button class="profile-btn" onclick="toggleDropdown()">
+                    <button class="profile-btn" onclick="toggleDropdown()" aria-label="Open profile menu" title="Open profile menu">
                         <i class="fas fa-user-circle"></i>
                         <i class="fas fa-chevron-down"></i>
                     </button>
@@ -259,7 +259,7 @@ $students = $stmt->fetchAll();
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                        <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()" aria-label="Select all students" title="Select all students"></th>
                         <th>Student ID</th>
                         <th>Full Name</th>
                         <th>Fee Balance (K)</th>
@@ -270,7 +270,7 @@ $students = $stmt->fetchAll();
                 <tbody>
                     <?php foreach ($students as $student): ?>
                         <tr>
-                            <td><input type="checkbox" name="selected_students[]" form="bulkForm" value="<?php echo $student['student_id']; ?>"></td>
+                            <td><input type="checkbox" name="selected_students[]" form="bulkForm" value="<?php echo $student['student_id']; ?>" aria-label="Select student <?php echo htmlspecialchars($student['student_id']); ?>" title="Select student <?php echo htmlspecialchars($student['student_id']); ?>"></td>
                             <td><?php echo htmlspecialchars($student['student_id']); ?></td>
                             <td><?php echo htmlspecialchars($student['full_name']); ?></td>
                             <td><?php echo number_format($student['balance'] ?? 0, 2); ?></td>
@@ -282,11 +282,7 @@ $students = $stmt->fetchAll();
                             <td>
                                 <form method="POST" action="results_access.php">
                                     <input type="hidden" name="student_id" value="<?php echo $student['student_id']; ?>">
-                                    <select name="results_access" onchange="if(this.value !== '') this.form.submit();">
-                                        <option value="">Select Action</option>
-                                        <option value="1">Grant Access</option>
-                                        <option value="0" <?php echo !$student['results_access'] ? 'selected' : ''; ?>>Restrict Access</option>
-                                    </select>
+                                    <select name="results_access" onchange="if(this.value !== ') this.form.submit();" aria-label="Set results access for <?php echo htmlspecialchars($student['student_id']); ?>" title="Set results access for <?php echo htmlspecialchars($student['student_id']); ?>">" title="Set results access for <?php echo htmlspecialchars($student['student_id']); ?>">`r`n                                        <option value="">Select Action</option>`r`n                                        <option value="1" <?php echo ((int)$student['results_access'] === 1) ? 'selected' : ''; ?>>Grant Access</option>`r`n                                        <option value="0" <?php echo ((int)$student['results_access'] === 0) ? 'selected' : ''; ?>>Restrict Access</option>`r`n                                    </select>
                                     <input type="hidden" name="update_access" value="1">
                                 </form>
                             </td>
