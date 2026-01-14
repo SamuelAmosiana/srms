@@ -2,6 +2,35 @@
 require '../config.php';
 require '../auth/auth.php';
 
+// Function to calculate grade based on total score and grading scale
+function calculateGrade($total_score, $grading_scale) {
+    foreach ($grading_scale as $scale) {
+        if ($total_score >= $scale['min_score'] && $total_score <= $scale['max_score']) {
+            return $scale['grade'];
+        }
+    }
+    return 'N/A'; // Return N/A if no matching grade found
+}
+
+// Function to get grade points from grading scale
+function getGradePoints($grade, $grading_scale) {
+    foreach ($grading_scale as $scale) {
+        if (strtoupper($scale['grade']) === strtoupper($grade)) {
+            return $scale['points'];
+        }
+    }
+    // Fallback for hardcoded grades if not found in scale
+    switch (strtoupper($grade)) {
+        case 'A': return 4;
+        case 'B+': return 3.5;
+        case 'B': return 3;
+        case 'C': return 2;
+        case 'D': return 1;
+        case 'F': return 0;
+        default: return 0;
+    }
+}
+
 // Check if user is logged in and has student role
 if (!currentUserId()) {
     header('Location: ../auth/login.php');
@@ -28,6 +57,11 @@ $balance = $student_data['balance'] ?? 0;
 $results_access = $student_data['results_access'] ?? 1; // Default to granted if column doesn't exist
 $access_granted = ($balance == 0 && $results_access == 1); // Grant access if balance is zero AND results access is granted
 
+// Fetch grading scale for grade calculation
+$grading_scale = [];
+$stmt = $pdo->query("SELECT min_score, max_score, grade, points FROM grading_scale ORDER BY min_score DESC");
+$grading_scale = $stmt->fetchAll();
+
 // Fetch all results grouped by academic year with course credits and admin comments
 $results_by_year = [];
 $stmt = $pdo->prepare("
@@ -48,6 +82,19 @@ foreach ($results as $result) {
     if (!isset($results_by_year[$year])) {
         $results_by_year[$year] = [];
     }
+    
+    // Calculate total score and grade if not already present
+    $ca_score = $result['ca_score'] ?? 0;
+    $exam_score = $result['exam_score'] ?? 0;
+    $total_score = $ca_score + $exam_score;
+    
+    // Always calculate grade based on current scores to reflect grading scale
+    $calculated_grade = calculateGrade($total_score, $grading_scale);
+    $result['grade'] = $calculated_grade;
+    
+    // Store the total score for potential use in grade calculation
+    $result['total_score'] = $total_score;
+    
     $results_by_year[$year][] = $result;
 }
 
@@ -74,23 +121,13 @@ foreach ($results_by_year as $year => $courses) {
     $total_credits = 0;
     
     foreach ($courses as $course) {
-        // Convert grade to grade points (assuming A=4, B+=3.5, B=3, C=2, D=1, F=0)
-        $grade_points = 0;
-        $grade = $course['grade'] ?? '';
-        switch (strtoupper($grade)) {
-            case 'A': $grade_points = 4; break;
-            case 'B+': $grade_points = 3.5; break;
-            case 'B': $grade_points = 3; break;
-            case 'C': $grade_points = 2; break;
-            case 'D': $grade_points = 1; break;
-            case 'F': $grade_points = 0; break;
-        }
-        
+        // Get grade points from grading scale
+        $grade_points = getGradePoints($course['grade'], $grading_scale);
         $credits = $course['credits'] ?? 0;
         $total_grade_points += $grade_points * $credits;
         $total_credits += $credits;
         
-        if ($grade_points == 0) { // Assume fail for F grade
+        if ($grade_points == 0) { // Assume fail for 0 grade points
             $failed++;
         }
     }
