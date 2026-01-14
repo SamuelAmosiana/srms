@@ -152,7 +152,7 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
             </div>
             
             <div class="nav-actions">
-                <a href="manage_programme_fees.php" class="nav-link" title="Programme Fees">
+                <a href="./manage_programme_fees.php" class="nav-link" title="Programme Fees">
                     <i class="fas fa-file-invoice-dollar"></i>
                 </a>
                 
@@ -166,8 +166,8 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile"><i class="fas fa-user"></i> View Profile</a>
-                        <a href="settings"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="./profile.php"><i class="fas fa-user"></i> View Profile</a>
+                        <a href="./settings.php"><i class="fas fa-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
                         <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
@@ -183,26 +183,26 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
         </div>
         
         <nav class="sidebar-nav">
-            <a href="dashboard" class="nav-item active">
+            <a href="./dashboard.php" class="nav-item active">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
             
             <div class="nav-section">
                 <h4>Student Management</h4>
-                <a href="view_students" class="nav-item">
+                <a href="./view_students.php" class="nav-item">
                     <i class="fas fa-users"></i>
                     <span>View Students</span>
                 </a>
-                <a href="manage_fees" class="nav-item">
+                <a href="./manage_fees.php" class="nav-item">
                     <i class="fas fa-money-bill"></i>
                     <span>Manage Fees & Finances</span>
                 </a>
-                <a href="manage_programme_fees" class="nav-item">
+                <a href="./manage_programme_fees.php" class="nav-item">
                     <i class="fas fa-file-invoice-dollar"></i>
                     <span>Programme Fees</span>
                 </a>
-                <a href="results_access" class="nav-item">
+                <a href="./results_access.php" class="nav-item">
                     <i class="fas fa-lock"></i>
                     <span>Manage Results Access</span>
                 </a>
@@ -210,19 +210,19 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
             
             <div class="nav-section">
                 <h4>Financial Operations</h4>
-                <a href="manage_programme_fees" class="nav-item">
+                <a href="./manage_programme_fees.php" class="nav-item">
                     <i class="fas fa-file-invoice-dollar"></i>
                     <span>Programme Fees</span>
                 </a>
-                <a href="income_expenses" class="nav-item">
+                <a href="./income_expenses.php" class="nav-item">
                     <i class="fas fa-chart-pie"></i>
                     <span>Income & Expenses</span>
                 </a>
-                <a href="finance_reports" class="nav-item">
+                <a href="./finance_reports.php" class="nav-item">
                     <i class="fas fa-file-invoice"></i>
                     <span>Finance Reports</span>
                 </a>
-                <a href="registration_clearance" class="nav-item">
+                <a href="./registration_clearance.php" class="nav-item">
                     <i class="fas fa-user-check"></i>
                     <span>Registration Clearance</span>
                 </a>
@@ -284,25 +284,25 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
         <div class="quick-actions">
             <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
             <div class="actions-grid">
-                <a href="manage_fees" class="action-card orange">
+                <a href="./manage_fees.php" class="action-card orange">
                     <i class="fas fa-money-bill"></i>
                     <h3>Manage Student Fees</h3>
                     <p>Update fees, payments, and balances</p>
                 </a>
                 
-                <a href="results_access" class="action-card green">
+                <a href="./results_access.php" class="action-card green">
                     <i class="fas fa-lock-open"></i>
                     <h3>Manage Results Access</h3>
                     <p>Control results view based on balances</p>
                 </a>
                 
-                <a href="income_expenses" class="action-card orange">
+                <a href="./income_expenses.php" class="action-card orange">
                     <i class="fas fa-chart-pie"></i>
                     <h3>Manage Income/Expenses</h3>
                     <p>Record and track financial transactions</p>
                 </a>
                 
-                <a href="finance_reports" class="action-card green">
+                <a href="./finance_reports.php" class="action-card green">
                     <i class="fas fa-print"></i>
                     <h3>Generate Reports</h3>
                     <p>Create and print finance reports</p>

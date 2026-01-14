@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             if ($application) {
                 // Redirect to first time registration form with pre-filled data
-                header('Location: first_time_registration.php?email=' . urlencode($email));
+                header('Location: ../applications/first_time_registration.php?email=' . urlencode($email));
                 exit();
             } else {
                 $message = "No approved registration found for this email. Please check your email or contact admissions.";

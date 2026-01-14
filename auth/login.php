@@ -20,17 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // redirect based on role
             if (in_array('Super Admin', $_SESSION['roles'])) {
-                header('Location: admin/dashboard.php');
+                header('Location: ../admin/dashboard.php');
             } elseif (in_array('Lecturer', $_SESSION['roles'])) {
-                header('Location: lecturer/dashboard.php');
+                header('Location: ../lecturer/dashboard.php');
             } elseif (in_array('Sub Admin (Finance)', $_SESSION['roles'])) {
-                header('Location: finance/dashboard.php');
+                header('Location: ../finance/dashboard.php');
             } elseif (in_array('Enrollment Officer', $_SESSION['roles'])) {
-                header('Location: enrollment/dashboard.php');
+                header('Location: ../enrollment/dashboard.php');
             } elseif (in_array('Academics Coordinator', $_SESSION['roles'])) {
-                header('Location: academics/dashboard.php');
+                header('Location: ../academics/dashboard.php');
             } elseif (in_array('HR Manager', $_SESSION['roles'])) {
-                header('Location: human_resource/dashboard.php');
+                header('Location: ../human_resource/dashboard.php');
             } else {
                 echo "Role not recognized";
             }

@@ -91,8 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
-                        <a href="profile"><i class="fas fa-user"></i> View Profile</a>
-                        <a href="settings" class="active"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="profile.php"><i class="fas fa-user"></i> View Profile</a>
+                        <a href="settings.php" class="active"><i class="fas fa-cog"></i> Settings</a>
                         <div class="dropdown-divider"></div>
                         <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>

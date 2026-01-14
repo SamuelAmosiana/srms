@@ -284,7 +284,7 @@ try {
         </div>
         
         <nav class="sidebar-nav">
-            <a href="dashboard" class="nav-item active">
+            <a href="./dashboard.php" class="nav-item active">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
@@ -436,7 +436,7 @@ try {
         
         <h2 class="section-title">Quick Actions</h2>
         <div class="quick-actions">
-            <div class="action-card" onclick="location.href='add_employee.php'">
+            <div class="action-card" onclick="location.href='./add_employee.php'">
                 <div class="action-icon">
                     <i class="fas fa-user-plus"></i>
                 </div>
@@ -444,7 +444,7 @@ try {
                 <div class="action-desc">Register new staff member</div>
             </div>
             
-            <div class="action-card" onclick="location.href='payroll.php'">
+            <div class="action-card" onclick="location.href='./payroll.php'">
                 <div class="action-icon">
                     <i class="fas fa-money-bill-wave"></i>
                 </div>
@@ -452,7 +452,7 @@ try {
                 <div class="action-desc">Calculate and process salaries</div>
             </div>
             
-            <div class="action-card" onclick="location.href='employees.php'">
+            <div class="action-card" onclick="location.href='./employees.php'">
                 <div class="action-icon">
                     <i class="fas fa-users"></i>
                 </div>
@@ -460,7 +460,7 @@ try {
                 <div class="action-desc">View all employees</div>
             </div>
             
-            <div class="action-card" onclick="location.href='tax_brackets.php'">
+            <div class="action-card" onclick="location.href='./tax_brackets.php'">
                 <div class="action-icon">
                     <i class="fas fa-percent"></i>
                 </div>

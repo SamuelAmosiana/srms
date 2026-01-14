@@ -52,14 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['roles'][] = 'Student';
                 }
                 // Use relative path for redirect to avoid issues
-                header('Location: student/dashboard.php');
+                header('Location: ../student/dashboard.php');
                 exit();
             } else {
                 // More detailed error message for debugging
                 if (!$user) {
-                    $message = "Account not found. Please check your student number.";
+                    $message = "Invalid Login Credentials. Please try again.";
                 } else {
-                    $message = "Invalid password. Please try again.";
+                    $message = "Invalid Login Credentials. Please try again.";
                 }
                 $messageType = 'error';
             }
@@ -334,7 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
         
         <div class="login-footer">
-            <p>Use your student number as username to login.</p>
+            <p>Current Students login.</p>
         </div>
     </div>
 </body>
