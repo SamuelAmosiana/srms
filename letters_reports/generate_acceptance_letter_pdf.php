@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../config.php';
 
 // Load the enhanced FPDF library
 require_once __DIR__ . '/lib/fpdf/fpdf.php';

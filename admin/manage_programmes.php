@@ -317,6 +317,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 break;
                 
+            case 'delete_course':
+                $course_id = $_POST['course_id'];
+                $programme_id = $_POST['programme_id'];
+                
+                try {
+                    // Check if course exists and belongs to this programme
+                    $check_stmt = $pdo->prepare("SELECT id, code, name FROM course WHERE id = ? AND programme_id = ?");
+                    $check_stmt->execute([$course_id, $programme_id]);
+                    $course = $check_stmt->fetch();
+                    
+                    if (!$course) {
+                        throw new Exception("Course not found or does not belong to this programme!");
+                    }
+                    
+                    // Check if there are any enrollments for this course
+                    $enrollment_check = $pdo->prepare("SELECT COUNT(*) FROM course_enrollment WHERE course_id = ?");
+                    $enrollment_check->execute([$course_id]);
+                    $enrollment_count = $enrollment_check->fetchColumn();
+                    
+                    if ($enrollment_count > 0) {
+                        throw new Exception("Cannot delete course with {$enrollment_count} enrollment(s). Please unenroll students first.");
+                    }
+                    
+                    // Delete the course
+                    $stmt = $pdo->prepare("DELETE FROM course WHERE id = ?");
+                    if ($stmt->execute([$course_id])) {
+                        $message = "Course '{$course['code']} - {$course['name']}' deleted successfully!";
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception("Failed to delete course!");
+                    }
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
             case 'assign_existing_course_to_programme':
                 $programme_id = $_POST['programme_id'];
                 $course_id = $_POST['existing_course_id'];
@@ -1864,42 +1901,34 @@ if (isset($_GET['view'])) {
         // Function to edit a course
         function editCourse(courseId, code, name, credits, term, description) {
             // Set the form fields with the course data
-            document.getElementById('course_code').value = code;
-            document.getElementById('course_name').value = name;
-            document.getElementById('course_credits').value = credits;
-            document.getElementById('course_term').value = term;
-            document.getElementById('course_description').value = description;
+            document.getElementById('new_course_code').value = code;
+            document.getElementById('new_course_name').value = name;
+            document.getElementById('new_course_credits').value = credits;
+            document.getElementById('new_course_term').value = term;
+            document.getElementById('new_course_description').value = description;
             
             // Change the form action to update course
-            const form = document.querySelector('#coursesSection form');
-            const actionInput = document.createElement('input');
-            actionInput.type = 'hidden';
-            actionInput.name = 'action';
+            const form = document.getElementById('new-course-form');
+            const actionInput = document.querySelector('#new-course-form input[name="action"]');
             actionInput.value = 'update_course';
-            actionInput.id = 'update_action_input';
-            form.appendChild(actionInput);
             
             // Change submit button text
             const submitButton = form.querySelector('button[type="submit"]');
             submitButton.innerHTML = '<i class="fas fa-sync-alt"></i> Update Course';
-            submitButton.onclick = function() {
-                // Remove the update_action_input after submission to reset the form
-                setTimeout(function() {
-                    const updateActionInput = document.getElementById('update_action_input');
-                    if(updateActionInput) {
-                        updateActionInput.remove();
-                        submitButton.innerHTML = '<i class="fas fa-plus"></i> Add Course to Programme';
-                    }
-                }, 1000);
-            };
             
             // Add hidden field for course ID
-            const courseIdInput = document.createElement('input');
-            courseIdInput.type = 'hidden';
-            courseIdInput.name = 'course_id';
-            courseIdInput.value = courseId; // Use the parameter passed to the function
-            courseIdInput.id = 'course_id_input';
-            form.appendChild(courseIdInput);
+            let courseIdInput = document.getElementById('course_id_input');
+            if (!courseIdInput) {
+                courseIdInput = document.createElement('input');
+                courseIdInput.type = 'hidden';
+                courseIdInput.name = 'course_id';
+                courseIdInput.id = 'course_id_input';
+                form.appendChild(courseIdInput);
+            }
+            courseIdInput.value = courseId;
+            
+            // Show the 'new course' form tab
+            showCourseTab('new');
         }
         
         // Function to show selected course tab
@@ -1919,6 +1948,28 @@ if (isset($_GET['view'])) {
                 existingForm.style.display = 'block';
                 newTabBtn.classList.remove('active');
                 existingTabBtn.classList.add('active');
+            }
+            
+            // Reset form if switching to new course tab
+            if (tabName === 'new') {
+                const form = document.getElementById('new-course-form');
+                const actionInput = document.querySelector('#new-course-form input[name="action"]');
+                if (actionInput.value === 'update_course') {
+                    actionInput.value = 'add_course_to_programme';
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    submitButton.innerHTML = '<i class="fas fa-plus"></i> Add Course';
+                    
+                    // Clear the course ID field
+                    const courseIdInput = document.getElementById('course_id_input');
+                    if (courseIdInput) {
+                        courseIdInput.remove();
+                    }
+                    
+                    // Reset form fields
+                    form.reset();
+                    // Set the action back to add course
+                    actionInput.value = 'add_course_to_programme';
+                }
             }
         }
     </script>

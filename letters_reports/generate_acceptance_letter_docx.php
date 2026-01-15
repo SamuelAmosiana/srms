@@ -5,8 +5,8 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // Include configuration files using the correct path
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/email_config.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../email_config.php';
 
 // Try to load PHPMailer if available
 $phpmailer_available = false;

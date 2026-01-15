@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../config.php';
 
 /**
  * Generate an acceptance letter in PDF format using HTML to PDF conversion

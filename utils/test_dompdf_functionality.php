@@ -1,7 +1,7 @@
 <?php
 // Test script to verify the new DOMPDF functionality
 require_once '../config.php';
-require_once 'generate_acceptance_letter_dompdf.php';
+require_once '../letters_reports/generate_acceptance_letter_dompdf.php';
 
 echo "<h2>Testing DOMPDF Acceptance Letter Generation</h2>\n";
 

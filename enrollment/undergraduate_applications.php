@@ -14,10 +14,10 @@ require_once '../email_config.php';
 require_once '../finance/generate_acceptance_letter_with_fees.php';
 
 // Include the new DOMPDF acceptance letter generator
-require_once '../generate_acceptance_letter_dompdf.php';
+require_once '../letters_reports/generate_acceptance_letter_dompdf.php';
 
 // Include the email functionality (contains sendAcceptanceLetterEmail function)
-require_once '../generate_acceptance_letter_docx.php';
+require_once '../letters_reports/generate_acceptance_letter_docx.php';
 
 /**
  * Send rejection email to applicant

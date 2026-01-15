@@ -1,6 +1,6 @@
 <?php
 require_once '../config.php';
-require_once 'email_config.php';
+require_once '../email_config.php';
 
 // Try to load PHPMailer if available
 $phpmailer_available = false;

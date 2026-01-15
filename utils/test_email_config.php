@@ -1,5 +1,5 @@
 <?php
-require_once 'email_config.php';
+require_once '../email_config.php';
 
 echo "Email Configuration Test\n";
 echo "======================\n";
