@@ -238,8 +238,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $course_term = trim($_POST['course_term']);
                 
                 // Validate inputs
-                if (empty($course_code) || empty($course_name) || empty($course_credits)) {
-                    $message = "Please fill in all required fields!";
+                if (empty($course_code) || empty($course_name) || empty($course_credits) || empty($course_term)) {
+                    $message = "Please fill in all required fields! (All fields marked with * are required)";
                     $messageType = 'error';
                 } elseif (strlen($course_code) > 20) {
                     $message = "Course code is too long (max 20 characters)!";
@@ -263,6 +263,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $messageType = 'success';
                             } else {
                                 $message = "Failed to add course to programme!";
+                                $messageType = 'error';
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $message = "Error: " . $e->getMessage();
+                        $messageType = 'error';
+                    }
+                }
+                break;
+                
+            case 'update_course':
+                $course_id = $_POST['course_id'];
+                $course_code = strtoupper(trim($_POST['course_code']));
+                $course_name = trim($_POST['course_name']);
+                $course_credits = $_POST['course_credits'];
+                $course_description = trim($_POST['course_description']);
+                $course_term = trim($_POST['course_term']);
+                
+                // Validate inputs
+                if (empty($course_code) || empty($course_name) || empty($course_credits) || empty($course_term)) {
+                    $message = "Please fill in all required fields! (All fields marked with * are required)";
+                    $messageType = 'error';
+                } elseif (strlen($course_code) > 20) {
+                    $message = "Course code is too long (max 20 characters)!";
+                    $messageType = 'error';
+                } elseif (!is_numeric($course_credits) || $course_credits <= 0) {
+                    $message = "Credits must be a positive number!";
+                    $messageType = 'error';
+                } else {
+                    try {
+                        // Check if course code already exists for a different course
+                        $check_stmt = $pdo->prepare("SELECT id FROM course WHERE code = ? AND id != ?");
+                        $check_stmt->execute([$course_code, $course_id]);
+                        
+                        if ($check_stmt->rowCount() > 0) {
+                            $message = "Course code already exists for another course!";
+                            $messageType = 'error';
+                        } else {
+                            $stmt = $pdo->prepare("UPDATE course SET name = ?, code = ?, credits = ?, description = ?, term = ? WHERE id = ?");
+                            if ($stmt->execute([$course_name, $course_code, $course_credits, $course_description, $course_term, $course_id])) {
+                                $message = "Course updated successfully!";
+                                $messageType = 'success';
+                            } else {
+                                $message = "Failed to update course!";
                                 $messageType = 'error';
                             }
                         }
@@ -1272,8 +1316,8 @@ if (isset($_GET['view'])) {
                             </div>
                             
                             <div class="form-group">
-                                <label for="course_term">Term</label>
-                                <input type="text" id="course_term" name="course_term" maxlength="50" placeholder="e.g. First Semester">
+                                <label for="course_term">Term *</label>
+                                <input type="text" id="course_term" name="course_term" required maxlength="50" placeholder="e.g. First Semester">
                             </div>
                         </div>
                         
@@ -1318,6 +1362,7 @@ if (isset($_GET['view'])) {
                                         <th>Name</th>
                                         <th>Credits</th>
                                         <th>Enrollments</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1327,6 +1372,19 @@ if (isset($_GET['view'])) {
                                             <td><?php echo htmlspecialchars($course['name']); ?></td>
                                             <td><?php echo $course['credits']; ?></td>
                                             <td><?php echo $course['enrollment_count']; ?></td>
+                                            <td class="actions">
+                                                <a href="#" onclick="editCourse(<?php echo $course['id']; ?>, '<?php echo addslashes(htmlspecialchars($course['code'])); ?>', '<?php echo addslashes(htmlspecialchars($course['name'])); ?>', <?php echo $course['credits']; ?>, '<?php echo addslashes(htmlspecialchars($course['term'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($course['description'] ?? '')); ?>')" class="btn-icon btn-edit" title="Edit">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this course?');">
+                                                    <input type="hidden" name="action" value="delete_course">
+                                                    <input type="hidden" name="course_id" value="<?php echo $course['id']; ?>">
+                                                    <input type="hidden" name="programme_id" value="<?php echo $viewProgramme['id']; ?>">
+                                                    <button type="submit" class="btn-icon btn-delete" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -1666,6 +1724,47 @@ if (isset($_GET['view'])) {
                 }
             });
         });
+        
+        // Function to edit a course
+        function editCourse(courseId, code, name, credits, term, description) {
+            // Set the form fields with the course data
+            document.getElementById('course_code').value = code;
+            document.getElementById('course_name').value = name;
+            document.getElementById('course_credits').value = credits;
+            document.getElementById('course_term').value = term;
+            document.getElementById('course_description').value = description;
+            
+            // Change the form action to update course
+            const form = document.querySelector('#coursesSection form');
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'update_course';
+            actionInput.id = 'update_action_input';
+            form.appendChild(actionInput);
+            
+            // Change submit button text
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.innerHTML = '<i class="fas fa-sync-alt"></i> Update Course';
+            submitButton.onclick = function() {
+                // Remove the update_action_input after submission to reset the form
+                setTimeout(function() {
+                    const updateActionInput = document.getElementById('update_action_input');
+                    if(updateActionInput) {
+                        updateActionInput.remove();
+                        submitButton.innerHTML = '<i class="fas fa-plus"></i> Add Course';
+                    }
+                }, 1000);
+            };
+            
+            // Add hidden field for course ID
+            const courseIdInput = document.createElement('input');
+            courseIdInput.type = 'hidden';
+            courseIdInput.name = 'course_id';
+            courseIdInput.value = courseId; // Use the parameter passed to the function
+            courseIdInput.id = 'course_id_input';
+            form.appendChild(courseIdInput);
+        }
     </script>
 </main>
 </body>
