@@ -183,7 +183,7 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     if (isset($login_details['instruction'])) {
         // For first-time applicants who need to use email for login
         $body .= $login_details['instruction'] . "\n";
-        $body .= "Portal URL/Link : https://" . $_SERVER['HTTP_HOST'] . "/first_time_login\n\n";
+        $body .= "Portal URL/Link : https://" . $_SERVER['HTTP_HOST'] . "/user_management/first_time_login.php\n\n";
     } else {
         // For existing students with username/password
         $username = $login_details['username'] ?? 'N/A';

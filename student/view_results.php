@@ -189,7 +189,7 @@ $ca_results = $stmt->fetchAll();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=1024, initial-scale=1.0, user-scalable=yes">
     <title>View Results - LSC SRMS</title>
     <link rel="icon" type="image/jpeg" href="../assets/images/school_logo.jpg">
     <link rel="stylesheet" href="../assets/css/style.css">
@@ -365,6 +365,30 @@ $ca_results = $stmt->fetchAll();
             padding: 15px;
             margin: 20px 0;
             color: #856404;
+        }
+        
+        /* Mobile Web View - Ensure tables display properly on mobile */
+        @media (max-width: 768px) {
+            .gpa-table, .results-table {
+                min-width: 800px;
+                display: table;
+                overflow-x: visible;
+            }
+            
+            .student-info-grid {
+                min-width: 600px;
+            }
+            
+            .year-info {
+                min-width: 600px;
+                flex-wrap: nowrap;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .gpa-table, .results-table, .student-info-grid, .year-info {
+                min-width: 600px;
+            }
         }
     </style>
 </head>

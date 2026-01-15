@@ -533,31 +533,62 @@ body.student-layout {
     display: block;
 }
 
-/* Responsive Design */
-@media (max-width: 1024px) {
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
+/* Mobile Web View - Forces desktop layout on mobile devices */
 @media (max-width: 768px) {
+    /* Force desktop layout on mobile */
+    body.student-layout {
+        overflow-x: hidden;
+        min-width: 1024px;
+    }
+    
     .top-nav {
+        position: fixed;
+        width: 100%;
+        min-width: 1024px;
         padding: 0 20px;
     }
     
+    /* Keep sidebar functionality but allow full width content */
     .sidebar {
         transform: translateX(-280px);
+        width: 280px;
+        z-index: 1001;
     }
     
     .sidebar.active {
         transform: translateX(0);
     }
     
+    /* Main content takes full viewport width but scrolls horizontally if needed */
     .main-content {
         margin-left: 0;
+        padding: 30px;
+        width: 100vw;
+        min-width: 1024px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
     
-    .user-info {
+    .main-content.with-sidebar {
+        margin-left: 280px;
+    }
+    
+    /* Maintain desktop grid layouts */
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        min-width: 800px;
+        width: fit-content;
+    }
+    
+    .actions-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        min-width: 800px;
+        width: fit-content;
+    }
+    
+    /* Hide user info text but keep icons */
+    .user-info .welcome-text,
+    .user-info .student-id {
         display: none;
     }
     
@@ -565,26 +596,45 @@ body.student-layout {
         gap: 12px;
     }
     
-    .stats-grid {
-        grid-template-columns: 1fr;
+    /* Maintain proper typography */
+    .content-header h1 {
+        font-size: 28px;
+    }
+    
+    .quick-actions h2, .recent-activity h2 {
+        font-size: 24px;
     }
 }
 
 @media (max-width: 480px) {
+    /* Even smaller screens - slightly reduced padding */
+    .main-content {
+        padding: 20px;
+        min-width: 800px;
+    }
+    
+    .top-nav {
+        padding: 0 15px;
+        min-width: 800px;
+    }
+    
     .stats-grid, .actions-grid {
-        grid-template-columns: 1fr;
+        min-width: 600px;
     }
     
     .content-header h1 {
-        font-size: 22px;
+        font-size: 24px;
     }
     
     .quick-actions h2, .recent-activity h2 {
         font-size: 20px;
     }
-    
-    .stat-card, .action-card, .activity-item {
-        padding: 15px;
+}
+
+/* Override any conflicting responsive styles */
+@media (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     }
 }
 

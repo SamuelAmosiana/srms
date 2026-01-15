@@ -40,7 +40,7 @@ Welcome to the Learning Systems College (LSC) Student Registration Management Sy
 
 ### Step 4: First-Time Login Setup
 1. After approval, you will receive an email with login instructions
-2. Visit the portal at `http://localhost/srms/first_time_login.php`
+2. Visit the portal at `http://localhost/srms/user_management/first_time_login.php`
 3. Enter the email address used for your application
 4. You will receive a temporary password via email
 5. On first login, you will be required to:

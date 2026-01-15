@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $body .= "You can now access your student portal using the following credentials:\n";
             $body .= "Student Number (Username): " . $student['student_number'] . "\n";
             $body .= "Password: " . $student['student_number'] . "\n";  // Using student number as default password
-            $body .= "Proceed and Login using the link: https://lsuclms.com/student_login\n\n";
+            $body .= "Proceed and Login using the link: https://" . $_SERVER['HTTP_HOST'] . "/auth/student_login.php\n\n";
             $body .= "IMPORTANT: Please change your password immediately after your first login for security purposes.\n";
             $body .= "Anyone with your student number can access your portal if password not changed immediately.\n\n";
             $body .= "Your registered programme: " . $student['programme_name'] . "\n";

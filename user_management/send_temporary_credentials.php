@@ -5,6 +5,7 @@
 function sendRegistrationConfirmationEmail($to, $name, $student_number, $password) {
     $subject = "LSC Registration Approved - Your Student Credentials";
     
+    $hostname = $_SERVER['HTTP_HOST'];
     $message = "
     <html>
     <head>
@@ -17,7 +18,7 @@ function sendRegistrationConfirmationEmail($to, $name, $student_number, $passwor
         <p>You are now a full-time student at Lusaka South College. Please use the following credentials to access your student dashboard:</p>
         <p><strong>Student Number (Username):</strong> $student_number</p>
         <p><strong>Password:</strong> $password</p>
-        <p>Visit <a href='https://lsuclms.com/student_login.php'>https://lsuclms.com/student_login.php</a> to login to your student dashboard.</p>
+        <p>Visit <a href='https://$hostname/auth/student_login.php'>https://$hostname/auth/student_login.php</a> to login to your student dashboard.</p>
         <p><strong>Important:</strong> Please change your password immediately after your first login for security purposes.</p>
         <p>Welcome to the LSC community!</p>
         <p>Best regards,<br>LSC Admissions Team</p>
