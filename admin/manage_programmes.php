@@ -317,6 +317,66 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 break;
                 
+            case 'assign_existing_course_to_programme':
+                $programme_id = $_POST['programme_id'];
+                $course_id = $_POST['existing_course_id'];
+                
+                try {
+                    // Check if course exists and doesn't already belong to this programme
+                    $check_stmt = $pdo->prepare("SELECT id, name, code FROM course WHERE id = ? AND (programme_id IS NULL OR programme_id != ?)");
+                    $check_stmt->execute([$course_id, $programme_id]);
+                    $course = $check_stmt->fetch();
+                    
+                    if (!$course) {
+                        $message = "Selected course does not exist or is already assigned to this programme!";
+                        $messageType = 'error';
+                    } else {
+                        // Assign the course to the programme
+                        $stmt = $pdo->prepare("UPDATE course SET programme_id = ? WHERE id = ?");
+                        if ($stmt->execute([$programme_id, $course_id])) {
+                            $message = "Course '{$course['code']} - {$course['name']}' assigned to programme successfully!";
+                            $messageType = 'success';
+                        } else {
+                            $message = "Failed to assign course to programme!";
+                            $messageType = 'error';
+                        }
+                    }
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
+            case 'add_existing_course_to_programme':
+                $programme_id = $_POST['programme_id'];
+                $course_id = $_POST['existing_course_id'];
+                
+                try {
+                    // Check if course exists and doesn't already belong to this programme
+                    $check_stmt = $pdo->prepare("SELECT id, name FROM course WHERE id = ? AND (programme_id IS NULL OR programme_id != ?)");
+                    $check_stmt->execute([$course_id, $programme_id]);
+                    $course = $check_stmt->fetch();
+                    
+                    if (!$course) {
+                        $message = "Selected course does not exist or is already assigned to this programme!";
+                        $messageType = 'error';
+                    } else {
+                        // Assign the course to the programme
+                        $stmt = $pdo->prepare("UPDATE course SET programme_id = ? WHERE id = ?");
+                        if ($stmt->execute([$programme_id, $course_id])) {
+                            $message = "Course '{$course['name']}' added to programme successfully!";
+                            $messageType = 'success';
+                        } else {
+                            $message = "Failed to add course to programme!";
+                            $messageType = 'error';
+                        }
+                    }
+                } catch (Exception $e) {
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                break;
+                
             case 'import_programmes':
                 if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] == 0) {
                     $file = $_FILES['csv_file'];
@@ -872,6 +932,40 @@ if (isset($_GET['view'])) {
             color: white;
         }
         
+        /* Tabs for course forms */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            outline: none;
+            transition: background-color 0.3s;
+        }
+        
+        .tab-button:first-child {
+            border-radius: 5px 0 0 0;
+        }
+        
+        .tab-button:last-child {
+            border-radius: 0 5px 0 0;
+        }
+        
+        .tab-button.active {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .tab-button:not(:last-child) {
+            border-right: none;
+        }
+        
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
@@ -1293,44 +1387,86 @@ if (isset($_GET['view'])) {
                 <!-- Add Course to Programme Form -->
                 <div class="form-card" style="margin-bottom: 20px;">
                     <h3><i class="fas fa-book-plus"></i> Add Course to Programme</h3>
-                    <form method="POST" class="school-form">
+                    
+                    <!-- Tabs for switching between forms -->
+                    <div class="tabs">
+                        <button class="tab-button active" onclick="showCourseTab('new')">Add New Course</button>
+                        <button class="tab-button" onclick="showCourseTab('existing')">Assign Existing Course</button>
+                    </div>
+                    
+                    <!-- Form for adding new course -->
+                    <form method="POST" class="school-form" id="new-course-form">
                         <input type="hidden" name="action" value="add_course_to_programme">
                         <input type="hidden" name="programme_id" value="<?php echo $viewProgramme['id']; ?>">
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="course_code">Course Code *</label>
-                                <input type="text" id="course_code" name="course_code" required maxlength="20" style="text-transform: uppercase;" placeholder="e.g. CS101">
+                                <label for="new_course_code">Course Code *</label>
+                                <input type="text" id="new_course_code" name="course_code" required maxlength="20" style="text-transform: uppercase;" placeholder="e.g. CS101">
                             </div>
                             
                             <div class="form-group">
-                                <label for="course_name">Course Name *</label>
-                                <input type="text" id="course_name" name="course_name" required maxlength="150" placeholder="e.g. Introduction to Computer Science">
+                                <label for="new_course_name">Course Name *</label>
+                                <input type="text" id="new_course_name" name="course_name" required maxlength="150" placeholder="e.g. Introduction to Computer Science">
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="course_credits">Credits *</label>
-                                <input type="number" id="course_credits" name="course_credits" required min="1" max="20" value="3" placeholder="e.g. 3">
+                                <label for="new_course_credits">Credits *</label>
+                                <input type="number" id="new_course_credits" name="course_credits" required min="1" max="20" value="3" placeholder="e.g. 3">
                             </div>
                             
                             <div class="form-group">
-                                <label for="course_term">Term *</label>
-                                <input type="text" id="course_term" name="course_term" required maxlength="50" placeholder="e.g. First Semester">
+                                <label for="new_course_term">Term *</label>
+                                <input type="text" id="new_course_term" name="course_term" required maxlength="50" placeholder="e.g. First Semester">
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group full-width">
-                                <label for="course_description">Description</label>
-                                <textarea id="course_description" name="course_description" rows="3" placeholder="Brief description of the course"></textarea>
+                                <label for="new_course_description">Description</label>
+                                <textarea id="new_course_description" name="course_description" rows="3" placeholder="Brief description of the course"></textarea>
                             </div>
                         </div>
                         
                         <div class="form-actions">
                             <button type="submit" class="btn btn-green">
                                 <i class="fas fa-plus"></i> Add Course
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- Form for assigning existing course -->
+                    <form method="POST" class="school-form" id="existing-course-form" style="display: none;">
+                        <input type="hidden" name="action" value="assign_existing_course_to_programme">
+                        <input type="hidden" name="programme_id" value="<?php echo $viewProgramme['id']; ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="existing_course_id">Select Existing Course *</label>
+                                <select id="existing_course_id" name="existing_course_id" required>
+                                    <option value="">-- Select a Course --</option>
+                                    <?php 
+                                        // Get all courses that are not already in this programme
+                                        $existing_course_ids = array_column($programmeCourses, 'id');
+                                        $exclude_course_ids = $existing_course_ids ? implode(',', array_map('intval', $existing_course_ids)) : '0';
+                                        $available_courses_query = "SELECT id, name, code FROM course WHERE programme_id IS NULL OR programme_id != {$viewProgramme['id']} AND id NOT IN ($exclude_course_ids) ORDER BY name";
+                                        $available_courses = $pdo->query($available_courses_query)->fetchAll();
+                                        foreach ($available_courses as $course): 
+                                    ?>
+                                        <option value="<?php echo $course['id']; ?>">
+                                            <?php echo htmlspecialchars($course['code'] . ' - ' . $course['name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="form-text">Select a course that has already been defined in the system</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-green">
+                                <i class="fas fa-plus"></i> Assign Course to Programme
                             </button>
                         </div>
                     </form>
@@ -1752,7 +1888,7 @@ if (isset($_GET['view'])) {
                     const updateActionInput = document.getElementById('update_action_input');
                     if(updateActionInput) {
                         updateActionInput.remove();
-                        submitButton.innerHTML = '<i class="fas fa-plus"></i> Add Course';
+                        submitButton.innerHTML = '<i class="fas fa-plus"></i> Add Course to Programme';
                     }
                 }, 1000);
             };
@@ -1764,6 +1900,26 @@ if (isset($_GET['view'])) {
             courseIdInput.value = courseId; // Use the parameter passed to the function
             courseIdInput.id = 'course_id_input';
             form.appendChild(courseIdInput);
+        }
+        
+        // Function to show selected course tab
+        function showCourseTab(tabName) {
+            const newForm = document.getElementById('new-course-form');
+            const existingForm = document.getElementById('existing-course-form');
+            const newTabBtn = document.querySelector('[onclick="showCourseTab(\'new\')"]');
+            const existingTabBtn = document.querySelector('[onclick="showCourseTab(\'existing\')"]');
+            
+            if (tabName === 'new') {
+                newForm.style.display = 'block';
+                existingForm.style.display = 'none';
+                newTabBtn.classList.add('active');
+                existingTabBtn.classList.remove('active');
+            } else if (tabName === 'existing') {
+                newForm.style.display = 'none';
+                existingForm.style.display = 'block';
+                newTabBtn.classList.remove('active');
+                existingTabBtn.classList.add('active');
+            }
         }
     </script>
 </main>
