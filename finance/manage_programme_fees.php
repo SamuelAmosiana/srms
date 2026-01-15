@@ -32,7 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt = $pdo->prepare("INSERT INTO programme_fees (programme_id, fee_name, fee_amount, fee_type, description) VALUES (?, ?, ?, ?, ?)");
                 $stmt->execute([$programme_id, $fee_name, $fee_amount, $fee_type, $description]);
-                $success_message = "Fee added successfully!";
+                // Redirect after successful insert to ensure fresh data
+                header("Location: manage_programme_fees.php?success=fee_added");
+                exit;
             } catch (Exception $e) {
                 $error_message = "Error adding fee: " . $e->getMessage();
             }
@@ -49,7 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare("UPDATE programme_fees SET fee_name = ?, fee_amount = ?, fee_type = ?, description = ?, is_active = ? WHERE id = ?");
             $stmt->execute([$fee_name, $fee_amount, $fee_type, $description, $is_active, $fee_id]);
-            $success_message = "Fee updated successfully!";
+            // Redirect after successful update to ensure fresh data
+            header("Location: manage_programme_fees.php?success=fee_updated");
+            exit;
         } catch (Exception $e) {
             $error_message = "Error updating fee: " . $e->getMessage();
         }
@@ -60,7 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare("DELETE FROM programme_fees WHERE id = ?");
             $stmt->execute([$fee_id]);
-            $success_message = "Fee deleted successfully!";
+            // Redirect after successful deletion to ensure fresh data
+            header("Location: manage_programme_fees.php?success=fee_deleted");
+            exit;
         } catch (Exception $e) {
             $error_message = "Error deleting fee: " . $e->getMessage();
         }
@@ -76,7 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt = $pdo->prepare("INSERT INTO fee_types (name, description) VALUES (?, ?)");
                 $stmt->execute([$fee_type_name, $fee_type_description]);
-                $success_message = "Fee type added successfully!";
+                // Redirect after successful insert to ensure fresh data
+                header("Location: manage_programme_fees.php?success=fee_type_added");
+                exit;
             } catch (Exception $e) {
                 $error_message = "Error adding fee type: " . $e->getMessage();
             }
@@ -91,7 +99,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare("UPDATE fee_types SET name = ?, description = ?, is_active = ? WHERE id = ?");
             $stmt->execute([$fee_type_name, $fee_type_description, $is_active, $fee_type_id]);
-            $success_message = "Fee type updated successfully!";
+            // Redirect after successful update to ensure fresh data
+            header("Location: manage_programme_fees.php?success=fee_type_updated");
+            exit;
         } catch (Exception $e) {
             $error_message = "Error updating fee type: " . $e->getMessage();
         }
@@ -102,7 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare("DELETE FROM fee_types WHERE id = ?");
             $stmt->execute([$fee_type_id]);
-            $success_message = "Fee type deleted successfully!";
+            // Redirect after successful deletion to ensure fresh data
+            header("Location: manage_programme_fees.php?success=fee_type_deleted");
+            exit;
         } catch (Exception $e) {
             $error_message = "Error deleting fee type: " . $e->getMessage();
         }
@@ -279,6 +291,15 @@ foreach ($programme_fees as $fee) {
             background: #f8f9fa;
             color: #333;
         }
+        
+        .count-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
@@ -382,10 +403,36 @@ foreach ($programme_fees as $fee) {
             <p>Define and manage fees for each programme</p>
         </div>
         
-        <?php if (isset($success_message)): ?>
-            <div class="alert success">
+        <?php 
+        // Check for success message from redirect
+        if (isset($_GET['success']) && $_GET['success'] === 'fee_added') {
+            $success_message = "Fee added successfully!";
+        } elseif (isset($_GET['success']) && $_GET['success'] === 'fee_type_added') {
+            $success_message = "Fee type added successfully!";
+        } elseif (isset($_GET['success']) && $_GET['success'] === 'fee_updated') {
+            $success_message = "Fee updated successfully!";
+        } elseif (isset($_GET['success']) && $_GET['success'] === 'fee_deleted') {
+            $success_message = "Fee deleted successfully!";
+        } elseif (isset($_GET['success']) && $_GET['success'] === 'fee_type_updated') {
+            $success_message = "Fee type updated successfully!";
+        } elseif (isset($_GET['success']) && $_GET['success'] === 'fee_type_deleted') {
+            $success_message = "Fee type deleted successfully!";
+        }
+        if (isset($success_message)): ?>
+            <div class="alert success" id="success-alert">
                 <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success_message); ?>
             </div>
+            <script>
+                // Scroll to the Programme Fees section after successful addition
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(function() {
+                        const programmeFeesSection = document.querySelector('.table-container');
+                        if (programmeFeesSection) {
+                            programmeFeesSection.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }, 1000);
+                });
+            </script>
         <?php endif; ?>
         
         <?php if (isset($error_message)): ?>
@@ -518,7 +565,7 @@ foreach ($programme_fees as $fee) {
         
         <!-- Programme Fees List -->
         <div class="table-container">
-            <h2>Programme Fees</h2>
+            <h2>Programme Fees <span class="count-badge">(<?php echo count($grouped_fees); ?> programmes)</span></h2>
             <?php if (!empty($grouped_fees)): ?>
                 <table class="fee-table" id="main-programme-table">
                     <thead>
