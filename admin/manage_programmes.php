@@ -1066,6 +1066,7 @@ if (isset($_GET['view'])) {
                 <a href="manage_programmes.php" class="nav-item active"><i class="fas fa-graduation-cap"></i><span>Programmes</span></a>
                 <a href="manage_courses.php" class="nav-item"><i class="fas fa-book"></i><span>Courses</span></a>
                 <a href="manage_intakes.php" class="nav-item"><i class="fas fa-calendar-alt"></i><span>Intakes</span></a>
+                                <a href="manage_sessions.php" class="nav-item"><i class="fas fa-clock"></i><span>Sessions</span></a>
             </div>
             <div class="nav-section">
                 <h4>Academic Operations</h4>

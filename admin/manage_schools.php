@@ -415,6 +415,10 @@ function processSchoolUpload($file, $pdo) {
                     <i class="fas fa-calendar-alt"></i>
                     <span>Intakes</span>
                 </a>
+                <a href="manage_sessions.php" class="nav-item">
+                    <i class="fas fa-clock"></i>
+                    <span>Sessions</span>
+                </a>
             </div>
             
             <div class="nav-section">
