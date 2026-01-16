@@ -189,7 +189,7 @@ function generateResultsPDF($user_id, $pdo) {
     // College Header
     $pdf->Cell(0, 10, 'LUSAKA SOUTH COLLEGE', 0, 1, 'C');
     $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 8, 'Academic Results Transcript', 0, 1, 'C');
+    $pdf->Cell(0, 8, 'STUDENT RESULTS STATEMENT', 0, 1, 'C');
     $pdf->Ln(5);
     
     // Student Information

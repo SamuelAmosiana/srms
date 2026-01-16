@@ -433,6 +433,74 @@ $ca_results = $stmt->fetchAll();
                 min-width: 600px;
             }
         }
+        
+        /* Print-specific styles */
+        @media print {
+            .top-nav, .sidebar, .actions-bar, .alert, .section-title {
+                display: none !important;
+            }
+            
+            .main-content {
+                margin: 0;
+                padding: 0;
+            }
+            
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            
+            .print-header {
+                display: block !important;
+                text-align: center;
+                margin-bottom: 20px;
+                padding: 10px;
+            }
+            
+            .print-header img {
+                width: 100px;
+                height: 100px;
+                display: block;
+                margin: 0 auto 10px auto;
+            }
+            
+            .print-header h1 {
+                color: #228B22;
+                font-size: 20px;
+                margin: 5px 0;
+            }
+            
+            .print-header h2 {
+                color: #333;
+                font-size: 16px;
+                margin: 5px 0;
+            }
+            
+            .student-info-print {
+                display: block !important;
+                background: white;
+                border: 1px solid #ddd;
+                margin: 10px 0;
+                padding: 15px;
+                border-radius: 4px;
+            }
+            
+            .info-item-print {
+                display: flex;
+                margin-bottom: 8px;
+            }
+            
+            .info-label-print {
+                font-weight: bold;
+                width: 150px;
+                flex-shrink: 0;
+            }
+            
+            .student-info, .student-info-grid {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body class="student-layout" data-theme="light">
@@ -523,11 +591,7 @@ $ca_results = $stmt->fetchAll();
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="content-header">
-            <h1><i class="fas fa-chart-line"></i> View Results</h1>
-            <p>Your academic results and transcript</p>
-        </div>
-        
+
         <?php if ((int)$results_access === 0): ?>
             <div class="alert alert-warning">
                 <i class="fas fa-exclamation-triangle"></i> Access to exam results has been restricted by the Finance Department. Please contact the Finance Department for assistance.
@@ -555,6 +619,29 @@ $ca_results = $stmt->fetchAll();
                     <i class="fas fa-print"></i> Print Results
                 </button>
             <?php endif; ?>
+        </div>
+        
+        <!-- Print Header -->
+        <div class="print-header" style="display:none;">
+            <img src="../assets/images/lsc-logo.png" alt="LSC Logo" onerror="this.style.display='none'">
+            <h1>LUSAKA SOUTH COLLEGE</h1>
+            <h2>STUDENT RESULTS STATEMENT</h2>
+        </div>
+        
+        <!-- Print Student Information -->
+        <div class="student-info-print" style="display:none;">
+            <div class="info-item-print">
+                <div class="info-label-print">Computer Number:</div>
+                <div><?php echo htmlspecialchars($student['student_id'] ?? 'N/A'); ?></div>
+            </div>
+            <div class="info-item-print">
+                <div class="info-label-print">Name:</div>
+                <div><?php echo htmlspecialchars($student['full_name'] ?? 'N/A'); ?></div>
+            </div>
+            <div class="info-item-print">
+                <div class="info-label-print">Gender:</div>
+                <div><?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></div>
+            </div>
         </div>
         
         <!-- Student Information -->
