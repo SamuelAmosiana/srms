@@ -573,7 +573,10 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                                 li.textContent = doc;
                             } else if (doc.path && doc.name) {
                                 // Handle new format with path and name
-                                li.innerHTML = `<a href="../${doc.path}" download="${doc.name}">${doc.name}</a>`;
+                                const filename = doc.path.split('/').pop();
+                                const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                               console.log("FINAL DOWNLOAD URL:", downloadUrl);
+                               li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
                             } else {
                                 // Handle other formats
                                 li.textContent = JSON.stringify(doc);
@@ -601,7 +604,10 @@ $rejectedShortCoursesApplications = $stmt->fetchAll();
                     if (fileDocs.length > 0) {
                         fileDocs.forEach(doc => {
                             const li = document.createElement('li');
-                            li.innerHTML = `<a href="../${doc.path}" download="${doc.name}">${doc.name}</a>`;
+                            const filename = doc.path.split('/').pop();
+                            const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                           console.log("FINAL DOWNLOAD URL:", downloadUrl);
+                           li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
                             docsList.appendChild(li);
                         });
                     }

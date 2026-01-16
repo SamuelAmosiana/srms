@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Download Test</title>
+</head>
+<body>
+    <h2>JavaScript Download Test</h2>
+    
+    <div>
+        <h3>Test Data Structure</h3>
+        <button onclick="testArrayFormat()">Test Array Format</button>
+        <button onclick="testObjectFormat()">Test Object Format</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        function testArrayFormat() {
+            // Test data similar to what comes from the database
+            const testData = {
+                full_name: "Test User",
+                email: "test@example.com",
+                documents: JSON.stringify([
+                    {
+                        name: "images.jpeg",
+                        path: "../uploads/1768550345_grade12results_5595ced2928e5c3e8726fa9a2beea4d4.webp"
+                    },
+                    {
+                        name: "images.jpeg", 
+                        path: "../uploads/1768550345_previousschool_59106c1ccaffbfb5aced4077fdfa1860.webp"
+                    }
+                ])
+            };
+            
+            viewApplication(testData);
+        }
+        
+        function testObjectFormat() {
+            // Test data similar to what comes from the database
+            const testData = {
+                full_name: "Test User",
+                email: "test@example.com", 
+                documents: JSON.stringify({
+                    "0": {
+                        "name": "images.jpeg",
+                        "path": "../uploads/1768550345_grade12results_5595ced2928e5c3e8726fa9a2beea4d4.webp"
+                    },
+                    "1": {
+                        "name": "images.jpeg",
+                        "path": "../uploads/1768550345_previousschool_59106c1ccaffbfb5aced4077fdfa1860.webp"
+                    },
+                    "recommended_by": "Jones",
+                    "gender": "Male",
+                    "nrc_number": "542363/82/1"
+                })
+            };
+            
+            viewApplication(testData);
+        }
+        
+        function viewApplication(app) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<h4>Processing Application Data:</h4>';
+            
+            try {
+                // Parse documents JSON
+                const documents = app.documents ? JSON.parse(app.documents) : {};
+                resultDiv.innerHTML += '<p>Documents parsed successfully</p>';
+                
+                // Handle file documents
+                if (Array.isArray(documents)) {
+                    resultDiv.innerHTML += '<p>Array format detected</p>';
+                    if (documents.length > 0) {
+                        documents.forEach((doc, index) => {
+                            resultDiv.innerHTML += `<p><strong>Document ${index + 1}:</strong></p>`;
+                            if (typeof doc === 'string') {
+                                resultDiv.innerHTML += `<p>Legacy format: ${doc}</p>`;
+                            } else if (doc.path && doc.name) {
+                                const filename = doc.path.split('/').pop();
+                                const downloadUrl = `download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                                resultDiv.innerHTML += `<p>Name: ${doc.name}</p>`;
+                                resultDiv.innerHTML += `<p>Path: ${doc.path}</p>`;
+                                resultDiv.innerHTML += `<p>Extracted filename: ${filename}</p>`;
+                                resultDiv.innerHTML += `<p>Download URL: <a href="${downloadUrl}" target="_blank">${downloadUrl}</a></p>`;
+                            } else {
+                                resultDiv.innerHTML += `<p>Other format: ${JSON.stringify(doc)}</p>`;
+                            }
+                        });
+                    } else {
+                        resultDiv.innerHTML += '<p>No documents in array</p>';
+                    }
+                } else if (typeof documents === 'object' && documents !== null) {
+                    resultDiv.innerHTML += '<p>Object format detected</p>';
+                    const fileDocs = [];
+                    
+                    // Extract file documents
+                    for (const key in documents) {
+                        if (typeof documents[key] === 'object' && documents[key].path) {
+                            fileDocs.push(documents[key]);
+                        }
+                    }
+                    
+                    // Display file documents
+                    if (fileDocs.length > 0) {
+                        fileDocs.forEach((doc, index) => {
+                            resultDiv.innerHTML += `<p><strong>File Document ${index + 1}:</strong></p>`;
+                            const filename = doc.path.split('/').pop();
+                            const downloadUrl = `download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                            resultDiv.innerHTML += `<p>Name: ${doc.name}</p>`;
+                            resultDiv.innerHTML += `<p>Path: ${doc.path}</p>`;
+                            resultDiv.innerHTML += `<p>Extracted filename: ${filename}</p>`;
+                            resultDiv.innerHTML += `<p>Download URL: <a href="${downloadUrl}" target="_blank">${downloadUrl}</a></p>`;
+                        });
+                    } else {
+                        resultDiv.innerHTML += '<p>No file documents found in object</p>';
+                    }
+                }
+            } catch (e) {
+                resultDiv.innerHTML += `<p style="color: red;">Error parsing documents: ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -367,6 +367,49 @@ $ca_results = $stmt->fetchAll();
             color: #856404;
         }
         
+        .actions-bar {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background-color: #228B22;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #1a6b1a;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
         /* Mobile Web View - Ensure tables display properly on mobile */
         @media (max-width: 768px) {
             .gpa-table, .results-table {
@@ -494,6 +537,25 @@ $ca_results = $stmt->fetchAll();
                 <i class="fas fa-exclamation-triangle"></i> Your fee balance is K<?php echo number_format($balance, 2); ?>. Access to exam results is restricted until your balance is cleared. You can only view CA results.
             </div>
         <?php endif; ?>
+        
+        <!-- Download and Print Buttons -->
+        <div class="actions-bar" style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <?php if ($access_granted): ?>
+                <button class="btn btn-primary" onclick="window.open('generate_results_pdf.php', '_blank')">
+                    <i class="fas fa-download"></i> Download Results PDF
+                </button>
+                <button class="btn btn-secondary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print Results
+                </button>
+            <?php else: ?>
+                <button class="btn btn-primary" disabled title="Access restricted due to finance clearance">
+                    <i class="fas fa-download"></i> Download Results PDF
+                </button>
+                <button class="btn btn-secondary" disabled title="Access restricted due to finance clearance">
+                    <i class="fas fa-print"></i> Print Results
+                </button>
+            <?php endif; ?>
+        </div>
         
         <!-- Student Information -->
         <div class="student-info">

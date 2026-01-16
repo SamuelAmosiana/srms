@@ -591,7 +591,10 @@ function generateTemporaryPassword($length = 8) {
             if (documents.length > 0) {
                 documents.forEach(doc => {
                     const li = document.createElement('li');
-                    li.innerHTML = `<a href="${doc.path}" target="_blank">${doc.name}</a>`;
+                    const filename = doc.path.split('/').pop();
+                    const downloadUrl = `/srms/admin/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                    console.log("FINAL DOWNLOAD URL:", downloadUrl);
+                    li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
                     docsList.appendChild(li);
                 });
             } else {
