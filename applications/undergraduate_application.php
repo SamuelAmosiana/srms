@@ -5,6 +5,12 @@ require '../auth/auth.php';
 // Check maintenance mode
 checkMaintenanceMode($pdo);
 
+// Ensure uploads directory exists
+$uploadDir = __DIR__ . '/../uploads';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true);
+}
+
 // Fetch undergraduate and certificate/diploma programmes from the database
 try {
     $stmt = $pdo->prepare("SELECT id, name, code FROM programme WHERE category = 'undergraduate' OR category IS NULL ORDER BY name");
@@ -51,28 +57,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Handle file uploads
     $documents = [];
+    $uploadBasePath = '../uploads/';
+    
     if ($has_grade12results) {
-        $documents[] = [
-            'name' => $_FILES['grade12results']['name'],
-            'path' => 'uploads/' . time() . '_grade12results_' . $_FILES['grade12results']['name']
-        ];
-        move_uploaded_file($_FILES['grade12results']['tmp_name'], $documents[count($documents)-1]['path']);
+        $filename = time() . '_grade12results_' . bin2hex(random_bytes(16)) . '.' . pathinfo($_FILES['grade12results']['name'], PATHINFO_EXTENSION);
+        $destination = $uploadBasePath . $filename;
+        
+        if (move_uploaded_file($_FILES['grade12results']['tmp_name'], $destination)) {
+            $documents[] = [
+                'name' => $_FILES['grade12results']['name'],
+                'path' => $destination
+            ];
+        } else {
+            throw new Exception("Failed to upload grade 12 results file");
+        }
     }
     
     if ($has_previousschool) {
-        $documents[] = [
-            'name' => $_FILES['previousschool']['name'],
-            'path' => 'uploads/' . time() . '_previousschool_' . $_FILES['previousschool']['name']
-        ];
-        move_uploaded_file($_FILES['previousschool']['tmp_name'], $documents[count($documents)-1]['path']);
+        $filename = time() . '_previousschool_' . bin2hex(random_bytes(16)) . '.' . pathinfo($_FILES['previousschool']['name'], PATHINFO_EXTENSION);
+        $destination = $uploadBasePath . $filename;
+        
+        if (move_uploaded_file($_FILES['previousschool']['tmp_name'], $destination)) {
+            $documents[] = [
+                'name' => $_FILES['previousschool']['name'],
+                'path' => $destination
+            ];
+        } else {
+            throw new Exception("Failed to upload previous school documents file");
+        }
     }
     
     if ($has_nrc_copy) {
-        $documents[] = [
-            'name' => $_FILES['nrc_copy']['name'],
-            'path' => 'uploads/' . time() . '_nrc_copy_' . $_FILES['nrc_copy']['name']
-        ];
-        move_uploaded_file($_FILES['nrc_copy']['tmp_name'], $documents[count($documents)-1]['path']);
+        $filename = time() . '_nrc_copy_' . bin2hex(random_bytes(16)) . '.' . pathinfo($_FILES['nrc_copy']['name'], PATHINFO_EXTENSION);
+        $destination = $uploadBasePath . $filename;
+        
+        if (move_uploaded_file($_FILES['nrc_copy']['tmp_name'], $destination)) {
+            $documents[] = [
+                'name' => $_FILES['nrc_copy']['name'],
+                'path' => $destination
+            ];
+        } else {
+            throw new Exception("Failed to upload NRC copy file");
+        }
     }
     
     try {
