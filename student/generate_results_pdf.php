@@ -2,10 +2,8 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../auth/auth.php';
 
-// Load DOMPDF
-require_once __DIR__ . '/../lib/dompdf/autoload.inc.php';
-use Dompdf\Dompdf;
-use Dompdf\Options;
+// Load FPDF
+require_once __DIR__ . '/../lib/fpdf/fpdf.php';
 
 /**
  * Function to calculate grade based on total score and grading scale
@@ -52,7 +50,7 @@ function ordinal($number) {
 }
 
 /**
- * Generate student results PDF
+ * Generate student results PDF using FPDF
  * 
  * @param int $user_id The student's user ID
  * @param PDO $pdo Database connection
@@ -181,327 +179,133 @@ function generateResultsPDF($user_id, $pdo) {
         ];
     }
 
-    // Generate the HTML content for the PDF
-    $html = '<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Academic Results Transcript</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            margin: 0;
-            padding: 30px;
-            background-color: #fff;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #228B22;
-            padding-bottom: 15px;
-        }
-        
-        .college-name {
-            font-size: 24px;
-            font-weight: bold;
-            color: #228B22;
-            margin-bottom: 5px;
-        }
-        
-        .tagline {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 10px;
-        }
-        
-        .logo {
-            width: 100px;
-            height: 100px;
-            margin-bottom: 10px;
-        }
-        
-        .student-info {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        
-        .info-row {
-            display: flex;
-            margin-bottom: 8px;
-        }
-        
-        .info-label {
-            font-weight: bold;
-            width: 150px;
-            flex-shrink: 0;
-        }
-        
-        .section-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #228B22;
-            margin: 30px 0 15px 0;
-            padding-bottom: 5px;
-            border-bottom: 2px solid #228B22;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 12px;
-        }
-        
-        table th, table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        
-        table th {
-            background-color: #228B22;
-            color: white;
-            font-weight: bold;
-        }
-        
-        table tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-        
-        .gpa-summary {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #e8f5e8;
-            border: 1px solid #c8e6c9;
-            border-radius: 5px;
-        }
-        
-        .year-section {
-            margin-top: 30px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #fafafa;
-        }
-        
-        .year-header {
-            font-size: 16px;
-            font-weight: bold;
-            color: #228B22;
-            margin-bottom: 15px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #228B22;
-        }
-        
-        .year-info {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .year-info-item {
-            margin-right: 20px;
-        }
-        
-        .year-info-label {
-            font-weight: bold;
-            display: inline-block;
-            width: 100px;
-        }
-        
-        .footer {
-            margin-top: 40px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-            border-top: 1px solid #ccc;
-            padding-top: 20px;
-        }
-        
-        .page-break {
-            page-break-before: always;
-        }
-        
-        @media print {
-            body {
-                font-size: 10pt;
-            }
-            
-            table {
-                font-size: 9pt;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="college-name">LUSAKA SOUTH COLLEGE</div>
-        <div class="tagline">Academic Results Transcript</div>
-        <img src="../assets/images/lsc-logo.png" class="logo" alt="LSUC Logo" onerror="this.style.display=\'none\'">
-    </div>
+    // Create PDF using FPDF
+    $pdf = new FPDF('L', 'mm', 'A4'); // Landscape orientation, millimeters, A4 size
+    $pdf->AddPage();
     
-    <div class="student-info">
-        <div class="info-row">
-            <div class="info-label">Computer Number:</div>
-            <div>' . htmlspecialchars($student['student_id'] ?? 'N/A') . '</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Name:</div>
-            <div>' . htmlspecialchars($student['full_name'] ?? 'N/A') . '</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Gender:</div>
-            <div>' . htmlspecialchars($student['gender'] ?? 'N/A') . '</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Programme:</div>
-            <div>' . htmlspecialchars($programme) . '</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Generated Date:</div>
-            <div>' . date('d/m/Y H:i:s') . '</div>
-        </div>
-    </div>';
-
-    // Add GPA Summary Table
-    $html .= '
-    <h3 class="section-title">GPA Summary</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Academic Year</th>
-                <th>Total Credits</th>
-                <th>GPA</th>
-            </tr>
-        </thead>
-        <tbody>';
-        
+    // Set font
+    $pdf->SetFont('Arial', 'B', 16);
+    
+    // College Header
+    $pdf->Cell(0, 10, 'LUSAKA SOUTH COLLEGE', 0, 1, 'C');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(0, 8, 'Academic Results Transcript', 0, 1, 'C');
+    $pdf->Ln(5);
+    
+    // Student Information
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 8, 'Student Information', 0, 1);
+    $pdf->SetFont('Arial', '', 10);
+    
+    $pdf->Cell(45, 6, 'Computer Number:', 1);
+    $pdf->Cell(0, 6, $student['student_id'] ?? 'N/A', 1, 1);
+    
+    $pdf->Cell(45, 6, 'Name:', 1);
+    $pdf->Cell(0, 6, $student['full_name'] ?? 'N/A', 1, 1);
+    
+    $pdf->Cell(45, 6, 'Gender:', 1);
+    $pdf->Cell(0, 6, $student['gender'] ?? 'N/A', 1, 1);
+    
+    $pdf->Cell(45, 6, 'Programme:', 1);
+    $pdf->Cell(0, 6, $programme, 1, 1);
+    
+    $pdf->Cell(45, 6, 'Generated Date:', 1);
+    $pdf->Cell(0, 6, date('d/m/Y H:i:s'), 1, 1);
+    
+    $pdf->Ln(5);
+    
+    // GPA Summary Table
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 8, 'GPA Summary', 0, 1);
+    $pdf->SetFont('Arial', 'B', 10);
+    
+    // Header for GPA table
+    $pdf->Cell(60, 8, 'Academic Year', 1);
+    $pdf->Cell(60, 8, 'Total Credits', 1);
+    $pdf->Cell(60, 8, 'GPA', 1);
+    $pdf->Ln();
+    
+    $pdf->SetFont('Arial', '', 10);
     if (!empty($gpa_data)) {
         foreach ($gpa_data as $gpa_entry) {
-            $html .= '
-            <tr>
-                <td>' . htmlspecialchars($gpa_entry['year']) . '</td>
-                <td>' . htmlspecialchars($gpa_entry['credits']) . '</td>
-                <td>' . htmlspecialchars($gpa_entry['gpa']) . '</td>
-            </tr>';
+            $pdf->Cell(60, 8, $gpa_entry['year'], 1);
+            $pdf->Cell(60, 8, $gpa_entry['credits'], 1);
+            $pdf->Cell(60, 8, $gpa_entry['gpa'], 1);
+            $pdf->Ln();
         }
     } else {
-        $html .= '
-            <tr>
-                <td colspan="3">No GPA data available</td>
-            </tr>';
+        $pdf->Cell(180, 8, 'No GPA data available', 1, 1);
     }
     
-    $html .= '
-        </tbody>
-    </table>';
-
-    // Add detailed results for each academic year
+    $pdf->Ln(5);
+    
+    // Detailed results for each academic year
     if (!empty($year_data)) {
         foreach ($year_data as $year => $data) {
-            $html .= '
-            <div class="year-section">
-                <div class="year-header">Academic Year: ' . htmlspecialchars($year) . '</div>
-                
-                <div class="year-info">
-                    <div class="year-info-item">
-                        <span class="year-info-label">Programme:</span>
-                        ' . htmlspecialchars($programme) . '
-                    </div>
-                    <div class="year-info-item">
-                        <span class="year-info-label">Year of Study:</span>
-                        ' . (date('Y') - intval(substr($year, 0, 4)) + 1) . ordinal(date('Y') - intval(substr($year, 0, 4)) + 1) . ' Year
-                    </div>
-                    <div class="year-info-item">
-                        <span class="year-info-label">Credits:</span>
-                        ' . htmlspecialchars($data['credits']) . '
-                    </div>
-                    <div class="year-info-item">
-                        <span class="year-info-label">GPA:</span>
-                        ' . htmlspecialchars($data['gpa']) . '
-                    </div>
-                    <div class="year-info-item">
-                        <span class="year-info-label">Comment:</span>
-                        ' . htmlspecialchars($data['comment']) . '
-                    </div>
-                </div>
-                
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Course Code</th>
-                            <th>Course Name</th>
-                            <th>CA Score</th>
-                            <th>Exam Score</th>
-                            <th>Total Score</th>
-                            <th>Credits</th>
-                            <th>Grade</th>
-                            <th>Comment</th>
-                        </tr>
-                    </thead>
-                    <tbody>';
-                    
+            $pdf->SetFont('Arial', 'B', 12);
+            $pdf->Cell(0, 8, "Academic Year: $year", 0, 1);
+            
+            // Year summary info
+            $pdf->SetFont('Arial', '', 10);
+            $year_of_study = (date('Y') - intval(substr($year, 0, 4)) + 1) . ordinal(date('Y') - intval(substr($year, 0, 4)) + 1) . ' Year';
+            
+            $pdf->Cell(40, 6, 'Programme:', 0);
+            $pdf->Cell(0, 6, $programme, 0, 1);
+            
+            $pdf->Cell(40, 6, 'Year of Study:', 0);
+            $pdf->Cell(0, 6, $year_of_study, 0, 1);
+            
+            $pdf->Cell(40, 6, 'Credits:', 0);
+            $pdf->Cell(0, 6, $data['credits'], 0, 1);
+            
+            $pdf->Cell(40, 6, 'GPA:', 0);
+            $pdf->Cell(0, 6, $data['gpa'], 0, 1);
+            
+            $pdf->Cell(40, 6, 'Comment:', 0);
+            $pdf->Cell(0, 6, $data['comment'], 0, 1);
+            
+            $pdf->Ln(3);
+            
+            // Course results table header
+            $pdf->SetFont('Arial', 'B', 9);
+            $pdf->Cell(25, 8, 'Course Code', 1);
+            $pdf->Cell(45, 8, 'Course Name', 1);
+            $pdf->Cell(20, 8, 'CA Score', 1);
+            $pdf->Cell(20, 8, 'Exam Score', 1);
+            $pdf->Cell(20, 8, 'Total Score', 1);
+            $pdf->Cell(15, 8, 'Credits', 1);
+            $pdf->Cell(15, 8, 'Grade', 1);
+            $pdf->Cell(20, 8, 'Comment', 1);
+            $pdf->Ln();
+            
+            $pdf->SetFont('Arial', '', 8);
             foreach ($data['courses'] as $course) {
                 $total_score = ($course['ca_score'] ?? 0) + ($course['exam_score'] ?? 0);
                 $comment = !empty($course['admin_comment']) ? $course['admin_comment'] : $data['comment'];
                 
-                $html .= '
-                    <tr>
-                        <td>' . htmlspecialchars($course['course_code']) . '</td>
-                        <td>' . htmlspecialchars($course['course_name']) . '</td>
-                        <td>' . htmlspecialchars($course['ca_score'] ?? 'N/A') . '</td>
-                        <td>' . htmlspecialchars($course['exam_score'] ?? 'N/A') . '</td>
-                        <td>' . htmlspecialchars($total_score) . '</td>
-                        <td>' . htmlspecialchars($course['credits'] ?? 'N/A') . '</td>
-                        <td>' . htmlspecialchars($course['grade'] ?? 'N/A') . '</td>
-                        <td>' . htmlspecialchars($comment) . '</td>
-                    </tr>';
+                $pdf->Cell(25, 8, $course['course_code'], 1);
+                $pdf->Cell(45, 8, substr($course['course_name'], 0, 25), 1);
+                $pdf->Cell(20, 8, $course['ca_score'] ?? 'N/A', 1);
+                $pdf->Cell(20, 8, $course['exam_score'] ?? 'N/A', 1);
+                $pdf->Cell(20, 8, $total_score, 1);
+                $pdf->Cell(15, 8, $course['credits'] ?? 'N/A', 1);
+                $pdf->Cell(15, 8, $course['grade'] ?? 'N/A', 1);
+                $pdf->Cell(20, 8, substr($comment, 0, 15), 1);
+                $pdf->Ln();
             }
             
-            $html .= '
-                    </tbody>
-                </table>
-            </div>';
+            $pdf->Ln(5);
         }
     } else {
-        $html .= '
-        <div class="alert alert-info">
-            <p>No results available yet.</p>
-        </div>';
+        $pdf->SetFont('Arial', '', 10);
+        $pdf->Cell(0, 8, 'No results available yet.', 0, 1);
     }
-
-    $html .= '
-    <div class="footer">
-        <p>This is a computer-generated document and is valid without signature.</p>
-        <p>Lusaka South College &copy; ' . date('Y') . ' - All Rights Reserved</p>
-    </div>
-</body>
-</html>';
-
-    // Configure DOMPDF
-    $options = new Options();
-    $options->set('defaultFont', 'Arial');
-    $options->set('isRemoteEnabled', true); // Enable loading remote resources like images
     
-    $dompdf = new Dompdf($options);
-    $dompdf->loadHtml($html);
-    
-    // Set paper size and orientation
-    $dompdf->setPaper('A4', 'landscape');
-    
-    // Render the PDF
-    $dompdf->render();
-    
-    // Output the generated PDF to Browser
-    $output = $dompdf->output();
+    // Footer
+    $pdf->Ln(10);
+    $pdf->SetFont('Arial', 'I', 8);
+    $pdf->Cell(0, 5, 'This is a computer-generated document and is valid without signature.', 0, 1, 'C');
+    $pdf->Cell(0, 5, 'Lusaka South College © ' . date('Y') . ' - All Rights Reserved', 0, 1, 'C');
     
     // Create output filename
     $output_filename = 'results_transcript_' . $student['student_id'] . '_' . date('Y-m-d') . '.pdf';
@@ -515,7 +319,7 @@ function generateResultsPDF($user_id, $pdo) {
     }
     
     // Write the PDF to the file
-    file_put_contents($output_path, $output);
+    $pdf->Output('F', $output_path);
     
     return $output_path;
 }
