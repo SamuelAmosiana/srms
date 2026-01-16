@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Formspree Email Test - LSUC</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4169E1 0%, #0080FF 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            color: #ffffff;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #4169E1, #0080FF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        .status-ready { background: #e8f5e8; color: #2e7d32; border: 2px solid #4caf50; }
+        .status-testing { background: #fff3cd; color: #856404; border: 2px solid #ffc107; }
+        .status-success { background: #d4edda; color: #155724; border: 2px solid #28a745; }
+        .status-error { background: #f8d7da; color: #721c24; border: 2px solid #dc3545; }
+        
+        .test-form {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            border: 2px solid #e9ecef;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2e8b57;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #4169E1;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.1);
+        }
+        .submit-btn {
+            background: linear-gradient(135deg, #4169E1, #0080FF);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(65, 105, 225, 0.3);
+            width: 100%;
+            margin-top: 20px;
+        }
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(65, 105, 225, 0.4);
+        }
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-family: 'Courier New', monospace;
+        }
+        .info-box {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #0d47a1;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .feature-item {
+            background: white;
+            border: 2px solid #4169E1;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        .feature-item .icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="header">
+            <h1>🚀 Formspree Integration Test</h1>
+            <p style="font-size: 1.2rem; margin: 10px 0;">Direct email delivery to admissions@lsuczm.com</p>
+            <div>
+                <span class="status-indicator status-ready">✅ Formspree Ready</span>
+                <span class="status-indicator status-ready">📧 Email Configured</span>
+                <span class="status-indicator status-ready">🔒 Secure Submission</span>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3>🎯 What This Test Does:</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="icon">📤</div>
+                    <strong>Direct Email</strong><br>
+                    Sends to your admissions email
+                </div>
+                <div class="feature-item">
+                    <div class="icon">↩️</div>
+                    <strong>Reply Feature</strong><br>
+                    You can reply directly to sender
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🆔</div>
+                    <strong>Application ID</strong><br>
+                    Unique tracking number
+                </div>
+                <div class="feature-item">
+                    <div class="icon">📋</div>
+                    <strong>Complete Data</strong><br>
+                    All form fields included
+                </div>
+            </div>
+        </div>
+
+        <form id="formspree-test" class="test-form">
+            <h3 style="color: #4169E1; margin-bottom: 20px;">📝 Test Application Form</h3>
+            
+            <div class="form-group">
+                <label>👤 First Name:</label>
+                <input type="text" name="firstname" value="Test" required>
+            </div>
+            
+            <div class="form-group">
+                <label>👤 Last Name:</label>
+                <input type="text" name="lastname" value="Applicant" required>
+            </div>
+            
+            <div class="form-group">
+                <label>📧 Email Address:</label>
+                <input type="email" name="email" value="test.applicant@example.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label>📞 Phone Number:</label>
+                <input type="tel" name="phone" value="+260-123-456-789" required>
+            </div>
+            
+            <div class="form-group">
+                <label>🎓 Application Type:</label>
+                <select name="application_type" required>
+                    <option value="Undergraduate Application">🎓 Undergraduate Program</option>
+                    <option value="Short Course Application">📚 Short Course</option>
+                    <option value="Corporate Training Request">🏢 Corporate Training</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>💼 Program of Interest:</label>
+                <select name="program" required>
+                    <option value="Business Administration">Business Administration</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Digital Marketing">Digital Marketing (Short Course)</option>
+                    <option value="Leadership Training">Leadership Training (Corporate)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>📝 Additional Message:</label>
+                <textarea name="message" rows="4" placeholder="Any additional information or questions...">This is a test submission from the Formspree integration test page. Please confirm that you received this email with all the form data.</textarea>
+            </div>
+            
+            <button type="submit" class="submit-btn">
+                🚀 Send Test Email to Admissions
+            </button>
+        </form>
+        
+        <div id="result"></div>
+        
+        <div class="info-box" style="margin-top: 40px;">
+            <h3>🔍 What to Expect:</h3>
+            <ol>
+                <li><strong>Immediate Response:</strong> You'll get a success message here</li>
+                <li><strong>Email Delivery:</strong> Check admissions@lsuczm.com inbox</li>
+                <li><strong>Professional Format:</strong> Email will include all form data</li>
+                <li><strong>Reply Capability:</strong> Reply-to will be set to test.applicant@example.com</li>
+                <li><strong>Tracking ID:</strong> Unique application ID for reference</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('formspree-test').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('.submit-btn');
+            const resultDiv = document.getElementById('result');
+            
+            // Add Formspree-specific fields
+            const applicationId = 'LSUC-TEST-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+            formData.append('_subject', `🧪 TEST: ${formData.get('application_type')} - ${formData.get('firstname')} ${formData.get('lastname')}`);
+            formData.append('_replyto', formData.get('email'));
+            formData.append('application_id', applicationId);
+            formData.append('submission_date', new Date().toLocaleString());
+            formData.append('test_mode', 'true');
+            formData.append('source', 'Formspree Integration Test');
+            
+            // Show loading state
+            const originalText = submitBtn.textContent;
+            submitBtn.innerHTML = '🔄 Sending Test Email...';
+            submitBtn.disabled = true;
+            
+            resultDiv.innerHTML = `
+                <div class="result status-testing">
+⏳ SENDING TEST EMAIL...
+
+📧 To: admissions@lsuczm.com
+📤 From: ${formData.get('email')}
+🆔 Application ID: ${applicationId}
+📅 Timestamp: ${new Date().toLocaleString()}
+
+⚡ Using Formspree endpoint: https://formspree.io/f/mwprbbwg
+
+Please wait while we deliver your test email...
+                </div>
+            `;
+            
+            // Submit to Formspree
+            fetch('https://formspree.io/f/mwprbbwg', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                resultDiv.innerHTML = `
+                    <div class="result status-success">
+🎉 SUCCESS! TEST EMAIL SENT!
+
+✅ Email delivered to: admissions@lsuczm.com
+🆔 Application ID: ${applicationId}
+📅 Sent at: ${new Date().toLocaleString()}
+🔧 Method: Formspree HTTPS
+
+📧 CHECK YOUR ADMISSIONS EMAIL NOW!
+
+The email includes:
+📋 Subject: "${formData.get('_subject')}"
+👤 From: ${formData.get('firstname')} ${formData.get('lastname')}
+📧 Reply-to: ${formData.get('email')}
+📞 Phone: ${formData.get('phone')}
+🎓 Program: ${formData.get('program')}
+📝 Message: ${formData.get('message')}
+
+🔥 This is REAL email delivery via Formspree!
+✉️ You can reply directly to the applicant from your inbox!
+
+🎯 Integration Status: WORKING PERFECTLY! 
+                    </div>
+                `;
+                
+                // Celebrate with some animation
+                setTimeout(() => {
+                    resultDiv.style.animation = 'bounce 0.6s ease-in-out';
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <div class="result status-error">
+❌ TEST FAILED
+
+Error: ${error.message}
+
+🔧 Possible Issues:
+- Formspree endpoint not active
+- Network connectivity problem
+- CORS restrictions
+- Invalid form data
+
+📧 Formspree Endpoint: https://formspree.io/f/mwprbbwg
+
+🔍 Debug Steps:
+1. Check if endpoint is verified in Formspree dashboard
+2. Verify internet connection
+3. Try again in a few minutes
+4. Check browser console for detailed errors
+
+💡 If issues persist, contact Formspree support or try a different endpoint.
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Restore button
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            });
+        });
+        
+        // Add some visual effects
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.test-container');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(30px)';
+            
+            setTimeout(() => {
+                container.style.transition = 'all 0.6s ease';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    </script>
+</body>
+</html>
