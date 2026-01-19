@@ -7,9 +7,9 @@
 // SMTP settings for enroll@lsuclms.com
 define('SMTP_HOST', 'lsuclms.com'); 
 define('SMTP_USERNAME', 'enroll@lsuclms.com');
-define('SMTP_PASSWORD', '****');  // Hidden for security purposes, replace with actual password
+define('SMTP_PASSWORD', 'your_actual_password_here');  // Replace with the actual email password
 define('SMTP_PORT', 465);          
-define('SMTP_SECURE', 'ssl');      
+define('SMTP_SECURE', 'ssl');      // For SSL encryption
 
 // Email metadata
 define('EMAIL_FROM', 'enroll@lsuclms.com');

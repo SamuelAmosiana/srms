@@ -19,6 +19,38 @@ require_once '../letters_reports/generate_acceptance_letter_dompdf.php';
 // Include the email functionality (contains sendAcceptanceLetterEmail function)
 require_once '../letters_reports/generate_acceptance_letter_docx.php';
 
+// Add a helper function to send emails with better error handling
+function sendEmailWithImprovedHandling($to, $subject, $body) {
+    // First try PHPMailer if available
+    global $phpmailer_available;
+    
+    if ($phpmailer_available) {
+        // Include the PHPMailer functions
+        require_once '../letters_reports/generate_acceptance_letter_docx.php';
+        $result = sendEmailWithPHPMailer($to, $subject, $body);
+        if ($result) {
+            return true;
+        }
+        error_log("PHPMailer failed, trying fallback method for: " . $to);
+    }
+    
+    // Fallback to mail() function
+    $headers = "From: " . EMAIL_FROM . "\r\n";
+    $headers .= "Reply-To: " . EMAIL_REPLY_TO . "\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    
+    $result = mail($to, $subject, $body, $headers);
+    
+    if ($result) {
+        error_log("Email sent using fallback method to: " . $to);
+    } else {
+        error_log("Email sending failed for: " . $to);
+    }
+    
+    return $result;
+}
+
 /**
  * Send rejection email to applicant
  * 
@@ -130,15 +162,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     // Check if the function exists before calling it
                     if (function_exists('sendAcceptanceLetterEmail')) {
-                        sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo);
+                        $email_sent = sendAcceptanceLetterEmail($application, $letter_path, $login_details, $pdo);
+                        if ($email_sent) {
+                            $message = "Application approved successfully! Acceptance letter generated and email sent to applicant with instructions to login using their email address.";
+                        } else {
+                            $message = "Application approved successfully! Acceptance letter generated but email could not be sent. Please check email configuration.";
+                        }
                     } else {
                         error_log('sendAcceptanceLetterEmail function is not available');
                         $message = "Application approved successfully! Acceptance letter generated but email could not be sent.";
-                        $messageType = "warning";
-                        break;
                     }
                     
-                    $message = "Application approved successfully! Acceptance letter generated and email sent to applicant with instructions to login using their email address.";
                     $messageType = "success";
                     break;
                     

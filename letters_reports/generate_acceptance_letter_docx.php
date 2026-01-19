@@ -219,7 +219,27 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
     
     // Try to use PHPMailer if available, otherwise fall back to mail()
     if ($phpmailer_available) {
-        return sendEmailWithPHPMailer($application['email'], $subject, $body);
+        error_log("Attempting to send acceptance email via PHPMailer to: " . $application['email']);
+        $result = sendEmailWithPHPMailer($application['email'], $subject, $body);
+        
+        if (!$result) {
+            error_log("PHPMailer failed, falling back to mail() function for: " . $application['email']);
+            // Fallback to mail() function
+            $headers = "From: " . EMAIL_FROM . "\r\n";
+            $headers .= "Reply-To: " . EMAIL_REPLY_TO . "\r\n";
+            $headers .= "MIME-Version: 1.0\r\n";
+            $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+            
+            $result = mail($application['email'], $subject, $body, $headers);
+            
+            if ($result) {
+                error_log("Email sent successfully using mail() function to: " . $application['email']);
+            } else {
+                error_log("Both PHPMailer and mail() function failed for: " . $application['email']);
+            }
+        }
+        
+        return $result;
     } else {
         // Send email using PHP's mail function
         $headers = "From: " . EMAIL_FROM . "\r\n";
@@ -227,19 +247,12 @@ function sendAcceptanceLetterEmail($application, $letter_path, $login_details, $
         $headers .= "MIME-Version: 1.0\r\n";
         $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
         
-        // Try to send the email
         $result = mail($application['email'], $subject, $body, $headers);
         
-        // Log email details for debugging (whether successful or not)
-        error_log("Email attempt to: " . $application['email']);
-        error_log("Subject: " . $subject);
-        error_log("Body: " . $body);
-        
-        // If mail() fails due to SMTP configuration, provide a more user-friendly message
-        if (!$result) {
-            error_log("Failed to send email to: " . $application['email'] . ". This is likely due to SMTP configuration issues.");
-            // Return true anyway so the application process continues
-            return true;
+        if ($result) {
+            error_log("Email sent successfully using mail() function to: " . $application['email']);
+        } else {
+            error_log("mail() function failed for: " . $application['email'] . ". This may be due to server configuration.");
         }
         
         return $result;
@@ -264,8 +277,11 @@ function sendEmailWithPHPMailer($to, $subject, $body) {
         $mail->SMTPAuth = true;
         $mail->Username = SMTP_USERNAME;
         $mail->Password = SMTP_PASSWORD;
-        $mail->SMTPSecure = SMTP_SECURE;
+        $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS; // Use STARTTLS
         $mail->Port = SMTP_PORT;
+        
+        // Enable verbose debug output
+        $mail->SMTPDebug = 0; // Set to 2 for detailed debugging
         
         // Recipients
         $mail->setFrom(EMAIL_FROM, EMAIL_FROM_NAME);
@@ -273,9 +289,10 @@ function sendEmailWithPHPMailer($to, $subject, $body) {
         $mail->addReplyTo(EMAIL_REPLY_TO);
         
         // Content
-        $mail->isHTML(false);
+        $mail->isHTML(true); // Changed to HTML for better formatting
         $mail->Subject = $subject;
-        $mail->Body = $body;
+        $mail->Body    = nl2br($body); // Convert newlines to HTML line breaks
+        $mail->AltBody = $body; // Plain text version
         
         // Send email
         $mail->send();
@@ -285,8 +302,9 @@ function sendEmailWithPHPMailer($to, $subject, $body) {
         return true;
         
     } catch (Exception $e) {
-        // Log error
-        error_log("Failed to send email to: " . $to . ". Error: " . $mail->ErrorInfo);
+        // Log error with more details
+        error_log("Failed to send email to: " . $to . ". Error: " . $e->getMessage());
+        error_log("SMTP Error Info: " . $mail->ErrorInfo ?? 'N/A');
         return false;
     }
 }

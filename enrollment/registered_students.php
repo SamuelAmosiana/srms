@@ -76,78 +76,170 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $student = $stmt->fetch();
         
         if ($student) {
-            // Generate student number if not already generated
-            if (empty($student['student_number']) || $student['student_number'] === 'Not Generated') {
-                // Generate a unique student number
-                $prefix = 'LSC';
-                $year = date('Y');
+// Check if the student_id corresponds to a user in the system
+            // If so, get the student number from student_profile table instead of generating a new one
+            if (!empty($student['student_id']) && $student['student_id'] > 0) {
+                $stmt = $pdo->prepare("SELECT student_number FROM student_profile WHERE user_id = ?");
+                $stmt->execute([$student['student_id']]);
+                $profile = $stmt->fetch();
                 
-                // Use a more robust approach to handle race conditions
-                $max_attempts = 10;
-                $attempt = 0;
-                $success = false;
-                
-                while ($attempt < $max_attempts && !$success) {
-                    $attempt++;
+                if ($profile && !empty($profile['student_number'])) {
+                    // Use the student number from the student profile
+                    $student_number = $profile['student_number'];
                     
-                    try {
-                        // Begin transaction to make the read-update atomic
-                        $pdo->beginTransaction();
+                    // Update the registered_students table with the correct student number
+                    $update_stmt = $pdo->prepare("UPDATE registered_students SET student_number = ? WHERE id = ?");
+                    $update_stmt->execute([$student_number, $student_id]);
+                    
+                    $student['student_number'] = $student_number;
+                } else {
+                    // Generate a unique student number if no existing one found
+                    if (empty($student['student_number']) || $student['student_number'] === 'Not Generated') {
+                        $prefix = 'LSC';
+                        $year = date('Y');
                         
-                        // Get the last student number to increment (with row locking)
-                        $last_stmt = $pdo->query("SELECT student_number FROM registered_students WHERE student_number LIKE 'LSC{$year}%' AND student_number IS NOT NULL AND student_number != '' AND student_number != 'Not Generated' ORDER BY CAST(SUBSTRING(student_number, -6) AS UNSIGNED) DESC LIMIT 1 FOR UPDATE");
-                        $last_record = $last_stmt->fetch();
+                        // Use a more robust approach to handle race conditions
+                        $max_attempts = 10;
+                        $attempt = 0;
+                        $success = false;
                         
-                        if ($last_record) {
-                            $last_number = intval(substr($last_record['student_number'], -6));
-                            $next_number = str_pad($last_number + 1, 6, '0', STR_PAD_LEFT);
-                        } else {
-                            $next_number = '000001';
+                        while ($attempt < $max_attempts && !$success) {
+                            $attempt++;
+                            
+                            try {
+                                // Begin transaction to make the read-update atomic
+                                $pdo->beginTransaction();
+                                
+                                // Get the last student number to increment (with row locking)
+                                $last_stmt = $pdo->query("SELECT student_number FROM registered_students WHERE student_number LIKE 'LSC{$year}%' AND student_number IS NOT NULL AND student_number != '' AND student_number != 'Not Generated' ORDER BY CAST(SUBSTRING(student_number, -6) AS UNSIGNED) DESC LIMIT 1 FOR UPDATE");
+                                $last_record = $last_stmt->fetch();
+                                
+                                if ($last_record) {
+                                    $last_number = intval(substr($last_record['student_number'], -6));
+                                    $next_number = str_pad($last_number + 1, 6, '0', STR_PAD_LEFT);
+                                } else {
+                                    $next_number = '000001';
+                                }
+                                
+                                $student_number = $prefix . $year . $next_number;
+                                
+                                // Update student number in registered_students
+                                $update_stmt = $pdo->prepare("UPDATE registered_students SET student_number = ? WHERE id = ?");
+                                $result = $update_stmt->execute([$student_number, $student_id]);
+                                
+                                // Commit the transaction
+                                $pdo->commit();
+                                
+                                if ($result && $update_stmt->rowCount() > 0) {
+                                    $success = true;
+                                    $student['student_number'] = $student_number;
+                                } else {
+                                    // If update failed, rollback and try again
+                                    usleep(rand(10000, 50000)); // 10-50 milliseconds
+                                    continue;
+                                }
+                            } catch (PDOException $e) {
+                                // Rollback in case of error
+                                if ($pdo->inTransaction()) {
+                                    $pdo->rollback();
+                                }
+                                
+                                // If it's a duplicate entry error, increment and try again
+                                if ($e->getCode() == 23000 && strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                                    // Wait a random amount of time to reduce collision probability
+                                    usleep(rand(10000, 50000)); // 10-50 milliseconds
+                                    continue;
+                                } else {
+                                    // Re-throw if it's a different error
+                                    throw $e;
+                                }
+                            } catch (Exception $e) {
+                                // Rollback in case of any other error
+                                if ($pdo->inTransaction()) {
+                                    $pdo->rollback();
+                                }
+                                throw $e;
+                            }
                         }
                         
-                        $student_number = $prefix . $year . $next_number;
-                        
-                        // Update student number in registered_students
-                        $update_stmt = $pdo->prepare("UPDATE registered_students SET student_number = ? WHERE id = ?");
-                        $result = $update_stmt->execute([$student_number, $student_id]);
-                        
-                        // Commit the transaction
-                        $pdo->commit();
-                        
-                        if ($result && $update_stmt->rowCount() > 0) {
-                            $success = true;
-                            $student['student_number'] = $student_number;
-                        } else {
-                            // If update failed, rollback and try again
-                            usleep(rand(10000, 50000)); // 10-50 milliseconds
-                            continue;
+                        if (!$success) {
+                            throw new Exception("Could not generate unique student number after {$max_attempts} attempts");
                         }
-                    } catch (PDOException $e) {
-                        // Rollback in case of error
-                        if ($pdo->inTransaction()) {
-                            $pdo->rollback();
-                        }
-                        
-                        // If it's a duplicate entry error, increment and try again
-                        if ($e->getCode() == 23000 && strpos($e->getMessage(), 'Duplicate entry') !== false) {
-                            // Wait a random amount of time to reduce collision probability
-                            usleep(rand(10000, 50000)); // 10-50 milliseconds
-                            continue;
-                        } else {
-                            // Re-throw if it's a different error
-                            throw $e;
-                        }
-                    } catch (Exception $e) {
-                        // Rollback in case of any other error
-                        if ($pdo->inTransaction()) {
-                            $pdo->rollback();
-                        }
-                        throw $e;
                     }
                 }
-                
-                if (!$success) {
-                    throw new Exception("Could not generate unique student number after {$max_attempts} attempts");
+            } else {
+                // Generate a unique student number if no existing one found
+                if (empty($student['student_number']) || $student['student_number'] === 'Not Generated') {
+                    $prefix = 'LSC';
+                    $year = date('Y');
+                    
+                    // Use a more robust approach to handle race conditions
+                    $max_attempts = 10;
+                    $attempt = 0;
+                    $success = false;
+                    
+                    while ($attempt < $max_attempts && !$success) {
+                        $attempt++;
+                        
+                        try {
+                            // Begin transaction to make the read-update atomic
+                            $pdo->beginTransaction();
+                            
+                            // Get the last student number to increment (with row locking)
+                            $last_stmt = $pdo->query("SELECT student_number FROM registered_students WHERE student_number LIKE 'LSC{$year}%' AND student_number IS NOT NULL AND student_number != '' AND student_number != 'Not Generated' ORDER BY CAST(SUBSTRING(student_number, -6) AS UNSIGNED) DESC LIMIT 1 FOR UPDATE");
+                            $last_record = $last_stmt->fetch();
+                            
+                            if ($last_record) {
+                                $last_number = intval(substr($last_record['student_number'], -6));
+                                $next_number = str_pad($last_number + 1, 6, '0', STR_PAD_LEFT);
+                            } else {
+                                $next_number = '000001';
+                            }
+                            
+                            $student_number = $prefix . $year . $next_number;
+                            
+                            // Update student number in registered_students
+                            $update_stmt = $pdo->prepare("UPDATE registered_students SET student_number = ? WHERE id = ?");
+                            $result = $update_stmt->execute([$student_number, $student_id]);
+                            
+                            // Commit the transaction
+                            $pdo->commit();
+                            
+                            if ($result && $update_stmt->rowCount() > 0) {
+                                $success = true;
+                                $student['student_number'] = $student_number;
+                            } else {
+                                // If update failed, rollback and try again
+                                usleep(rand(10000, 50000)); // 10-50 milliseconds
+                                continue;
+                            }
+                        } catch (PDOException $e) {
+                            // Rollback in case of error
+                            if ($pdo->inTransaction()) {
+                                $pdo->rollback();
+                            }
+                            
+                            // If it's a duplicate entry error, increment and try again
+                            if ($e->getCode() == 23000 && strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                                // Wait a random amount of time to reduce collision probability
+                                usleep(rand(10000, 50000)); // 10-50 milliseconds
+                                continue;
+                            } else {
+                                // Re-throw if it's a different error
+                                throw $e;
+                            }
+                        } catch (Exception $e) {
+                            // Rollback in case of any other error
+                            if ($pdo->inTransaction()) {
+                                $pdo->rollback();
+                            }
+                            throw $e;
+                        }
+                    }
+                    
+                    if (!$success) {
+                        throw new Exception("Could not generate unique student number after {$max_attempts} attempts");
+                    }
                 }
             }
             
