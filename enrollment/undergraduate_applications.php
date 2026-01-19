@@ -808,10 +808,30 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 li.textContent = doc;
                             } else if (doc.path && doc.name) {
                                 // Handle new format with path and name
-                                const filename = doc.path.split('/').pop();
-                                const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                                // Extract filename using a more robust method
+                                let filename = doc.path;
+                                // Look for the last occurrence of '/' and extract everything after it
+                                const lastSlashIndex = doc.path.lastIndexOf('/');
+                                if (lastSlashIndex >= 0) {
+                                    filename = doc.path.substring(lastSlashIndex + 1);
+                                }
+                                
+                                // Debug logging
+                                console.log("Document path:", doc.path);
+                                console.log("Document name:", doc.name);
+                                console.log("Extracted filename:", filename);
+                                
+                                // Check if we have valid values
+                                if (!filename || !doc.name) {
+                                    console.error("Missing required values for document download");
+                                    li.innerHTML = `<span style="color:red;">Error: Missing document data</span>`;
+                                    docsList.appendChild(li);
+                                    return;
+                                }
+                                
+                                const downloadUrl = './download_document.php?file=' + encodeURIComponent(filename) + '&original_name=' + encodeURIComponent(doc.name);
                                 console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                                li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
+                                li.innerHTML = '<a href="' + downloadUrl + '" target="_blank" style="color:#228B22; text-decoration:none;"><i class="fas fa-file"></i> ' + doc.name + '</a>';
                             } else {
                                 // Handle other formats
                                 li.textContent = JSON.stringify(doc);
@@ -839,10 +859,30 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     if (fileDocs.length > 0) {
                         fileDocs.forEach(doc => {
                             const li = document.createElement('li');
-                            const filename = doc.path.split('/').pop();
-                            const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                            // Extract filename using a more robust method
+                            let filename = doc.path;
+                            // Look for the last occurrence of '/' and extract everything after it
+                            const lastSlashIndex = doc.path.lastIndexOf('/');
+                            if (lastSlashIndex >= 0) {
+                                filename = doc.path.substring(lastSlashIndex + 1);
+                            }
+                            
+                            // Debug logging
+                            console.log("Document path:", doc.path);
+                            console.log("Document name:", doc.name);
+                            console.log("Extracted filename:", filename);
+                            
+                            // Check if we have valid values
+                            if (!filename || !doc.name) {
+                                console.error("Missing required values for document download");
+                                li.innerHTML = `<span style="color:red;">Error: Missing document data</span>`;
+                                docsList.appendChild(li);
+                                return;
+                            }
+                            
+                            const downloadUrl = './download_document.php?file=' + encodeURIComponent(filename) + '&original_name=' + encodeURIComponent(doc.name);
                             console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                            li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
+                            li.innerHTML = '<a href="' + downloadUrl + '" target="_blank" style="color:#228B22; text-decoration:none;"><i class="fas fa-file"></i> ' + doc.name + '</a>';
                             docsList.appendChild(li);
                         });
                     }
