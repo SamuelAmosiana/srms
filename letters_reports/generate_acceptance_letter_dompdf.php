@@ -389,7 +389,7 @@ function generateAcceptanceLetterDOMPDF($application, $pdo) {
     if (!$converted) {
         // Use FPDF as fallback to create a PDF from the HTML content
         if (!class_exists('FPDF')) {
-            require_once __DIR__ . '/lib/fpdf/fpdf.php';
+            require_once __DIR__ . '/../lib/fpdf/fpdf.php';
         }
         
         // Create a basic PDF from the HTML content
