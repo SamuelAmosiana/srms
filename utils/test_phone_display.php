@@ -136,7 +136,7 @@
                             } else if (doc.path && doc.name) {
                                 const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(doc.path.split('/').pop())}&original_name=${encodeURIComponent(doc.name)}`;
                                 console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                                li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
+                                li.innerHTML = `<a href="${downloadUrl}" target="_blank" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
                             } else {
                                 li.textContent = JSON.stringify(doc);
                             }
@@ -153,7 +153,7 @@
                             const li = document.createElement('li');
                             const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(documents[key].path.split('/').pop())}&original_name=${encodeURIComponent(documents[key].name)}`;
                             console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                            li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${documents[key].name}</a>`;
+                            li.innerHTML = `<a href="${downloadUrl}" target="_blank" style="cursor:pointer; color:blue; text-decoration:underline;">${documents[key].name}</a>`;
                             docsList.appendChild(li);
                             hasDocuments = true;
                         } else if (key !== 'path' && key !== 'name' && documents[key]) {

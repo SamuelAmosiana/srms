@@ -12,7 +12,7 @@ if (file_exists($upload_path)) {
     echo "<p>File size: " . filesize($upload_path) . " bytes</p>";
     
     // Test the download URL
-    $download_url = "enrollment/download_document.php?file=" . urlencode($test_filename);
+    $download_url = "/srms/enrollment/download_document.php?file=" . urlencode($test_filename);
     echo "<p><a href='{$download_url}' target='_blank' style='font-size: 18px; padding: 10px; background: #007cba; color: white; text-decoration: none; border-radius: 5px;'>Click to Test Download</a></p>";
     
     echo "<p>If this link works, the download handler is functioning correctly.</p>";
@@ -27,7 +27,7 @@ if (file_exists($upload_path)) {
         echo "<h3>Available WEBP files:</h3><ul>";
         foreach ($webp_files as $file) {
             $basename = basename($file);
-            $test_url = "enrollment/download_document.php?file=" . urlencode($basename);
+            $test_url = "/srms/enrollment/download_document.php?file=" . urlencode($basename);
             echo "<li><a href='{$test_url}' target='_blank'>{$basename}</a></li>";
         }
         echo "</ul>";

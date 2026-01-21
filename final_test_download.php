@@ -24,8 +24,8 @@ if (file_exists($full_path)) {
     }
     
     // Show download link for manual testing
-    echo "<p><a href='enrollment/download_document.php?file=" . urlencode($problematic_file) . "&original_name=test_file.webp' target='_blank'>Test Download Link</a> (Requires Enrollment Officer role)</p>";
-    echo "<p><a href='admin/download_document.php?file=" . urlencode($problematic_file) . "&original_name=test_file.webp' target='_blank'>Test Admin Download Link</a> (Requires Admin role)</p>";
+    echo "<p><a href='/srms/enrollment/download_document.php?file=" . urlencode($problematic_file) . "&original_name=test_file.webp' target='_blank'>Test Download Link</a> (Requires Enrollment Officer role)</p>";
+    echo "<p><a href='/srms/admin/download_document.php?file=" . urlencode($problematic_file) . "&original_name=test_file.webp' target='_blank'>Test Admin Download Link</a> (Requires Admin role)</p>";
 } else {
     echo "<p>❌ File does not exist: {$problematic_file}</p>";
     

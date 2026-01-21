@@ -14,7 +14,7 @@ echo "File exists: " . (file_exists($full_path) ? 'YES' : 'NO') . "<br>";
 
 if (file_exists($full_path)) {
     echo "File size: " . filesize($full_path) . " bytes<br>";
-    echo "<a href='download_document.php?file=" . urlencode($test_file) . "'>Try Download</a><br>";
+    echo "<a href='/srms/enrollment/download_document.php?file=" . urlencode($test_file) . "'>Try Download</a><br>";
 } else {
     echo "File not found!<br>";
 }

@@ -77,7 +77,7 @@
                                 resultDiv.innerHTML += `<p>Legacy format: ${doc}</p>`;
                             } else if (doc.path && doc.name) {
                                 const filename = doc.path.split('/').pop();
-                                const downloadUrl = `download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                                const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
                                 resultDiv.innerHTML += `<p>Name: ${doc.name}</p>`;
                                 resultDiv.innerHTML += `<p>Path: ${doc.path}</p>`;
                                 resultDiv.innerHTML += `<p>Extracted filename: ${filename}</p>`;
@@ -105,7 +105,7 @@
                         fileDocs.forEach((doc, index) => {
                             resultDiv.innerHTML += `<p><strong>File Document ${index + 1}:</strong></p>`;
                             const filename = doc.path.split('/').pop();
-                            const downloadUrl = `download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
+                            const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
                             resultDiv.innerHTML += `<p>Name: ${doc.name}</p>`;
                             resultDiv.innerHTML += `<p>Path: ${doc.path}</p>`;
                             resultDiv.innerHTML += `<p>Extracted filename: ${filename}</p>`;

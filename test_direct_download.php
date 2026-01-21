@@ -12,11 +12,11 @@ if (file_exists($full_path)) {
     echo "<p>File size: " . filesize($full_path) . " bytes</p>";
     
     // Test the download URL construction
-    $download_url = "enrollment/download_document.php?file=" . urlencode($test_file);
+    $download_url = "/srms/enrollment/download_document.php?file=" . urlencode($test_file);
     echo "<p>Download URL: <a href='{$download_url}' target='_blank'>{$download_url}</a></p>";
     
     // Also test with original name parameter
-    $download_url_with_name = "enrollment/download_document.php?file=" . urlencode($test_file) . "&original_name=test.webp";
+    $download_url_with_name = "/srms/enrollment/download_document.php?file=" . urlencode($test_file) . "&original_name=test.webp";
     echo "<p>Download URL with name: <a href='{$download_url_with_name}' target='_blank'>{$download_url_with_name}</a></p>";
     
 } else {

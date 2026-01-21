@@ -69,263 +69,311 @@ if (isset($_GET['action']) && $_GET['action'] === 'generate_report') {
 
 // Function to generate class list report
 function generateClassListReport($pdo, $course_id, $format) {
-    // Get course details
-    $stmt = $pdo->prepare("
-        SELECT c.code, c.name, p.name as programme_name
-        FROM course c
-        JOIN programme p ON c.programme_id = p.id
-        WHERE c.id = ?
-    ");
-    $stmt->execute([$course_id]);
-    $course = $stmt->fetch();
-    
-    // Get enrolled students
-    $stmt = $pdo->prepare("
-        SELECT sp.student_number, sp.full_name, sp.NRC, i.name as intake_name
-        FROM student_profile sp
-        JOIN course_enrollment ce ON sp.user_id = ce.student_user_id
-        LEFT JOIN intake i ON sp.intake_id = i.id
-        WHERE ce.course_id = ? AND ce.status = 'enrolled'
-        ORDER BY sp.full_name
-    ");
-    $stmt->execute([$course_id]);
-    $students = $stmt->fetchAll();
-    
-    if ($format === 'csv') {
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="class_list_' . $course['code'] . '.csv"');
-        $output = fopen('php://output', 'w');
-        fputcsv($output, ['Student Number', 'Full Name', 'NRC', 'Intake']);
-        foreach ($students as $student) {
-            fputcsv($output, [
-                $student['student_number'],
-                $student['full_name'],
-                $student['NRC'] ?? 'N/A',
-                $student['intake_name'] ?? 'N/A'
-            ]);
+    try {
+        // Get course details
+        $stmt = $pdo->prepare("
+            SELECT c.code, c.name, p.name as programme_name
+            FROM course c
+            JOIN programme p ON c.programme_id = p.id
+            WHERE c.id = ?
+        ");
+        $stmt->execute([$course_id]);
+        $course = $stmt->fetch();
+        
+        if (!$course) {
+            throw new Exception('Course not found');
         }
-        fclose($output);
-    } else {
-        // PDF generation
-        require_once '../lib/fpdf/fpdf.php';
-        $pdf = new FPDF();
-        $pdf->AddPage();
-        $pdf->SetFont('Arial', 'B', 16);
-        $pdf->Cell(0, 10, 'Class List Report', 0, 1, 'C');
-        $pdf->SetFont('Arial', '', 12);
-        $pdf->Cell(0, 10, 'Course: ' . $course['code'] . ' - ' . $course['name'], 0, 1);
-        $pdf->Cell(0, 10, 'Programme: ' . $course['programme_name'], 0, 1);
-        $pdf->Ln(10);
         
-        $pdf->SetFont('Arial', 'B', 12);
-        $pdf->Cell(40, 10, 'Student Number', 1);
-        $pdf->Cell(60, 10, 'Full Name', 1);
-        $pdf->Cell(40, 10, 'NRC', 1);
-        $pdf->Cell(40, 10, 'Intake', 1);
-        $pdf->Ln();
+        // Get enrolled students
+        $stmt = $pdo->prepare("
+            SELECT sp.student_number, sp.full_name, sp.NRC, i.name as intake_name
+            FROM student_profile sp
+            JOIN course_enrollment ce ON sp.user_id = ce.student_user_id
+            LEFT JOIN intake i ON sp.intake_id = i.id
+            WHERE ce.course_id = ? AND (ce.status IN ('enrolled', 'approved') OR ce.status IS NULL OR ce.status = '')
+            ORDER BY sp.full_name
+        ");
+        $stmt->execute([$course_id]);
+        $students = $stmt->fetchAll();
         
-        $pdf->SetFont('Arial', '', 10);
-        foreach ($students as $student) {
-            $pdf->Cell(40, 10, $student['student_number'], 1);
-            $pdf->Cell(60, 10, $student['full_name'], 1);
-            $pdf->Cell(40, 10, $student['NRC'] ?? 'N/A', 1);
-            $pdf->Cell(40, 10, $student['intake_name'] ?? 'N/A', 1);
+        if ($format === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="class_list_' . $course['code'] . '.csv"');
+            $output = fopen('php://output', 'w');
+            // Add BOM for UTF-8 to handle special characters in Excel
+            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($output, ['Student Number', 'Full Name', 'NRC', 'Intake']);
+            foreach ($students as $student) {
+                fputcsv($output, [
+                    $student['student_number'] ?? 'N/A',
+                    $student['full_name'] ?? 'N/A',
+                    $student['NRC'] ?? 'N/A',
+                    $student['intake_name'] ?? 'N/A'
+                ]);
+            }
+            fclose($output);
+        } else {
+            // PDF generation
+            require_once '../lib/fpdf/fpdf.php';
+            $pdf = new FPDF();
+            $pdf->AddPage();
+            $pdf->SetFont('Arial', 'B', 16);
+            $pdf->Cell(0, 10, 'Class List Report', 0, 1, 'C');
+            $pdf->SetFont('Arial', '', 12);
+            $pdf->Cell(0, 10, 'Course: ' . htmlspecialchars($course['code']) . ' - ' . htmlspecialchars($course['name']), 0, 1);
+            $pdf->Cell(0, 10, 'Programme: ' . htmlspecialchars($course['programme_name']), 0, 1);
+            $pdf->Ln(10);
+            
+            $pdf->SetFont('Arial', 'B', 12);
+            $pdf->Cell(40, 10, 'Student Number', 1);
+            $pdf->Cell(60, 10, 'Full Name', 1);
+            $pdf->Cell(40, 10, 'NRC', 1);
+            $pdf->Cell(40, 10, 'Intake', 1);
             $pdf->Ln();
+            
+            $pdf->SetFont('Arial', '', 10);
+            if (empty($students)) {
+                $pdf->Cell(0, 10, 'No students enrolled in this course.', 1, 1, 'C');
+            } else {
+                foreach ($students as $student) {
+                    $pdf->Cell(40, 10, $student['student_number'] ?? 'N/A', 1);
+                    $pdf->Cell(60, 10, $student['full_name'] ?? 'N/A', 1);
+                    $pdf->Cell(40, 10, $student['NRC'] ?? 'N/A', 1);
+                    $pdf->Cell(40, 10, $student['intake_name'] ?? 'N/A', 1);
+                    $pdf->Ln();
+                }
+            }
+            
+            $pdf->Output('D', 'class_list_' . $course['code'] . '.pdf');
         }
-        
-        $pdf->Output('D', 'class_list_' . $course['code'] . '.pdf');
+    } catch (Exception $e) {
+        error_log('Error generating class list report: ' . $e->getMessage());
+        echo "Error generating report: " . htmlspecialchars($e->getMessage());
+        exit;
     }
     exit;
 }
 
 // Function to generate results summary report
 function generateResultsSummaryReport($pdo, $course_id, $format) {
-    // Get course details
-    $stmt = $pdo->prepare("
-        SELECT c.code, c.name, p.name as programme_name
-        FROM course c
-        JOIN programme p ON c.programme_id = p.id
-        WHERE c.id = ?
-    ");
-    $stmt->execute([$course_id]);
-    $course = $stmt->fetch();
-    
-    // Get results summary
-    $stmt = $pdo->prepare("
-        SELECT 
-            sp.student_number,
-            sp.full_name,
-            r.ca_score,
-            r.exam_score,
-            r.total_score,
-            r.grade
-        FROM student_profile sp
-        JOIN course_enrollment ce ON sp.user_id = ce.student_user_id
-        LEFT JOIN results r ON ce.id = r.enrollment_id
-        WHERE ce.course_id = ? AND ce.status = 'enrolled'
-        ORDER BY sp.full_name
-    ");
-    $stmt->execute([$course_id]);
-    $results = $stmt->fetchAll();
-    
-    if ($format === 'csv') {
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="results_summary_' . $course['code'] . '.csv"');
-        $output = fopen('php://output', 'w');
-        fputcsv($output, ['Student Number', 'Full Name', 'CA Score', 'Exam Score', 'Total Score', 'Grade']);
-        foreach ($results as $result) {
-            fputcsv($output, [
-                $result['student_number'],
-                $result['full_name'],
-                $result['ca_score'] ?? 'N/A',
-                $result['exam_score'] ?? 'N/A',
-                $result['total_score'] ?? 'N/A',
-                $result['grade'] ?? 'N/A'
-            ]);
+    try {
+        // Get course details
+        $stmt = $pdo->prepare("
+            SELECT c.code, c.name, p.name as programme_name
+            FROM course c
+            JOIN programme p ON c.programme_id = p.id
+            WHERE c.id = ?
+        ");
+        $stmt->execute([$course_id]);
+        $course = $stmt->fetch();
+        
+        if (!$course) {
+            throw new Exception('Course not found');
         }
-        fclose($output);
-    } else {
-        // PDF generation
-        require_once '../lib/fpdf/fpdf.php';
-        $pdf = new FPDF();
-        $pdf->AddPage();
-        $pdf->SetFont('Arial', 'B', 16);
-        $pdf->Cell(0, 10, 'Results Summary Report', 0, 1, 'C');
-        $pdf->SetFont('Arial', '', 12);
-        $pdf->Cell(0, 10, 'Course: ' . $course['code'] . ' - ' . $course['name'], 0, 1);
-        $pdf->Cell(0, 10, 'Programme: ' . $course['programme_name'], 0, 1);
-        $pdf->Ln(10);
         
-        $pdf->SetFont('Arial', 'B', 12);
-        $pdf->Cell(30, 10, 'Student No', 1);
-        $pdf->Cell(50, 10, 'Full Name', 1);
-        $pdf->Cell(25, 10, 'CA Score', 1);
-        $pdf->Cell(25, 10, 'Exam Score', 1);
-        $pdf->Cell(25, 10, 'Total', 1);
-        $pdf->Cell(25, 10, 'Grade', 1);
-        $pdf->Ln();
+        // Get results summary
+        $stmt = $pdo->prepare("
+            SELECT 
+                sp.student_number,
+                sp.full_name,
+                r.ca_score,
+                r.exam_score,
+                r.total_score,
+                r.grade
+            FROM student_profile sp
+            JOIN course_enrollment ce ON sp.user_id = ce.student_user_id
+            LEFT JOIN results r ON ce.id = r.enrollment_id
+            WHERE ce.course_id = ? AND (ce.status IN ('enrolled', 'approved') OR ce.status IS NULL OR ce.status = '')
+            ORDER BY sp.full_name
+        ");
+        $stmt->execute([$course_id]);
+        $results = $stmt->fetchAll();
         
-        $pdf->SetFont('Arial', '', 10);
-        foreach ($results as $result) {
-            $pdf->Cell(30, 10, $result['student_number'], 1);
-            $pdf->Cell(50, 10, $result['full_name'], 1);
-            $pdf->Cell(25, 10, $result['ca_score'] ?? 'N/A', 1);
-            $pdf->Cell(25, 10, $result['exam_score'] ?? 'N/A', 1);
-            $pdf->Cell(25, 10, $result['total_score'] ?? 'N/A', 1);
-            $pdf->Cell(25, 10, $result['grade'] ?? 'N/A', 1);
+        if ($format === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="results_summary_' . $course['code'] . '.csv"');
+            $output = fopen('php://output', 'w');
+            // Add BOM for UTF-8 to handle special characters in Excel
+            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($output, ['Student Number', 'Full Name', 'CA Score', 'Exam Score', 'Total Score', 'Grade']);
+            foreach ($results as $result) {
+                fputcsv($output, [
+                    $result['student_number'] ?? 'N/A',
+                    $result['full_name'] ?? 'N/A',
+                    $result['ca_score'] ?? 'N/A',
+                    $result['exam_score'] ?? 'N/A',
+                    $result['total_score'] ?? 'N/A',
+                    $result['grade'] ?? 'N/A'
+                ]);
+            }
+            fclose($output);
+        } else {
+            // PDF generation
+            require_once '../lib/fpdf/fpdf.php';
+            $pdf = new FPDF();
+            $pdf->AddPage();
+            $pdf->SetFont('Arial', 'B', 16);
+            $pdf->Cell(0, 10, 'Results Summary Report', 0, 1, 'C');
+            $pdf->SetFont('Arial', '', 12);
+            $pdf->Cell(0, 10, 'Course: ' . htmlspecialchars($course['code']) . ' - ' . htmlspecialchars($course['name']), 0, 1);
+            $pdf->Cell(0, 10, 'Programme: ' . htmlspecialchars($course['programme_name']), 0, 1);
+            $pdf->Ln(10);
+            
+            $pdf->SetFont('Arial', 'B', 12);
+            $pdf->Cell(30, 10, 'Student No', 1);
+            $pdf->Cell(50, 10, 'Full Name', 1);
+            $pdf->Cell(25, 10, 'CA Score', 1);
+            $pdf->Cell(25, 10, 'Exam Score', 1);
+            $pdf->Cell(25, 10, 'Total', 1);
+            $pdf->Cell(25, 10, 'Grade', 1);
             $pdf->Ln();
+            
+            $pdf->SetFont('Arial', '', 10);
+            if (empty($results)) {
+                $pdf->Cell(0, 10, 'No results available for this course.', 1, 1, 'C');
+            } else {
+                foreach ($results as $result) {
+                    $pdf->Cell(30, 10, $result['student_number'] ?? 'N/A', 1);
+                    $pdf->Cell(50, 10, $result['full_name'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['ca_score'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['exam_score'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['total_score'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['grade'] ?? 'N/A', 1);
+                    $pdf->Ln();
+                }
+            }
+            
+            $pdf->Output('D', 'results_summary_' . $course['code'] . '.pdf');
         }
-        
-        $pdf->Output('D', 'results_summary_' . $course['code'] . '.pdf');
+    } catch (Exception $e) {
+        error_log('Error generating results summary report: ' . $e->getMessage());
+        echo "Error generating report: " . htmlspecialchars($e->getMessage());
+        exit;
     }
     exit;
 }
 
 // Function to generate detailed results report
 function generateDetailedResultsReport($pdo, $course_id, $format) {
-    // Get course details
-    $stmt = $pdo->prepare("
-        SELECT c.code, c.name, p.name as programme_name
-        FROM course c
-        JOIN programme p ON c.programme_id = p.id
-        WHERE c.id = ?
-    ");
-    $stmt->execute([$course_id]);
-    $course = $stmt->fetch();
-    
-    // Get detailed results with statistics
-    $stmt = $pdo->prepare("
-        SELECT 
-            sp.student_number,
-            sp.full_name,
-            r.ca_score,
-            r.exam_score,
-            r.total_score,
-            r.grade
-        FROM student_profile sp
-        JOIN course_enrollment ce ON sp.user_id = ce.student_user_id
-        LEFT JOIN results r ON ce.id = r.enrollment_id
-        WHERE ce.course_id = ? AND ce.status = 'enrolled'
-        ORDER BY r.total_score DESC, sp.full_name
-    ");
-    $stmt->execute([$course_id]);
-    $results = $stmt->fetchAll();
-    
-    // Calculate statistics
-    $scores = array_filter(array_column($results, 'total_score'));
-    $stats = [
-        'count' => count($scores),
-        'average' => count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : 0,
-        'highest' => count($scores) > 0 ? max($scores) : 0,
-        'lowest' => count($scores) > 0 ? min($scores) : 0
-    ];
-    
-    if ($format === 'csv') {
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="detailed_results_' . $course['code'] . '.csv"');
-        $output = fopen('php://output', 'w');
-        fputcsv($output, ['Student Number', 'Full Name', 'CA Score', 'Exam Score', 'Total Score', 'Grade']);
-        foreach ($results as $result) {
-            fputcsv($output, [
-                $result['student_number'],
-                $result['full_name'],
-                $result['ca_score'] ?? 'N/A',
-                $result['exam_score'] ?? 'N/A',
-                $result['total_score'] ?? 'N/A',
-                $result['grade'] ?? 'N/A'
-            ]);
+    try {
+        // Get course details
+        $stmt = $pdo->prepare("
+            SELECT c.code, c.name, p.name as programme_name
+            FROM course c
+            JOIN programme p ON c.programme_id = p.id
+            WHERE c.id = ?
+        ");
+        $stmt->execute([$course_id]);
+        $course = $stmt->fetch();
+        
+        if (!$course) {
+            throw new Exception('Course not found');
         }
-        fputcsv($output, []);
-        fputcsv($output, ['Statistics']);
-        fputcsv($output, ['Total Students', $stats['count']]);
-        fputcsv($output, ['Average Score', $stats['average']]);
-        fputcsv($output, ['Highest Score', $stats['highest']]);
-        fputcsv($output, ['Lowest Score', $stats['lowest']]);
-        fclose($output);
-    } else {
-        // PDF generation
-        require_once '../lib/fpdf/fpdf.php';
-        $pdf = new FPDF();
-        $pdf->AddPage();
-        $pdf->SetFont('Arial', 'B', 16);
-        $pdf->Cell(0, 10, 'Detailed Results Report', 0, 1, 'C');
-        $pdf->SetFont('Arial', '', 12);
-        $pdf->Cell(0, 10, 'Course: ' . $course['code'] . ' - ' . $course['name'], 0, 1);
-        $pdf->Cell(0, 10, 'Programme: ' . $course['programme_name'], 0, 1);
-        $pdf->Ln(5);
         
-        // Statistics
-        $pdf->SetFont('Arial', 'B', 12);
-        $pdf->Cell(0, 10, 'Statistics:', 0, 1);
-        $pdf->SetFont('Arial', '', 10);
-        $pdf->Cell(0, 8, 'Total Students: ' . $stats['count'], 0, 1);
-        $pdf->Cell(0, 8, 'Average Score: ' . $stats['average'], 0, 1);
-        $pdf->Cell(0, 8, 'Highest Score: ' . $stats['highest'], 0, 1);
-        $pdf->Cell(0, 8, 'Lowest Score: ' . $stats['lowest'], 0, 1);
-        $pdf->Ln(5);
+        // Get detailed results with statistics
+        $stmt = $pdo->prepare("
+            SELECT 
+                sp.student_number,
+                sp.full_name,
+                r.ca_score,
+                r.exam_score,
+                r.total_score,
+                r.grade
+            FROM student_profile sp
+            JOIN course_enrollment ce ON sp.user_id = ce.student_user_id
+            LEFT JOIN results r ON ce.id = r.enrollment_id
+            WHERE ce.course_id = ? AND (ce.status IN ('enrolled', 'approved') OR ce.status IS NULL OR ce.status = '')
+            ORDER BY r.total_score DESC, sp.full_name
+        ");
+        $stmt->execute([$course_id]);
+        $results = $stmt->fetchAll();
         
-        // Results table
-        $pdf->SetFont('Arial', 'B', 12);
-        $pdf->Cell(30, 10, 'Student No', 1);
-        $pdf->Cell(50, 10, 'Full Name', 1);
-        $pdf->Cell(25, 10, 'CA Score', 1);
-        $pdf->Cell(25, 10, 'Exam Score', 1);
-        $pdf->Cell(25, 10, 'Total', 1);
-        $pdf->Cell(25, 10, 'Grade', 1);
-        $pdf->Ln();
+        // Calculate statistics
+        $scores = array_filter(array_column($results, 'total_score'));
+        $stats = [
+            'count' => count($scores),
+            'average' => count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : 0,
+            'highest' => count($scores) > 0 ? max($scores) : 0,
+            'lowest' => count($scores) > 0 ? min($scores) : 0
+        ];
         
-        $pdf->SetFont('Arial', '', 10);
-        foreach ($results as $result) {
-            $pdf->Cell(30, 10, $result['student_number'], 1);
-            $pdf->Cell(50, 10, $result['full_name'], 1);
-            $pdf->Cell(25, 10, $result['ca_score'] ?? 'N/A', 1);
-            $pdf->Cell(25, 10, $result['exam_score'] ?? 'N/A', 1);
-            $pdf->Cell(25, 10, $result['total_score'] ?? 'N/A', 1);
-            $pdf->Cell(25, 10, $result['grade'] ?? 'N/A', 1);
+        if ($format === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="detailed_results_' . $course['code'] . '.csv"');
+            $output = fopen('php://output', 'w');
+            // Add BOM for UTF-8 to handle special characters in Excel
+            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($output, ['Student Number', 'Full Name', 'CA Score', 'Exam Score', 'Total Score', 'Grade']);
+            foreach ($results as $result) {
+                fputcsv($output, [
+                    $result['student_number'] ?? 'N/A',
+                    $result['full_name'] ?? 'N/A',
+                    $result['ca_score'] ?? 'N/A',
+                    $result['exam_score'] ?? 'N/A',
+                    $result['total_score'] ?? 'N/A',
+                    $result['grade'] ?? 'N/A'
+                ]);
+            }
+            fputcsv($output, []);
+            fputcsv($output, ['Statistics']);
+            fputcsv($output, ['Total Students', $stats['count']]);
+            fputcsv($output, ['Average Score', $stats['average']]);
+            fputcsv($output, ['Highest Score', $stats['highest']]);
+            fputcsv($output, ['Lowest Score', $stats['lowest']]);
+            fclose($output);
+        } else {
+            // PDF generation
+            require_once '../lib/fpdf/fpdf.php';
+            $pdf = new FPDF();
+            $pdf->AddPage();
+            $pdf->SetFont('Arial', 'B', 16);
+            $pdf->Cell(0, 10, 'Detailed Results Report', 0, 1, 'C');
+            $pdf->SetFont('Arial', '', 12);
+            $pdf->Cell(0, 10, 'Course: ' . htmlspecialchars($course['code']) . ' - ' . htmlspecialchars($course['name']), 0, 1);
+            $pdf->Cell(0, 10, 'Programme: ' . htmlspecialchars($course['programme_name']), 0, 1);
+            $pdf->Ln(5);
+            
+            // Statistics
+            $pdf->SetFont('Arial', 'B', 12);
+            $pdf->Cell(0, 10, 'Statistics:', 0, 1);
+            $pdf->SetFont('Arial', '', 10);
+            $pdf->Cell(0, 8, 'Total Students: ' . $stats['count'], 0, 1);
+            $pdf->Cell(0, 8, 'Average Score: ' . $stats['average'], 0, 1);
+            $pdf->Cell(0, 8, 'Highest Score: ' . $stats['highest'], 0, 1);
+            $pdf->Cell(0, 8, 'Lowest Score: ' . $stats['lowest'], 0, 1);
+            $pdf->Ln(5);
+            
+            // Results table
+            $pdf->SetFont('Arial', 'B', 12);
+            $pdf->Cell(30, 10, 'Student No', 1);
+            $pdf->Cell(50, 10, 'Full Name', 1);
+            $pdf->Cell(25, 10, 'CA Score', 1);
+            $pdf->Cell(25, 10, 'Exam Score', 1);
+            $pdf->Cell(25, 10, 'Total', 1);
+            $pdf->Cell(25, 10, 'Grade', 1);
             $pdf->Ln();
+            
+            $pdf->SetFont('Arial', '', 10);
+            if (empty($results)) {
+                $pdf->Cell(0, 10, 'No results available for this course.', 1, 1, 'C');
+            } else {
+                foreach ($results as $result) {
+                    $pdf->Cell(30, 10, $result['student_number'] ?? 'N/A', 1);
+                    $pdf->Cell(50, 10, $result['full_name'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['ca_score'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['exam_score'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['total_score'] ?? 'N/A', 1);
+                    $pdf->Cell(25, 10, $result['grade'] ?? 'N/A', 1);
+                    $pdf->Ln();
+                }
+            }
+            
+            $pdf->Output('D', 'detailed_results_' . $course['code'] . '.pdf');
         }
-        
-        $pdf->Output('D', 'detailed_results_' . $course['code'] . '.pdf');
+    } catch (Exception $e) {
+        error_log('Error generating detailed results report: ' . $e->getMessage());
+        echo "Error generating report: " . htmlspecialchars($e->getMessage());
+        exit;
     }
     exit;
 }

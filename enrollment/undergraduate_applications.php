@@ -741,6 +741,8 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <script>
         let currentApplicationId = null;
         
+
+        
         function viewApplication(app) {
             document.getElementById('view_name').textContent = app.full_name || 'N/A';
             document.getElementById('view_email').textContent = app.email || 'N/A';
@@ -829,9 +831,9 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     return;
                                 }
                                 
-                                const downloadUrl = './download_document.php?file=' + encodeURIComponent(filename) + '&original_name=' + encodeURIComponent(doc.name);
+                                const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
                                 console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                                li.innerHTML = '<a href="' + downloadUrl + '" target="_blank" style="color:#228B22; text-decoration:none;"><i class="fas fa-file"></i> ' + doc.name + '</a>';
+                                li.innerHTML = `<a href="${downloadUrl}" target="_blank" style="color:#228B22; text-decoration:none;"><i class="fas fa-file"></i> ${doc.name}</a>`;
                             } else {
                                 // Handle other formats
                                 li.textContent = JSON.stringify(doc);
@@ -879,10 +881,10 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 docsList.appendChild(li);
                                 return;
                             }
-                            
-                            const downloadUrl = './download_document.php?file=' + encodeURIComponent(filename) + '&original_name=' + encodeURIComponent(doc.name);
+                                                        
+                            const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
                             console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                            li.innerHTML = '<a href="' + downloadUrl + '" target="_blank" style="color:#228B22; text-decoration:none;"><i class="fas fa-file"></i> ' + doc.name + '</a>';
+                            li.innerHTML = `<a href="${downloadUrl}" target="_blank" style="color:#228B22; text-decoration:none;"><i class="fas fa-file"></i> ${doc.name}</a>`;
                             docsList.appendChild(li);
                         });
                     }
@@ -964,6 +966,8 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
             }
         }
+        
+
     </script>
 </body>
 </html>

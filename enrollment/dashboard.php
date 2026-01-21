@@ -537,7 +537,7 @@ foreach ($pendingApplications as $application) {
                                 const filename = doc.path.split('/').pop();
                                 const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(doc.name)}`;
                                console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                               li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
+                               li.innerHTML = `<a href="${downloadUrl}" target="_blank" style="cursor:pointer; color:blue; text-decoration:underline;">${doc.name}</a>`;
                             } else {
                                 li.textContent = JSON.stringify(doc);
                             }
@@ -555,7 +555,7 @@ foreach ($pendingApplications as $application) {
                             const filename = documents[key].path.split('/').pop();
                             const downloadUrl = `/srms/enrollment/download_document.php?file=${encodeURIComponent(filename)}&original_name=${encodeURIComponent(documents[key].name)}`;
                             console.log("FINAL DOWNLOAD URL:", downloadUrl);
-                            li.innerHTML = `<a onclick="window.location.href='${downloadUrl}'; return false;" style="cursor:pointer; color:blue; text-decoration:underline;">${documents[key].name}</a>`;
+                            li.innerHTML = `<a href="${downloadUrl}" target="_blank" style="cursor:pointer; color:blue; text-decoration:underline;">${documents[key].name}</a>`;
                             docsList.appendChild(li);
                             hasDocuments = true;
                         } else if (key !== 'path' && key !== 'name' && documents[key]) {

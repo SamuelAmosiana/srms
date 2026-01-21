@@ -13,12 +13,32 @@ if (!currentUserId()) {
 
 requireRole('Enrollment Officer', $pdo);
 
+// DEBUG: Log incoming parameters and request information for troubleshooting
+$requestInfo = [
+    'GET_PARAMS' => $_GET,
+    'REQUEST_URI' => $_SERVER['REQUEST_URI'] ?? 'N/A',
+    'HTTP_REFERER' => $_SERVER['HTTP_REFERER'] ?? 'N/A',
+    'REQUEST_METHOD' => $_SERVER['REQUEST_METHOD'] ?? 'N/A',
+    'QUERY_STRING' => $_SERVER['QUERY_STRING'] ?? 'N/A',
+    'TIMESTAMP' => date('Y-m-d H:i:s'),
+];
+file_put_contents(__DIR__ . '/debug.log', print_r($requestInfo, true) . "\n\n", FILE_APPEND);
+
 // Get the requested file parameters
 $requested_file = trim($_GET['file'] ?? '');
 $original_name = trim($_GET['original_name'] ?? '');
 
 if (empty($requested_file)) {
     http_response_code(400);
+    $errorInfo = [
+        'ERROR' => 'File parameter is required',
+        'GET_PARAMS' => $_GET,
+        'REQUEST_URI' => $_SERVER['REQUEST_URI'] ?? 'N/A',
+        'HTTP_REFERER' => $_SERVER['HTTP_REFERER'] ?? 'N/A',
+        'QUERY_STRING' => $_SERVER['QUERY_STRING'] ?? 'N/A',
+        'TIMESTAMP' => date('Y-m-d H:i:s'),
+    ];
+    file_put_contents(__DIR__ . '/error_debug.log', print_r($errorInfo, true) . "\n\n", FILE_APPEND);
     exit('File parameter is required');
 }
 
@@ -40,38 +60,17 @@ if (!is_readable($path)) {
     exit('File not readable');
 }
 
-// Determine MIME type based on file extension
-$extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-$mime_types = [
-    'pdf' => 'application/pdf',
-    'doc' => 'application/msword',
-    'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'jpg' => 'image/jpeg',
-    'jpeg' => 'image/jpeg',
-    'png' => 'image/png',
-    'gif' => 'image/gif',
-    'webp' => 'image/webp'
-];
-
-$mimetype = $mime_types[$extension] ?? 'application/octet-stream';
+// Determine MIME type using mime_content_type for better accuracy
+$mimetype = mime_content_type($path);
 
 // Use original name if provided, otherwise use the sanitized file name
 $download_filename = !empty($original_name) ? $original_name : basename($path);
 
-// Send appropriate headers
-header('Content-Description: File Transfer');
+// Send appropriate headers - using inline to open in browser rather than download
 header('Content-Type: ' . $mimetype);
-header('Content-Disposition: attachment; filename="' . $download_filename . '"');
+header('Content-Disposition: inline; filename="' . $download_filename . '"');
 header('Content-Length: ' . filesize($path));
-header('Cache-Control: no-cache');
-header('Pragma: public');
-header('Expires: 0');
-header('Accept-Ranges: none');
-
-// Flush headers
-flush();
 
 // Output the file content
 readfile($path);
 exit;
-?>
