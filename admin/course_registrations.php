@@ -206,7 +206,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get pending registrations (existing course registrations)
+$pending_registrations_limit = isset($_GET['pending_reg_limit']) ? (int)$_GET['pending_reg_limit'] : 5;
+$pending_registrations_offset = isset($_GET['pending_reg_page']) ? ((int)$_GET['pending_reg_page'] - 1) * $pending_registrations_limit : 0;
+
 try {
+    $pending_count_query = "
+        SELECT COUNT(*) as count
+        FROM course_registration cr
+        JOIN student_profile sp ON cr.student_id = sp.user_id
+        JOIN course c ON cr.course_id = c.id
+        JOIN intake i ON sp.intake_id = i.id
+        WHERE cr.status = 'pending'
+    ";
+    $pending_count_result = $pdo->query($pending_count_query);
+    $pending_total = $pending_count_result->fetch()['count'];
+    $pending_pages = ceil($pending_total / $pending_registrations_limit);
+    
     $pending_query = "
         SELECT cr.*, sp.full_name, sp.student_number as student_id, c.name as course_name, i.name as intake_name
         FROM course_registration cr
@@ -215,14 +230,31 @@ try {
         JOIN intake i ON sp.intake_id = i.id
         WHERE cr.status = 'pending'
         ORDER BY cr.submitted_at DESC
+        LIMIT $pending_registrations_limit OFFSET $pending_registrations_offset
     ";
     $pending_registrations = $pdo->query($pending_query)->fetchAll();
 } catch (Exception $e) {
     $pending_registrations = [];
+    $pending_total = 0;
+    $pending_pages = 1;
 }
 
 // Get pending students (first-time registrations from approved applications)
+$pending_students_limit = isset($_GET['pending_students_limit']) ? (int)$_GET['pending_students_limit'] : 5;
+$pending_students_offset = isset($_GET['pending_students_page']) ? ((int)$_GET['pending_students_page'] - 1) * $pending_students_limit : 0;
+
 try {
+    $pending_students_count_query = "
+        SELECT COUNT(*) as count
+        FROM pending_students ps
+        LEFT JOIN programme p ON ps.programme_id = p.id
+        LEFT JOIN intake i ON ps.intake_id = i.id
+        WHERE ps.registration_status = 'pending_approval'
+    ";
+    $pending_students_count_result = $pdo->query($pending_students_count_query);
+    $pending_students_total = $pending_students_count_result->fetch()['count'];
+    $pending_students_pages = ceil($pending_students_total / $pending_students_limit);
+    
     $pending_students_query = "
         SELECT ps.*, p.name as programme_name, i.name as intake_name,
                CASE 
@@ -235,10 +267,13 @@ try {
         LEFT JOIN intake i ON ps.intake_id = i.id
         WHERE ps.registration_status = 'pending_approval'
         ORDER BY ps.created_at DESC
+        LIMIT $pending_students_limit OFFSET $pending_students_offset
     ";
     $pending_students = $pdo->query($pending_students_query)->fetchAll();
 } catch (Exception $e) {
     $pending_students = [];
+    $pending_students_total = 0;
+    $pending_students_pages = 1;
 }
 
 // Get intakes for defining courses
@@ -269,7 +304,22 @@ try {
 }
 
 // Get defined intake courses (for display or edit) - handle both old and new schema
+$defined_courses_limit = isset($_GET['defined_courses_limit']) ? (int)$_GET['defined_courses_limit'] : 5;
+$defined_courses_offset = isset($_GET['defined_courses_page']) ? ((int)$_GET['defined_courses_page'] - 1) * $defined_courses_limit : 0;
+
 try {
+    // Count total records for pagination
+    $defined_courses_count_query = "
+        SELECT COUNT(*) as count
+        FROM intake_courses ic
+        JOIN intake i ON ic.intake_id = i.id
+        JOIN course c ON ic.course_id = c.id
+        LEFT JOIN programme p ON ic.programme_id = p.id
+    ";
+    $defined_courses_count_result = $pdo->query($defined_courses_count_query);
+    $defined_courses_total = $defined_courses_count_result->fetch()['count'];
+    $defined_courses_pages = ceil($defined_courses_total / $defined_courses_limit);
+    
     // Try to get data with programme information first
     $defined_courses_query = "
         SELECT ic.*, i.name as intake_name, c.name as course_name, c.code as course_code, p.name as programme_name
@@ -278,21 +328,36 @@ try {
         JOIN course c ON ic.course_id = c.id
         LEFT JOIN programme p ON ic.programme_id = p.id
         ORDER BY i.name, ic.term, p.name, c.name
+        LIMIT $defined_courses_limit OFFSET $defined_courses_offset
     ";
     $defined_courses = $pdo->query($defined_courses_query)->fetchAll();
 } catch (Exception $e) {
     // Fall back to old query without programme information
     try {
+        // Count total records for pagination
+        $defined_courses_count_query = "
+            SELECT COUNT(*) as count
+            FROM intake_courses ic
+            JOIN intake i ON ic.intake_id = i.id
+            JOIN course c ON ic.course_id = c.id
+        ";
+        $defined_courses_count_result = $pdo->query($defined_courses_count_query);
+        $defined_courses_total = $defined_courses_count_result->fetch()['count'];
+        $defined_courses_pages = ceil($defined_courses_total / $defined_courses_limit);
+        
         $defined_courses_query = "
             SELECT ic.*, i.name as intake_name, c.name as course_name, c.code as course_code, NULL as programme_name
             FROM intake_courses ic
             JOIN intake i ON ic.intake_id = i.id
             JOIN course c ON ic.course_id = c.id
             ORDER BY i.name, ic.term, c.name
+            LIMIT $defined_courses_limit OFFSET $defined_courses_offset
         ";
         $defined_courses = $pdo->query($defined_courses_query)->fetchAll();
     } catch (Exception $e) {
         $defined_courses = [];
+        $defined_courses_total = 0;
+        $defined_courses_pages = 1;
     }
 }
 
@@ -494,6 +559,52 @@ try {
             color: #333;
             display: block;
         }
+        
+        /* Pagination Styles */
+        .pagination-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding: 15px 0;
+            border-top: 1px solid #eee;
+        }
+        
+        .pagination-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .pagination {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .page-link {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            color: #007bff;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .page-link:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        .page-link.active {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        
+        .page-link:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
@@ -639,7 +750,17 @@ try {
         <!-- Pending Registrations -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="fas fa-clock"></i> Pending Registrations (<?php echo count($pending_registrations); ?>)</h3>
+                <h3><i class="fas fa-clock"></i> Pending Registrations (<?php echo $pending_total; ?>)</h3>
+                <div class="panel-actions">
+                    <label for="pending_reg_limit">Show:</label>
+                    <select id="pending_reg_limit" name="pending_reg_limit" onchange="updatePendingRegPage()" style="margin-right: 10px;">
+                        <option value="5" <?php echo $pending_registrations_limit == 5 ? 'selected' : ''; ?>>5</option>
+                        <option value="10" <?php echo $pending_registrations_limit == 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="25" <?php echo $pending_registrations_limit == 25 ? 'selected' : ''; ?>>25</option>
+                        <option value="50" <?php echo $pending_registrations_limit == 50 ? 'selected' : ''; ?>>50</option>
+                        <option value="100" <?php echo $pending_registrations_limit == 100 ? 'selected' : ''; ?>>100</option>
+                    </select>
+                </div>
             </div>
             <div class="panel-content">
                 <?php if (empty($pending_registrations)): ?>
@@ -683,6 +804,28 @@ try {
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls">
+                        <div class="pagination-info">
+                            Showing <?php echo min($pending_registrations_offset + 1, $pending_total); ?> to <?php echo min($pending_registrations_offset + $pending_registrations_limit, $pending_total); ?> of <?php echo $pending_total; ?> entries
+                        </div>
+                        <div class="pagination">
+                            <?php if ($pending_pages > 1): ?>
+                                <?php if (($_GET['pending_reg_page'] ?? 1) > 1): ?>
+                                    <a href="?pending_reg_page=<?php echo (int)($_GET['pending_reg_page'] ?? 1) - 1; ?>&pending_reg_limit=<?php echo (int)$pending_registrations_limit; ?>" class="page-link">Previous</a>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $pending_pages; $i++): ?>
+                                    <a href="?pending_reg_page=<?php echo (int)$i; ?>&pending_reg_limit=<?php echo (int)$pending_registrations_limit; ?>" class="page-link <?php echo ($i == ((int)($_GET['pending_reg_page'] ?? 1))) ? 'active' : ''; ?>"><?php echo (int)$i; ?></a>
+                                <?php endfor; ?>
+                                
+                                <?php if (((int)($_GET['pending_reg_page'] ?? 1)) < $pending_pages): ?>
+                                    <a href="?pending_reg_page=<?php echo (int)($_GET['pending_reg_page'] ?? 1) + 1; ?>&pending_reg_limit=<?php echo (int)$pending_registrations_limit; ?>" class="page-link">Next</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -690,7 +833,17 @@ try {
         <!-- Pending Students (First-Time Registrations) -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="fas fa-user-graduate"></i> Pending Students (<?php echo count($pending_students); ?>)</h3>
+                <h3><i class="fas fa-user-graduate"></i> Pending Students (<?php echo $pending_students_total; ?>)</h3>
+                <div class="panel-actions">
+                    <label for="pending_students_limit">Show:</label>
+                    <select id="pending_students_limit" name="pending_students_limit" onchange="updatePendingStudentsPage()" style="margin-right: 10px;">
+                        <option value="5" <?php echo $pending_students_limit == 5 ? 'selected' : ''; ?>>5</option>
+                        <option value="10" <?php echo $pending_students_limit == 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="25" <?php echo $pending_students_limit == 25 ? 'selected' : ''; ?>>25</option>
+                        <option value="50" <?php echo $pending_students_limit == 50 ? 'selected' : ''; ?>>50</option>
+                        <option value="100" <?php echo $pending_students_limit == 100 ? 'selected' : ''; ?>>100</option>
+                    </select>
+                </div>
             </div>
             <div class="panel-content">
                 <?php if (empty($pending_students)): ?>
@@ -740,6 +893,28 @@ try {
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls">
+                        <div class="pagination-info">
+                            Showing <?php echo min($pending_students_offset + 1, $pending_students_total); ?> to <?php echo min($pending_students_offset + $pending_students_limit, $pending_students_total); ?> of <?php echo $pending_students_total; ?> entries
+                        </div>
+                        <div class="pagination">
+                            <?php if ($pending_students_pages > 1): ?>
+                                <?php if (($_GET['pending_students_page'] ?? 1) > 1): ?>
+                                    <a href="?pending_students_page=<?php echo (int)($_GET['pending_students_page'] ?? 1) - 1; ?>&pending_students_limit=<?php echo (int)$pending_students_limit; ?>" class="page-link">Previous</a>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $pending_students_pages; $i++): ?>
+                                    <a href="?pending_students_page=<?php echo (int)$i; ?>&pending_students_limit=<?php echo (int)$pending_students_limit; ?>" class="page-link <?php echo ($i == ((int)($_GET['pending_students_page'] ?? 1))) ? 'active' : ''; ?>"><?php echo (int)$i; ?></a>
+                                <?php endfor; ?>
+                                
+                                <?php if (((int)($_GET['pending_students_page'] ?? 1)) < $pending_students_pages): ?>
+                                    <a href="?pending_students_page=<?php echo (int)($_GET['pending_students_page'] ?? 1) + 1; ?>&pending_students_limit=<?php echo (int)$pending_students_limit; ?>" class="page-link">Next</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -797,8 +972,16 @@ try {
         <!-- Defined Courses -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="fas fa-check-circle"></i> Defined Courses</h3>
+                <h3><i class="fas fa-check-circle"></i> Defined Courses (<?php echo $defined_courses_total; ?>)</h3>
                 <div class="panel-actions">
+                    <label for="defined_courses_limit">Show:</label>
+                    <select id="defined_courses_limit" name="defined_courses_limit" onchange="updateDefinedCoursesPage()" style="margin-right: 10px;">
+                        <option value="5" <?php echo $defined_courses_limit == 5 ? 'selected' : ''; ?>>5</option>
+                        <option value="10" <?php echo $defined_courses_limit == 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="25" <?php echo $defined_courses_limit == 25 ? 'selected' : ''; ?>>25</option>
+                        <option value="50" <?php echo $defined_courses_limit == 50 ? 'selected' : ''; ?>>50</option>
+                        <option value="100" <?php echo $defined_courses_limit == 100 ? 'selected' : ''; ?>>100</option>
+                    </select>
                     <button class="btn btn-primary" onclick="document.getElementById('addDefinedCourseModal').style.display='block'">
                         <i class="fas fa-plus"></i> Add Defined Course
                     </button>
@@ -841,6 +1024,28 @@ try {
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls">
+                        <div class="pagination-info">
+                            Showing <?php echo min($defined_courses_offset + 1, $defined_courses_total); ?> to <?php echo min($defined_courses_offset + $defined_courses_limit, $defined_courses_total); ?> of <?php echo $defined_courses_total; ?> entries
+                        </div>
+                        <div class="pagination">
+                            <?php if ($defined_courses_pages > 1): ?>
+                                <?php if (($_GET['defined_courses_page'] ?? 1) > 1): ?>
+                                    <a href="?defined_courses_page=<?php echo (int)($_GET['defined_courses_page'] ?? 1) - 1; ?>&defined_courses_limit=<?php echo (int)$defined_courses_limit; ?>" class="page-link">Previous</a>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $defined_courses_pages; $i++): ?>
+                                    <a href="?defined_courses_page=<?php echo (int)$i; ?>&defined_courses_limit=<?php echo (int)$defined_courses_limit; ?>" class="page-link <?php echo ($i == ((int)($_GET['defined_courses_page'] ?? 1))) ? 'active' : ''; ?>"><?php echo (int)$i; ?></a>
+                                <?php endfor; ?>
+                                
+                                <?php if (((int)($_GET['defined_courses_page'] ?? 1)) < $defined_courses_pages): ?>
+                                    <a href="?defined_courses_page=<?php echo (int)($_GET['defined_courses_page'] ?? 1) + 1; ?>&defined_courses_limit=<?php echo (int)$defined_courses_limit; ?>" class="page-link">Next</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -1143,6 +1348,40 @@ try {
                 .catch(error => {
                     contentDiv.innerHTML = `<p>Error loading student details: ${error.message}</p>`;
                 });
+        }
+        
+        // Pagination functions
+        function updatePendingRegPage() {
+            const limit = document.getElementById('pending_reg_limit').value;
+            // Remove any existing pagination parameters and add new ones
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('pending_reg_limit');
+            urlParams.delete('pending_reg_page');
+            urlParams.set('pending_reg_limit', limit);
+            urlParams.set('pending_reg_page', 1);
+            window.location.href = '?' + urlParams.toString();
+        }
+        
+        function updatePendingStudentsPage() {
+            const limit = document.getElementById('pending_students_limit').value;
+            // Remove any existing pagination parameters and add new ones
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('pending_students_limit');
+            urlParams.delete('pending_students_page');
+            urlParams.set('pending_students_limit', limit);
+            urlParams.set('pending_students_page', 1);
+            window.location.href = '?' + urlParams.toString();
+        }
+        
+        function updateDefinedCoursesPage() {
+            const limit = document.getElementById('defined_courses_limit').value;
+            // Remove any existing pagination parameters and add new ones
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('defined_courses_limit');
+            urlParams.delete('defined_courses_page');
+            urlParams.set('defined_courses_limit', limit);
+            urlParams.set('defined_courses_page', 1);
+            window.location.href = '?' + urlParams.toString();
         }
         
         // Dynamic course loading based on selected programme
