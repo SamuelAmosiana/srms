@@ -1394,16 +1394,11 @@ try {
                 console.log('Loading courses for programme ID:', programmeId, typeof programmeId);
                 
                 // Convert to integer to ensure it's a proper ID, and handle potential issues
-                let programmeIdInt;
-                if (typeof programmeId === 'string') {
-                    programmeIdInt = parseInt(programmeId.trim());
-                } else {
-                    programmeIdInt = parseInt(programmeId);
-                }
+                let programmeIdInt = parseInt(programmeId);
                 
                 console.log('Converted programme ID:', programmeIdInt, typeof programmeIdInt);
                 
-                if (!programmeIdInt || programmeIdInt <= 0) {
+                if (isNaN(programmeIdInt) || programmeIdInt <= 0) {
                     courseSelect.innerHTML = '<option value="">-- Select Courses --</option>';
                     console.log('Programme ID is invalid:', programmeId, programmeIdInt);
                     return;
@@ -1413,7 +1408,10 @@ try {
                 courseSelect.innerHTML = '<option value="">Loading courses...</option>';
                 
                 // Make AJAX request to get courses for the selected programme
-                fetch(`get_courses_by_programme.php?programme_id=${programmeIdInt}`)
+                const params = new URLSearchParams({
+                    programme_id: programmeIdInt
+                });
+                fetch('get_courses_by_programme.php?' + params)
                     .then(response => {
                         console.log('Response status:', response.status);
                         return response.json();
@@ -1461,16 +1459,11 @@ try {
                     console.log('Loading courses for add modal programme ID:', this.value, typeof this.value);
                     
                     // Convert to integer to ensure it's a proper ID, and handle potential issues
-                    let programmeIdInt;
-                    if (typeof this.value === 'string') {
-                        programmeIdInt = parseInt(this.value.trim());
-                    } else {
-                        programmeIdInt = parseInt(this.value);
-                    }
+                    let programmeIdInt = parseInt(this.value);
                     
                     console.log('Add modal - Converted programme ID:', programmeIdInt, typeof programmeIdInt);
                     
-                    if (!programmeIdInt || programmeIdInt <= 0) {
+                    if (isNaN(programmeIdInt) || programmeIdInt <= 0) {
                         addCourseSelect.innerHTML = '<option value="">-- Select Courses --</option>';
                         console.log('Add modal - Programme ID is invalid:', this.value, programmeIdInt);
                         return;
@@ -1480,7 +1473,10 @@ try {
                     addCourseSelect.innerHTML = '<option value="">Loading courses...</option>';
                     
                     // Make AJAX request to get courses for the selected programme
-                    fetch(`get_courses_by_programme.php?programme_id=${programmeIdInt}`)
+                    const params = new URLSearchParams({
+                        programme_id: programmeIdInt
+                    });
+                    fetch('get_courses_by_programme.php?' + params)
                         .then(response => {
                             console.log('Add modal - Response status:', response.status);
                             return response.json();
