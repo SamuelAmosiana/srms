@@ -504,7 +504,7 @@ if (isset($_GET['edit_schedule'])) {
                     <button onclick="showSection('add-session')" class="btn btn-green">
                         <i class="fas fa-plus"></i> Add New Session
                     </button>
-                    <button onclick="showSection('add-schedule')" class="btn btn-blue">
+                    <button onclick="showSection('add-schedule')" class="btn btn-green">
                         <i class="fas fa-calendar-plus"></i> Add Programme Schedule
                     </button>
                 </div>
