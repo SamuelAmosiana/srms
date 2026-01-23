@@ -251,121 +251,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'error';
                 }
                 break;
-                
-            case 'bulk_upload_courses':
-                if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] == 0) {
-                    $file = $_FILES['csv_file'];
-                    $uploaded_courses = [];
-                    $errors = [];
-                    $success_count = 0;
-                    
-                    // Validate file type
-                    $allowed_types = ['text/csv', 'application/vnd.ms-excel'];
-                    if (!in_array($file['type'], $allowed_types) && pathinfo($file['name'], PATHINFO_EXTENSION) !== 'csv') {
-                        $message = "Invalid file type. Please upload a CSV file.";
-                        $messageType = 'error';
-                    } else {
-                        // Process CSV file
-                        if (($handle = fopen($file['tmp_name'], 'r')) !== FALSE) {
-                            // Skip header row
-                            fgetcsv($handle, 1000, ',');
-                            
-                            $line_number = 1;
-                            while (($data = fgetcsv($handle, 1000, ',')) !== FALSE) {
-                                $line_number++;
-                                
-                                if (count($data) >= 4) {
-                                    $code = trim(strtoupper($data[0]));
-                                    $name = trim($data[1]);
-                                    $programme_name = trim($data[2]);
-                                    $credits = trim($data[3]);
-                                    $description = isset($data[4]) ? trim($data[4]) : '';
-                                    
-                                    // Validate data
-                                    if (empty($code) || empty($name) || empty($programme_name) || empty($credits)) {
-                                        $errors[] = "Line {$line_number}: Missing required fields";
-                                        continue;
-                                    }
-                                    
-                                    if (strlen($code) > 20) {
-                                        $errors[] = "Line {$line_number}: Course code too long (max 20 characters)";
-                                        continue;
-                                    }
-                                    
-                                    if (!is_numeric($credits) || $credits <= 0) {
-                                        $errors[] = "Line {$line_number}: Credits must be a positive number";
-                                        continue;
-                                    }
-                                    
-                                    // Find programme ID
-                                    $programme_stmt = $pdo->prepare("SELECT id FROM programme WHERE name = ?");
-                                    $programme_stmt->execute([$programme_name]);
-                                    $programme = $programme_stmt->fetch();
-                                    
-                                    if (!$programme) {
-                                        $errors[] = "Line {$line_number}: Programme '{$programme_name}' not found";
-                                        continue;
-                                    }
-                                    
-                                    // Check if course code already exists
-                                    $check_stmt = $pdo->prepare("SELECT id FROM course WHERE code = ?");
-                                    $check_stmt->execute([$code]);
-                                    
-                                    if ($check_stmt->rowCount() > 0) {
-                                        $errors[] = "Line {$line_number}: Course code '{$code}' already exists";
-                                        continue;
-                                    }
-                                    
-                                    // Insert course
-                                    try {
-                                        $insert_stmt = $pdo->prepare("INSERT INTO course (name, code, programme_id, credits, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                                        $insert_stmt->execute([$name, $code, $programme['id'], $credits, $description]);
-                                        $success_count++;
-                                        $uploaded_courses[] = $code;
-                                    } catch (Exception $e) {
-                                        $errors[] = "Line {$line_number}: Database error - " . $e->getMessage();
-                                    }
-                                } else {
-                                    $errors[] = "Line {$line_number}: Invalid number of columns (expected at least 4)";
-                                }
-                            }
-                            fclose($handle);
-                            
-                            // Prepare success message
-                            if ($success_count > 0) {
-                                $message = "Successfully uploaded {$success_count} courses";
-                                if (!empty($uploaded_courses)) {
-                                    $message .= ": " . implode(', ', array_slice($uploaded_courses, 0, 5));
-                                    if (count($uploaded_courses) > 5) {
-                                        $message .= " and " . (count($uploaded_courses) - 5) . " more";
-                                    }
-                                }
-                                $messageType = 'success';
-                            }
-                            
-                            // Add error information if there were errors
-                            if (!empty($errors)) {
-                                if ($success_count > 0) {
-                                    $message .= ". However, there were " . count($errors) . " errors.";
-                                } else {
-                                    $message = "Upload failed with " . count($errors) . " errors. ";
-                                    $message .= implode('; ', array_slice($errors, 0, 3));
-                                    if (count($errors) > 3) {
-                                        $message .= " and " . (count($errors) - 3) . " more errors.";
-                                    }
-                                    $messageType = 'error';
-                                }
-                            }
-                        } else {
-                            $message = "Error opening uploaded file.";
-                            $messageType = 'error';
-                        }
-                    }
-                } else {
-                    $message = "Please select a CSV file to upload.";
-                    $messageType = 'error';
-                }
-                break;
         }
     }
 }
@@ -596,63 +481,6 @@ try {
             background-color: #007bff;
             color: white;
         }
-        
-        /* Bulk Upload Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.4);
-        }
-        
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 100%;
-            max-width: 600px;
-            border-radius: 5px;
-        }
-        
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-        }
-        
-        .upload-template {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-        }
-        
-        .template-header {
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #007bff;
-        }
-        
-        .template-columns {
-            font-family: monospace;
-            background-color: #e9ecef;
-            padding: 10px;
-            border-radius: 3px;
-            margin: 5px 0;
-        }
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
@@ -806,9 +634,6 @@ try {
             </div>
             <div class="action-right">
                 <?php if (!isset($_GET['view'])): ?>
-                    <button onclick="showBulkUploadModal()" class="btn btn-info">
-                        <i class="fas fa-file-upload"></i> Bulk Upload
-                    </button>
                     <button onclick="showAddForm()" class="btn btn-green">
                         <i class="fas fa-plus"></i> Add New Course
                     </button>
@@ -837,39 +662,6 @@ try {
                                 <i class="fas fa-refresh"></i> Reset
                             </a>
                         </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Bulk Upload Modal -->
-        <div id="bulkUploadModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeBulkUploadModal()">&times;</span>
-                <h2><i class="fas fa-file-upload"></i> Bulk Upload Courses</h2>
-                <p>Upload multiple courses at once using a CSV file.</p>
-                
-                <div class="upload-template">
-                    <div class="template-header">CSV Template Format:</div>
-                    <div class="template-columns">Code,Name,Programme,Credits,Description</div>
-                    <div class="template-columns">CS101,Introduction to Computer Science,Bachelor of Science in Computer Science,3,Introduction to fundamental concepts</div>
-                    <div class="template-columns">MATH101,Calculus I,Bachelor of Science in Mathematics,4,Fundamental calculus concepts</div>
-                </div>
-                
-                <form method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="action" value="bulk_upload_courses">
-                    <div class="form-group">
-                        <label for="csv_file">Select CSV File *</label>
-                        <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
-                        <small class="form-text">Maximum file size: 2MB. Only CSV files are accepted.</small>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-green">
-                            <i class="fas fa-upload"></i> Upload Courses
-                        </button>
-                        <button type="button" onclick="closeBulkUploadModal()" class="btn btn-orange">
-                            <i class="fas fa-times"></i> Cancel
-                        </button>
                     </div>
                 </form>
             </div>
@@ -922,6 +714,8 @@ try {
                                    value="<?php echo htmlspecialchars($editCourse['credits'] ?? ''); ?>">
                         </div>
                     </div>
+                    
+
                     
                     <div class="form-row">
                         <div class="form-group full-width">
@@ -1262,14 +1056,6 @@ try {
         function hideForm() {
             document.getElementById('courseForm').style.display = 'none';
         }
-        
-        function showBulkUploadModal() {
-            document.getElementById('bulkUploadModal').style.display = 'block';
-        }
-        
-        function closeBulkUploadModal() {
-            document.getElementById('bulkUploadModal').style.display = 'none';
-        }
 
         function filterTable(input, tableId) {
             const filter = input.value.toLowerCase();
@@ -1318,14 +1104,6 @@ try {
             if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
             
             window.location.href = url;
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('bulkUploadModal');
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
         }
         
         // Searchable dropdown functionality for lecturer and intake selection
