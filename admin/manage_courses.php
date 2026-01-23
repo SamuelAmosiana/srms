@@ -611,12 +611,14 @@ try {
         
         .modal-content {
             background-color: #fefefe;
-            margin: 15% auto;
+            margin: 2% auto;
             padding: 20px;
             border: 1px solid #888;
             width: 100%;
             max-width: 600px;
             border-radius: 5px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         
         .close {
@@ -854,6 +856,7 @@ try {
                     <div class="template-columns">Code,Name,Programme,Credits,Description</div>
                     <div class="template-columns">CS101,Introduction to Computer Science,Bachelor of Science in Computer Science,3,Introduction to fundamental concepts</div>
                     <div class="template-columns">MATH101,Calculus I,Bachelor of Science in Mathematics,4,Fundamental calculus concepts</div>
+                    <p><a href="course_import_template.csv" download class="btn btn-sm btn-outline" style="margin-top: 10px;"><i class="fas fa-download"></i> Download Template File</a></p>
                 </div>
                 
                 <form method="POST" enctype="multipart/form-data">
