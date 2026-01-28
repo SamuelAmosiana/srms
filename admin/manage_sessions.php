@@ -1,4 +1,7 @@
 <?php
+// Suppress errors to prevent HTML warnings from breaking JS
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', 0);
 session_start();
 require_once '../config.php';
 require_once '../auth/auth.php';
@@ -197,23 +200,313 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get sessions
-$sessions = $pdo->query("SELECT * FROM academic_sessions ORDER BY academic_year DESC, term ASC")->fetchAll();
+try {
+    $sessions = $pdo->query("SELECT * FROM academic_sessions ORDER BY academic_year DESC, term ASC")->fetchAll();
+} catch (Exception $e) {
+    error_log("Error fetching sessions: " . $e->getMessage());
+    $sessions = [];
+}
 
 // Get programmes
-$programmes = $pdo->query("SELECT * FROM programme ORDER BY name ASC")->fetchAll();
+try {
+    $programmes = $pdo->query("SELECT * FROM programme ORDER BY name ASC")->fetchAll();
+} catch (Exception $e) {
+    error_log("Error fetching programmes: " . $e->getMessage());
+    $programmes = [];
+}
 
 // Get intakes
-$intakes = $pdo->query("SELECT * FROM intake ORDER BY name ASC")->fetchAll();
+try {
+    $intakes = $pdo->query("SELECT * FROM intake ORDER BY name ASC")->fetchAll();
+} catch (Exception $e) {
+    error_log("Error fetching intakes: " . $e->getMessage());
+    $intakes = [];
+}
 
 // Get programme schedules with related data
-$programme_schedules = $pdo->query("
-    SELECT ps.*, p.name as programme_name, s.session_name, i.name as intake_name
-    FROM programme_schedule ps
+try {
+    $programme_schedules = $pdo->query("
+        SELECT ps.*, 
+               p.name as programme_name, 
+               s.session_name, s.academic_year, s.term, s.status as session_status,
+               i.name as intake_name
+        FROM programme_schedule ps
+        LEFT JOIN programme p ON ps.programme_id = p.id
+        LEFT JOIN academic_sessions s ON ps.session_id = s.id
+        LEFT JOIN intake i ON ps.intake_id = i.id
+        ORDER BY ps.year_of_study, p.name, s.academic_year, s.term
+    ")->fetchAll();
+} catch (Exception $e) {
+    error_log("Error fetching programme schedules: " . $e->getMessage());
+    $programme_schedules = []; // Provide empty array as fallback
+}
+
+// Get courses associated with each session through programme_schedule and intake_courses
+$courses_by_session = [];
+$sessions_result = $pdo->query("
+    SELECT s.id as session_id, s.session_name, s.academic_year, s.term, 
+           p.name as programme_name, ic.course_id, c.name as course_name, c.code as course_code
+    FROM academic_sessions s
+    LEFT JOIN programme_schedule ps ON s.id = ps.session_id
     LEFT JOIN programme p ON ps.programme_id = p.id
-    LEFT JOIN academic_sessions s ON ps.session_id = s.id
-    LEFT JOIN intake i ON ps.intake_id = i.id
-    ORDER BY ps.year_of_study, p.name, s.academic_year, s.term
+    LEFT JOIN intake_courses ic ON p.id = ic.programme_id
+    LEFT JOIN course c ON ic.course_id = c.id
+    WHERE c.id IS NOT NULL
+    ORDER BY s.id, p.name, c.name
 ")->fetchAll();
+
+foreach ($sessions_result as $row) {
+    $session_id = $row['session_id'];
+    if (!isset($courses_by_session[$session_id])) {
+        $courses_by_session[$session_id] = [
+            'session_info' => [
+                'session_name' => $row['session_name'],
+                'academic_year' => $row['academic_year'],
+                'term' => $row['term']
+            ],
+            'courses' => []
+        ];
+    }
+    
+    if ($row['course_id']) {
+        $courses_by_session[$session_id]['courses'][] = [
+            'course_id' => $row['course_id'],
+            'course_name' => $row['course_name'],
+            'course_code' => $row['course_code'],
+            'programme_name' => $row['programme_name']
+        ];
+    }
+}
+
+// Get sessions with programme details
+$sessions_with_details = $pdo->query("
+    SELECT s.*, 
+           COUNT(ps.id) as schedule_count,
+           GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as programmes
+    FROM academic_sessions s
+    LEFT JOIN programme_schedule ps ON s.id = ps.session_id
+    LEFT JOIN programme p ON ps.programme_id = p.id
+    GROUP BY s.id
+    ORDER BY s.academic_year DESC, s.term ASC
+")->fetchAll();
+
+// Get programmes with session details
+$programmes_with_sessions = $pdo->query("
+    SELECT p.*, 
+           COUNT(ps.id) as session_count,
+           GROUP_CONCAT(DISTINCT s.session_name SEPARATOR ', ') as active_sessions
+    FROM programme p
+    LEFT JOIN programme_schedule ps ON p.id = ps.programme_id
+    LEFT JOIN academic_sessions s ON ps.session_id = s.id
+    GROUP BY p.id
+    ORDER BY p.name
+")->fetchAll();
+
+// Get intakes with programme details
+$intakes_with_programmes = $pdo->query("
+    SELECT i.*,
+           COUNT(ps.id) as programme_count,
+           GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as programmes
+    FROM intake i
+    LEFT JOIN programme_schedule ps ON i.id = ps.intake_id
+    LEFT JOIN programme p ON ps.programme_id = p.id
+    GROUP BY i.id
+    ORDER BY i.name
+")->fetchAll();
+
+// Ensure all intakes have a status field (some might not have it in the database)
+foreach ($intakes_with_programmes as &$intake) {
+    if (!isset($intake['status']) || is_null($intake['status'])) {
+        $intake['status'] = 'active'; // Default to 'active' if not set or null
+    }
+}
+
+// Handle AJAX requests for course assignment (per session + programme)
+if (isset($_POST['action']) && $_POST['action'] === 'assign_courses_to_session_programme') {
+    header('Content-Type: application/json');
+
+    $session_id = (int)($_POST['session_id'] ?? 0);
+    $programme_id = (int)($_POST['programme_id'] ?? 0);
+    $course_ids = $_POST['course_ids'] ?? [];
+
+    if ($session_id <= 0 || $programme_id <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Session ID and Programme ID are required']);
+        exit;
+    }
+
+    // normalize course ids
+    if (!is_array($course_ids)) {
+        $course_ids = [$course_ids];
+    }
+    $course_ids = array_values(array_filter(array_map('intval', $course_ids), fn($id) => $id > 0));
+
+    if (empty($course_ids)) {
+        echo json_encode(['success' => false, 'message' => 'Please select at least one course']);
+        exit;
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        // Ensure the programme is scheduled in the given session
+        $check = $pdo->prepare("SELECT COUNT(*) FROM programme_schedule WHERE session_id = ? AND programme_id = ?");
+        $check->execute([$session_id, $programme_id]);
+        if ((int)$check->fetchColumn() === 0) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Selected programme is not scheduled under this session']);
+            exit;
+        }
+
+        // Replace previous selections for this session+programme (idempotent UX)
+        $del = $pdo->prepare("DELETE FROM session_programme_courses WHERE session_id = ? AND programme_id = ?");
+        $del->execute([$session_id, $programme_id]);
+
+        $ins = $pdo->prepare("INSERT INTO session_programme_courses (session_id, programme_id, course_id) VALUES (?, ?, ?)");
+        foreach ($course_ids as $course_id) {
+            $ins->execute([$session_id, $programme_id, $course_id]);
+        }
+
+        $pdo->commit();
+        echo json_encode([
+            'success' => true,
+            'message' => 'Courses saved for the selected programme in this session',
+            'session_id' => $session_id,
+            'programme_id' => $programme_id,
+            'assigned_count' => count($course_ids)
+        ]);
+        exit;
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => 'Error saving courses: ' . $e->getMessage()]);
+        exit;
+    }
+}
+
+// AJAX: programmes scheduled in a session
+if (isset($_GET['action']) && $_GET['action'] === 'get_session_programmes') {
+    header('Content-Type: application/json');
+    $session_id = (int)($_GET['session_id'] ?? 0);
+
+    if ($session_id <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid session id']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT p.id, p.name
+        FROM programme_schedule ps
+        JOIN programme p ON ps.programme_id = p.id
+        WHERE ps.session_id = ?
+        ORDER BY p.name
+    ");
+    $stmt->execute([$session_id]);
+
+    echo json_encode([
+        'success' => true,
+        'session_id' => $session_id,
+        'programmes' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+    ]);
+    exit;
+}
+
+// AJAX: courses for session + programme (with assignment state)
+if (isset($_GET['action']) && $_GET['action'] === 'get_session_programme_courses') {
+    header('Content-Type: application/json');
+    $session_id = (int)($_GET['session_id'] ?? 0);
+    $programme_id = (int)($_GET['programme_id'] ?? 0);
+
+    if ($session_id <= 0 || $programme_id <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Session ID and Programme ID are required']);
+        exit;
+    }
+
+    // Validate programme is scheduled for the session
+    $check = $pdo->prepare("SELECT COUNT(*) FROM programme_schedule WHERE session_id = ? AND programme_id = ?");
+    $check->execute([$session_id, $programme_id]);
+    if ((int)$check->fetchColumn() === 0) {
+        echo json_encode(['success' => false, 'message' => 'Programme not scheduled for this session']);
+        exit;
+    }
+
+    // Fetch all courses mapped to this programme
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT c.id, c.code, c.name
+        FROM intake_courses ic
+        JOIN course c ON ic.course_id = c.id
+        WHERE ic.programme_id = ?
+        ORDER BY c.name
+    ");
+    $stmt->execute([$programme_id]);
+    $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Assigned course IDs for this session+programme
+    $a = $pdo->prepare("SELECT course_id FROM session_programme_courses WHERE session_id = ? AND programme_id = ?");
+    $a->execute([$session_id, $programme_id]);
+    $assigned = array_map('intval', $a->fetchAll(PDO::FETCH_COLUMN));
+    $assignedSet = array_flip($assigned);
+
+    $courses = array_map(function($c) use ($assignedSet) {
+        $c['assigned'] = isset($assignedSet[(int)$c['id']]);
+        return $c;
+    }, $courses);
+
+    echo json_encode([
+        'success' => true,
+        'session_id' => $session_id,
+        'programme_id' => $programme_id,
+        'courses' => $courses
+    ]);
+    exit;
+}
+
+// Handle AJAX requests for getting card data
+if (isset($_GET['action']) && $_GET['action'] === 'get_card_data') {
+    $type = $_GET['type'] ?? '';
+    
+    $response = ['success' => false, 'message' => 'Invalid type'];
+    
+    switch($type) {
+        case 'sessions':
+            $response = [
+                'success' => true,
+                'sessions' => array_map(function($session) {
+                    return [
+                        'id' => $session['id'],
+                        'session_name' => $session['session_name'],
+                        'academic_year' => $session['academic_year'],
+                        'term' => $session['term'],
+                        'start_date' => $session['start_date'],
+                        'end_date' => $session['end_date'],
+                        'status' => $session['status'],
+                        'programmes' => $session['programmes'] ?: 'None'
+                    ];
+                }, $sessions_with_details)
+            ];
+            break;
+    }
+    
+    header('Content-Type: application/json');
+    echo json_encode($response);
+    exit;
+}
+
+// Check and create session_programme_courses table if it doesn't exist (used for selecting courses per programme per session)
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS session_programme_courses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        session_id INT NOT NULL,
+        programme_id INT NOT NULL,
+        course_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES academic_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (programme_id) REFERENCES programme(id) ON DELETE CASCADE,
+        FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_session_programme_course (session_id, programme_id, course_id)
+    )");
+} catch (Exception $e) {
+    // Table creation failed, log the error if needed
+    error_log("Could not create session_programme_courses table: " . $e->getMessage());
+}
 
 // Get session for editing if specified
 $editSession = null;
@@ -319,6 +612,37 @@ if (isset($_GET['edit_schedule'])) {
 
         .stats-grid.sessions-stats {
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+        
+        .course-selection-modal {
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .course-selection-modal h4 {
+            margin-top: 0;
+            color: #2E8B57;
+            border-bottom: 2px solid #2E8B57;
+            padding-bottom: 10px;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            cursor: pointer;
+        }
+        
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
         }
     </style>
 </head>
@@ -457,17 +781,17 @@ if (isset($_GET['edit_schedule'])) {
 
             <!-- Stats Cards -->
             <div class="stats-grid sessions-stats">
-                <div class="stat-card">
+                <div class="stat-card" onclick="showCardDetails('sessions')" style="cursor: pointer;">
                     <div class="stat-icon">
                         <i class="fas fa-calendar-alt"></i>
                     </div>
                     <div class="stat-content">
-                        <h3><?php echo count($sessions); ?></h3>
+                        <h3><?php echo count($sessions_with_details); ?></h3>
                         <p>Total Sessions</p>
                     </div>
                 </div>
                 
-                <div class="stat-card">
+                <div class="stat-card" onclick="showCardDetails('schedules')" style="cursor: pointer;">
                     <div class="stat-icon">
                         <i class="fas fa-list"></i>
                     </div>
@@ -477,24 +801,36 @@ if (isset($_GET['edit_schedule'])) {
                     </div>
                 </div>
                 
-                <div class="stat-card">
+                <div class="stat-card" onclick="showCardDetails('programmes')" style="cursor: pointer;">
                     <div class="stat-icon">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
                     <div class="stat-content">
-                        <h3><?php echo count($programmes); ?></h3>
+                        <h3><?php echo count($programmes_with_sessions); ?></h3>
                         <p>Programmes</p>
                     </div>
                 </div>
                 
-                <div class="stat-card">
+                <div class="stat-card" onclick="showCardDetails('intakes')" style="cursor: pointer;">
                     <div class="stat-icon">
                         <i class="fas fa-users"></i>
                     </div>
                     <div class="stat-content">
-                        <h3><?php echo count($intakes); ?></h3>
+                        <h3><?php echo count($intakes_with_programmes); ?></h3>
                         <p>Intakes</p>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Card Details Section -->
+            <div id="card-details-section" class="section-card" style="display: none; margin-top: 20px;">
+                <div class="section-header">
+                    <h3 id="details-title"><i class="fas fa-info-circle"></i> <span id="details-type">Details</span></h3>
+                    <button onclick="hideCardDetails()" class="btn btn-orange"><i class="fas fa-times"></i> Close</button>
+                </div>
+                
+                <div id="details-content">
+                    <!-- Dynamic content will be loaded here -->
                 </div>
             </div>
 
@@ -793,6 +1129,53 @@ if (isset($_GET['edit_schedule'])) {
     </div>
 
     <script>
+        // Safely embed server-side data into JS (prevents JS syntax errors from unescaped DB text)
+        const CARD_DATA = {
+            sessions: <?php echo json_encode(array_map(function($s) {
+                return [
+                    'id' => (int)$s['id'],
+                    'session_name' => $s['session_name'],
+                    'academic_year' => $s['academic_year'],
+                    'term' => $s['term'],
+                    'start_date' => $s['start_date'],
+                    'end_date' => $s['end_date'],
+                    'status' => $s['status'],
+                    'programmes' => $s['programmes'] ?: 'None',
+                ];
+            }, $sessions_with_details), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            schedules: <?php echo json_encode(array_map(function($s) {
+                return [
+                    'programme_name' => $s['programme_name'] ?? 'N/A',
+                    'session_name' => $s['session_name'] ?? 'N/A',
+                    'academic_year' => $s['academic_year'] ?? 'N/A',
+                    'term' => $s['term'] ?? 'N/A',
+                    'year_of_study' => $s['year_of_study'],
+                    'intake_name' => $s['intake_name'] ?? 'N/A',
+                    'session_status' => $s['session_status'] ?? 'inactive',
+                ];
+            }, $programme_schedules), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            programmes: <?php echo json_encode(array_map(function($p) {
+                return [
+                    'name' => $p['name'],
+                    'department' => $p['department'] ?? 'N/A',
+                    'school' => $p['school'] ?? 'N/A',
+                    'duration' => $p['duration'] ?? 'N/A',
+                    'session_count' => (int)$p['session_count'],
+                    'active_sessions' => $p['active_sessions'] ?? 'None',
+                ];
+            }, $programmes_with_sessions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            intakes: <?php echo json_encode(array_map(function($i) {
+                return [
+                    'name' => $i['name'],
+                    'start_date' => $i['start_date'],
+                    'end_date' => $i['end_date'],
+                    'status' => $i['status'],
+                    'programme_count' => (int)$i['programme_count'],
+                    'programmes' => $i['programmes'] ?? 'None',
+                ];
+            }, $intakes_with_programmes), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        };
+
         function toggleTheme() {
             document.body.classList.toggle('dark-mode');
             const icon = document.getElementById('theme-icon');
@@ -822,6 +1205,325 @@ if (isset($_GET['edit_schedule'])) {
             } else if (section === 'add-schedule') {
                 document.getElementById('add-schedule-form').style.display = 'none';
             }
+        }
+
+        function showCardDetails(type) {
+            document.getElementById('details-type').textContent = 
+                type.charAt(0).toUpperCase() + type.slice(1) + ' Details';
+                    
+            let content = '';
+                    
+            switch(type) {
+                case 'sessions':
+                    content = '<div class="table-responsive">' +
+                        '<table class="users-table">' +
+                        '<thead>' +
+                            '<tr>' +
+                                '<th>Session Name</th>' +
+                                '<th>Academic Year</th>' +
+                                '<th>Term</th>' +
+                                '<th>Dates</th>' +
+                                '<th>Status</th>' +
+                                '<th>Programmes</th>' +
+                                '<th>Courses (per Programme)</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>';
+
+                    (CARD_DATA.sessions || []).forEach(s => {
+                        const dates = `${formatDate(s.start_date)} - ${formatDate(s.end_date)}`;
+                        content += '<tr>' +
+                            `<td>${escapeHtml(s.session_name)}</td>` +
+                            `<td>${escapeHtml(s.academic_year)}</td>` +
+                            `<td>${escapeHtml(s.term)}</td>` +
+                            `<td>${escapeHtml(dates)}</td>` +
+                            `<td><span class="status-badge ${escapeHtml(s.status)}">${escapeHtml(capitalize(s.status))}</span></td>` +
+                            `<td>${escapeHtml(s.programmes)}</td>` +
+                            '<td>' +
+                                `<button onclick="showSessionCoursePicker(${Number(s.id)})" class="btn btn-sm btn-blue">` +
+                                    '<i class="fas fa-book"></i> Manage Courses' +
+                                '</button>' +
+                            '</td>' +
+                        '</tr>';
+                    });
+                            
+                    content += '</tbody>' +
+                        '</table>' +
+                    '</div>';
+                    break;
+                            
+                case 'schedules':
+                    content = '<div class="table-responsive">' +
+                        '<table class="users-table">' +
+                        '<thead>' +
+                            '<tr>' +
+                                '<th>Programme</th>' +
+                                '<th>Session</th>' +
+                                '<th>Academic Year</th>' +
+                                '<th>Term</th>' +
+                                '<th>Year of Study</th>' +
+                                '<th>Intake</th>' +
+                                '<th>Status</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>';
+
+                    (CARD_DATA.schedules || []).forEach(s => {
+                        const status = s.session_status || 'inactive';
+                        content += '<tr>' +
+                            `<td>${escapeHtml(s.programme_name)}</td>` +
+                            `<td>${escapeHtml(s.session_name)}</td>` +
+                            `<td>${escapeHtml(s.academic_year)}</td>` +
+                            `<td>${escapeHtml(s.term)}</td>` +
+                            `<td>Year ${escapeHtml(s.year_of_study)}</td>` +
+                            `<td>${escapeHtml(s.intake_name)}</td>` +
+                            `<td><span class="status-badge ${escapeHtml(status)}">${escapeHtml(capitalize(status))}</span></td>` +
+                        '</tr>';
+                    });
+                            
+                    content += '</tbody>' +
+                        '</table>' +
+                    '</div>';
+                    break;
+                            
+                case 'programmes':
+                    content = '<div class="table-responsive">' +
+                        '<table class="users-table">' +
+                        '<thead>' +
+                            '<tr>' +
+                                '<th>Programme Name</th>' +
+                                '<th>Department</th>' +
+                                '<th>School</th>' +
+                                '<th>Duration</th>' +
+                                '<th>Schedule Count</th>' +
+                                '<th>Active Sessions</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>';
+
+                    (CARD_DATA.programmes || []).forEach(p => {
+                        content += '<tr>' +
+                            `<td>${escapeHtml(p.name)}</td>` +
+                            `<td>${escapeHtml(p.department)}</td>` +
+                            `<td>${escapeHtml(p.school)}</td>` +
+                            `<td>${escapeHtml(p.duration)} years</td>` +
+                            `<td>${escapeHtml(p.session_count)}</td>` +
+                            `<td>${escapeHtml(p.active_sessions)}</td>` +
+                        '</tr>';
+                    });
+                            
+                    content += '</tbody>' +
+                        '</table>' +
+                    '</div>';
+                    break;
+                            
+                case 'intakes':
+                    content = '<div class="table-responsive">' +
+                        '<table class="users-table">' +
+                        '<thead>' +
+                            '<tr>' +
+                                '<th>Intake Name</th>' +
+                                '<th>Start Date</th>' +
+                                '<th>End Date</th>' +
+                                '<th>Status</th>' +
+                                '<th>Programme Count</th>' +
+                                '<th>Programmes</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>';
+
+                    (CARD_DATA.intakes || []).forEach(i => {
+                        const status = i.status || 'inactive';
+                        content += '<tr>' +
+                            `<td>${escapeHtml(i.name)}</td>` +
+                            `<td>${escapeHtml(formatDate(i.start_date))}</td>` +
+                            `<td>${escapeHtml(formatDate(i.end_date))}</td>` +
+                            `<td><span class="status-badge ${escapeHtml(status)}">${escapeHtml(capitalize(status))}</span></td>` +
+                            `<td>${escapeHtml(i.programme_count)}</td>` +
+                            `<td>${escapeHtml(i.programmes)}</td>` +
+                        '</tr>';
+                    });
+                            
+                    content += '</tbody>' +
+                        '</table>' +
+                    '</div>';
+                    break;
+            }
+                    
+            document.getElementById('details-content').innerHTML = content;
+            document.getElementById('card-details-section').style.display = 'block';
+            document.getElementById('card-details-section').scrollIntoView({behavior: 'smooth'});
+        }
+
+        function hideCardDetails() {
+            document.getElementById('card-details-section').style.display = 'none';
+        }
+
+        function showSessionCoursePicker(sessionId) {
+            document.getElementById('details-content').innerHTML = '<div class="loading">Loading programmes...</div>';
+
+            fetch(`?action=get_session_programmes&session_id=${sessionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        document.getElementById('details-content').innerHTML = `<p>Error: ${data.message || 'Unable to load programmes.'}</p>`;
+                        return;
+                    }
+
+                    const programmes = data.programmes || [];
+                    let html = '<div class="course-selection-modal">' +
+                        '<h4>Courses to Run (choose Programme)</h4>';
+
+                    if (programmes.length === 0) {
+                        html += '<p>No programmes are scheduled under this session yet. Add a programme schedule first.</p>';
+                        html += '<button class="btn btn-orange" onclick="closeCourseSelection()">Close</button></div>';
+                        document.getElementById('details-content').innerHTML = html;
+                        return;
+                    }
+
+                    html += `<div class="form-row" style="margin-bottom: 12px;">
+                                <div class="form-group" style="max-width: 520px;">
+                                    <label for="coursePickerProgramme">Programme</label>
+                                    <select id="coursePickerProgramme" onchange="loadProgrammeCoursesForSession(${sessionId})">
+                                        <option value="">-- Select Programme --</option>
+                                        ${programmes.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}
+                                    </select>
+                                </div>
+                             </div>
+                             <div id="coursePickerCourses" class="loading">Select a programme to load its courses...</div>
+                             <div style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap;">
+                                <button class="btn btn-orange" onclick="closeCourseSelection()">Close</button>
+                             </div>
+                         </div>`;
+
+                    document.getElementById('details-content').innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('details-content').innerHTML = '<p>Error loading programmes.</p>';
+                });
+        }
+
+        function loadProgrammeCoursesForSession(sessionId) {
+            const programmeId = document.getElementById('coursePickerProgramme').value;
+            const container = document.getElementById('coursePickerCourses');
+
+            if (!programmeId) {
+                container.innerHTML = '<div class="loading">Select a programme to load its courses...</div>';
+                return;
+            }
+
+            container.innerHTML = '<div class="loading">Loading courses...</div>';
+            fetch(`?action=get_session_programme_courses&session_id=${sessionId}&programme_id=${programmeId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        container.innerHTML = `<p>Error: ${data.message || 'Unable to load courses.'}</p>`;
+                        return;
+                    }
+
+                    const courses = data.courses || [];
+                    if (courses.length === 0) {
+                        container.innerHTML = '<p>No courses found for this programme.</p>';
+                        return;
+                    }
+
+                    let html = '<table class="users-table">' +
+                        '<thead><tr><th>Select</th><th>Code</th><th>Course Name</th></tr></thead><tbody>';
+
+                    courses.forEach(c => {
+                        html += `<tr>
+                            <td><input type="checkbox" name="selected_courses[]" value="${c.id}" ${c.assigned ? 'checked' : ''}></td>
+                            <td>${escapeHtml(c.code || '')}</td>
+                            <td>${escapeHtml(c.name || '')}</td>
+                        </tr>`;
+                    });
+
+                    html += '</tbody></table>';
+                    html += `<div style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap;">
+                                <button class="btn btn-green" onclick="saveProgrammeCoursesForSession(${sessionId}, ${programmeId})">
+                                    <i class="fas fa-save"></i> Save Selected Courses
+                                </button>
+                             </div>`;
+
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    container.innerHTML = '<p>Error loading courses.</p>';
+                });
+        }
+
+        function showProgrammeSessions(programmeId) {
+            // This function would typically make an AJAX call to fetch sessions for the programme
+            alert('Showing sessions for programme ID: ' + programmeId);
+        }
+
+        function showIntakeProgrammes(intakeId) {
+            // This function would typically make an AJAX call to fetch programmes for the intake
+            alert('Showing programmes for intake ID: ' + intakeId);
+        }
+        
+        function saveProgrammeCoursesForSession(sessionId, programmeId) {
+            const checkboxes = document.querySelectorAll('input[name="selected_courses[]"]:checked');
+            const selectedCourses = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (selectedCourses.length === 0) {
+                alert('Please select at least one course.');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('action', 'assign_courses_to_session_programme');
+            formData.append('session_id', sessionId);
+            formData.append('programme_id', programmeId);
+            selectedCourses.forEach((courseId) => formData.append('course_ids[]', courseId));
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Reload the picker content to reflect saved state
+                    loadProgrammeCoursesForSession(sessionId);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while saving courses.');
+            });
+        }
+        
+        function closeCourseSelection() {
+            // Refresh the current view to show updated information
+            showCardDetails('sessions');
+        }
+
+        function capitalize(str) {
+            const s = String(str || '');
+            return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            // If it's already a friendly date, keep it; otherwise try to format YYYY-MM-DD.
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return String(dateStr);
+            return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         // Close dropdown when clicking outside
