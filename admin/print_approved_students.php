@@ -30,12 +30,12 @@ try {
                     WHEN ps.payment_method IS NOT NULL AND ps.payment_method != '' THEN 'First Time Registration'
                     ELSE 'Regular/Returning'
                 END as registration_type,
-                cr.created_at
+                cr.submitted_at
             FROM course_registration cr
             JOIN student_profile sp ON cr.student_id = sp.user_id
             JOIN users u ON sp.user_id = u.id
             LEFT JOIN programme p ON sp.programme_id = p.id
-            LEFT JOIN pending_students ps ON sp.user_id = ps.user_id
+            LEFT JOIN pending_students ps ON sp.student_number = ps.student_number
             WHERE cr.status = 'approved'";
     
     $params = [];
@@ -54,7 +54,7 @@ try {
         $params[] = $programme_id;
     }
     
-    $sql .= " ORDER BY cr.created_at DESC";
+    $sql .= " ORDER BY registration_date DESC";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -179,7 +179,7 @@ try {
                         <td><?php echo htmlspecialchars($student['email']); ?></td>
                         <td><?php echo htmlspecialchars($student['programme_name']); ?></td>
                         <td><?php echo htmlspecialchars($student['registration_type']); ?></td>
-                        <td><?php echo htmlspecialchars(date('Y-m-d', strtotime($student['created_at']))); ?></td>
+                        <td><?php echo htmlspecialchars(date('Y-m-d', strtotime($student['submitted_at']))); ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php endif; ?>

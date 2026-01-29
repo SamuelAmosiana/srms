@@ -31,13 +31,13 @@ try {
                     WHEN ps.payment_method IS NOT NULL AND ps.payment_method != '' THEN 'First Time Registration'
                     ELSE 'Regular/Returning'
                 END as registration_type,
-                cr.created_at
-            FROM course_registration cr
-            JOIN student_profile sp ON cr.student_id = sp.user_id
+                COALESCE(cr.submitted_at, ps.updated_at) as registration_date
+            FROM student_profile sp
             JOIN users u ON sp.user_id = u.id
             LEFT JOIN programme p ON sp.programme_id = p.id
-            LEFT JOIN pending_students ps ON sp.user_id = ps.user_id
-            WHERE cr.status = 'approved'";
+            LEFT JOIN pending_students ps ON sp.student_number = ps.student_number
+            LEFT JOIN course_registration cr ON sp.user_id = cr.student_id
+            WHERE (cr.status = 'approved' OR ps.registration_status = 'approved')";
     
     $params = [];
     
@@ -83,7 +83,7 @@ try {
                 $student['email'],
                 $student['programme_name'],
                 $student['registration_type'],
-                $student['created_at']
+                $student['submitted_at']
             ]);
         }
         
@@ -119,7 +119,7 @@ try {
             $pdf->Cell(40, 8, $student['email'], 1, 0, 'L');
             $pdf->Cell(40, 8, $student['programme_name'], 1, 0, 'L');
             $pdf->Cell(25, 8, $student['registration_type'], 1, 0, 'C');
-            $pdf->Cell(20, 8, date('Y-m-d', strtotime($student['created_at'])), 1, 1, 'C');
+            $pdf->Cell(20, 8, date('Y-m-d', strtotime($student['submitted_at'])), 1, 1, 'C');
         }
         
         $pdf->Output('D', 'approved_students_' . date('Y-m-d') . '.pdf');

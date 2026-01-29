@@ -1604,7 +1604,7 @@ function loadApprovedStudents(page = 1, studentType = 'all', programmeId = '') {
                             <td>${escapeHtml(student.email)}</td>
                             <td>${escapeHtml(student.programme_name)}</td>
                             <td>${escapeHtml(student.registration_type)}</td>
-                            <td>${formatDate(student.created_at)}</td>
+                            <td>${formatDate(student.registration_date)}</td>
                             <td>
                                 <a href="../student/profile.php?id=${student.user_id}" class="btn-icon btn-view" title="View Profile">
                                     <i class="fas fa-eye"></i>
@@ -1742,7 +1742,7 @@ function loadApprovedStudents(page = 1, studentType = 'all', programmeId = '') {
                             <td>${escapeHtml(student.email)}</td>
                             <td>${escapeHtml(student.programme_name)}</td>
                             <td>${escapeHtml(student.registration_type)}</td>
-                            <td>${formatDate(student.created_at)}</td>
+                            <td>${formatDate(student.registration_date)}</td>
                             <td>
                                 <a href="../student/profile.php?id=${student.user_id}" class="btn-icon btn-view" title="View Profile">
                                     <i class="fas fa-eye"></i>

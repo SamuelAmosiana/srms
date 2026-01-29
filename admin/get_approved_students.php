@@ -33,14 +33,14 @@ try {
                     WHEN ps.payment_method IS NOT NULL AND ps.payment_method != '' THEN 'First Time Registration'
                     ELSE 'Regular/Returning'
                 END as registration_type,
-                cr.created_at,
+                COALESCE(cr.submitted_at, ps.updated_at) as registration_date,
                 sp.user_id
-            FROM course_registration cr
-            JOIN student_profile sp ON cr.student_id = sp.user_id
+            FROM student_profile sp
             JOIN users u ON sp.user_id = u.id
             LEFT JOIN programme p ON sp.programme_id = p.id
-            LEFT JOIN pending_students ps ON sp.user_id = ps.user_id
-            WHERE cr.status = 'approved'";
+            LEFT JOIN pending_students ps ON sp.student_number = ps.student_number
+            LEFT JOIN course_registration cr ON sp.user_id = cr.student_id
+            WHERE (cr.status = 'approved' OR ps.registration_status = 'approved')";
     
     $params = [];
     
@@ -58,7 +58,7 @@ try {
         $params[] = $programme_id;
     }
     
-    $sql .= " ORDER BY cr.created_at DESC LIMIT ? OFFSET ?";
+    $sql .= " ORDER BY registration_date DESC LIMIT ? OFFSET ?";
     $params[] = $limit;
     $params[] = $offset;
     
@@ -68,11 +68,10 @@ try {
     
     // Count total records for pagination
     $countSql = "SELECT COUNT(DISTINCT sp.student_number) as total_count
-                 FROM course_registration cr
-                 JOIN student_profile sp ON cr.student_id = sp.user_id
-                 LEFT JOIN pending_students ps ON sp.user_id = ps.user_id
-                 LEFT JOIN course c ON cr.course_id = c.id
-                 WHERE cr.status = 'approved'";
+                 FROM student_profile sp
+                 LEFT JOIN pending_students ps ON sp.student_number = ps.student_number
+                 LEFT JOIN course_registration cr ON sp.user_id = cr.student_id
+                 WHERE (cr.status = 'approved' OR ps.registration_status = 'approved')";
     
     $countParams = [];
     
