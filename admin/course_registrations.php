@@ -1214,6 +1214,70 @@ try {
         </div>
     </div>
 
+    <!-- Approved Students Section -->
+    <div class="card" style="margin-top: 30px;">
+        <div class="card-header">
+            <h3><i class="fas fa-check-circle"></i> Approved Students</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-row" style="margin-bottom: 20px;">
+                <div class="form-group">
+                    <label for="student_type_filter">Student Type:</label>
+                    <select id="student_type_filter" class="form-control" onchange="filterApprovedStudents()">
+                        <option value="all">All Students</option>
+                        <option value="first_time">First Time Registration</option>
+                        <option value="regular">Regular/Returning</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="programme_filter">Programme:</label>
+                    <select id="programme_filter" class="form-control" onchange="filterApprovedStudents()">
+                        <option value="">All Programmes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <div>
+                        <button class="btn btn-primary" onclick="filterApprovedStudents()">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <button class="btn btn-success" onclick="exportApprovedStudents('csv')" style="margin-left: 10px;">
+                            <i class="fas fa-file-excel"></i> Export CSV
+                        </button>
+                        <button class="btn btn-danger" onclick="exportApprovedStudents('pdf')" style="margin-left: 10px;">
+                            <i class="fas fa-file-pdf"></i> Export PDF
+                        </button>
+                        <button class="btn btn-secondary" onclick="printApprovedStudents()" style="margin-left: 10px;">
+                            <i class="fas fa-print"></i> Print
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="users-table" id="approved-students-table">
+                    <thead>
+                        <tr>
+                            <th>Student Number</th>
+                            <th>Full Name</th>
+                            <th>Email</th>
+                            <th>Programme</th>
+                            <th>Type</th>
+                            <th>Registration Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="approved-students-tbody">
+                        <!-- Data will be loaded via AJAX -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="approved-pagination-controls" class="pagination-container" style="margin-top: 20px; display: none;">
+                <!-- Pagination controls will be loaded via AJAX -->
+            </div>
+        </div>
+    </div>
+
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
         function openRejectModal(id) {
@@ -1510,6 +1574,316 @@ try {
             }
         });
 
-    </script>
+    
+
+// Approved Students Functions
+function filterApprovedStudents() {
+    const studentType = document.getElementById('student_type_filter').value;
+    const programmeId = document.getElementById('programme_filter').value;
+    
+    loadApprovedStudents(1, studentType, programmeId);
+}
+
+function loadApprovedStudents(page = 1, studentType = 'all', programmeId = '') {
+    const tbody = document.getElementById('approved-students-tbody');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading...</td></tr>';
+    
+    fetch(`get_approved_students.php?page=${page}&type=${studentType}&programme_id=${programmeId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let html = '';
+                
+                if (data.students.length === 0) {
+                    html = '<tr><td colspan="7" style="text-align: center;">No approved students found</td></tr>';
+                } else {
+                    data.students.forEach(student => {
+                        html += `<tr>
+                            <td>${escapeHtml(student.student_number)}</td>
+                            <td>${escapeHtml(student.full_name)}</td>
+                            <td>${escapeHtml(student.email)}</td>
+                            <td>${escapeHtml(student.programme_name)}</td>
+                            <td>${escapeHtml(student.registration_type)}</td>
+                            <td>${formatDate(student.created_at)}</td>
+                            <td>
+                                <a href="../student/profile.php?id=${student.user_id}" class="btn-icon btn-view" title="View Profile">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="../student/view_results.php?student_id=${student.user_id}" class="btn-icon btn-info" title="View Results">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </a>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                
+                tbody.innerHTML = html;
+                
+                // Update pagination
+                updatePaginationControls(data.pagination, 'loadApprovedStudents');
+            } else {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Error: ${data.message}</td></tr>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading approved students:', error);
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Error loading data</td></tr>';
+        });
+}
+
+function exportApprovedStudents(format) {
+    const studentType = document.getElementById('student_type_filter').value;
+    const programmeId = document.getElementById('programme_filter').value;
+    
+    let url = `export_approved_students.php?format=${format}`;
+    if (studentType !== 'all') url += `&type=${studentType}`;
+    if (programmeId) url += `&programme_id=${programmeId}`;
+    
+    window.open(url, '_blank');
+}
+
+function printApprovedStudents() {
+    const studentType = document.getElementById('student_type_filter').value;
+    const programmeId = document.getElementById('programme_filter').value;
+    
+    let url = 'print_approved_students.php';
+    if (studentType !== 'all') url += `?type=${studentType}`;
+    if (programmeId) url += url.includes('?') ? `&programme_id=${programmeId}` : `?programme_id=${programmeId}`;
+    
+    window.open(url, '_blank');
+}
+
+// Initialize approved students table on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadApprovedStudents();
+});
+
+// Update pagination controls function
+function updatePaginationControls(pagination, loadFunction) {
+    const paginationDiv = document.getElementById('approved-pagination-controls');
+    if (!paginationDiv) return;
+    
+    if (pagination.pages.length === 0) {
+        paginationDiv.style.display = 'none';
+        return;
+    }
+    
+    paginationDiv.style.display = 'block';
+    
+    let html = '<div class="pagination">';
+    
+    // Previous button
+    if (pagination.current_page > 1) {
+        html += `<a href="#" onclick="${loadFunction}(${pagination.current_page - 1}); return false;" class="prev-page">&laquo; Previous</a>`;
+    }
+    
+    // Page numbers
+    pagination.pages.forEach(pageNum => {
+        if (pageNum === '...') {
+            html += '<span class="page-ellipsis">...</span>';
+        } else {
+            const activeClass = pageNum === pagination.current_page ? 'active' : '';
+            html += `<a href="#" onclick="${loadFunction}(${pageNum}); return false;" class="page-number ${activeClass}">${pageNum}</a>`;
+        }
+    });
+    
+    // Next button
+    if (pagination.current_page < pagination.last_page) {
+        html += `<a href="#" onclick="${loadFunction}(${pagination.current_page + 1}); return false;" class="next-page">Next &raquo;</a>`;
+    }
+    
+    html += '</div>';
+    
+    // Add entries per page selector
+    html += `
+        <div class="entries-per-page">
+            Show 
+            <select onchange="${loadFunction}(1, document.getElementById('student_type_filter').value, document.getElementById('programme_filter').value, this.value)">
+                <option value="10" ${pagination.per_page == 10 ? 'selected' : ''}>10</option>
+                <option value="25" ${pagination.per_page == 25 ? 'selected' : ''}>25</option>
+                <option value="50" ${pagination.per_page == 50 ? 'selected' : ''}>50</option>
+                <option value="100" ${pagination.per_page == 100 ? 'selected' : ''}>100</option>
+            </select>
+            entries per page
+        </div>
+    `;
+    
+    paginationDiv.innerHTML = html;
+}
+
+// Approved Students Functions
+function filterApprovedStudents() {
+    const studentType = document.getElementById('student_type_filter').value;
+    const programmeId = document.getElementById('programme_filter').value;
+    
+    loadApprovedStudents(1, studentType, programmeId);
+}
+
+function loadApprovedStudents(page = 1, studentType = 'all', programmeId = '') {
+    const tbody = document.getElementById('approved-students-tbody');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading...</td></tr>';
+    
+    let url = `get_approved_students.php?page=${page}&type=${studentType}`;
+    if (programmeId) url += `&programme_id=${programmeId}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let html = '';
+                
+                if (data.students.length === 0) {
+                    html = '<tr><td colspan="7" style="text-align: center;">No approved students found</td></tr>';
+                } else {
+                    data.students.forEach(student => {
+                        html += `<tr>
+                            <td>${escapeHtml(student.student_number)}</td>
+                            <td>${escapeHtml(student.full_name)}</td>
+                            <td>${escapeHtml(student.email)}</td>
+                            <td>${escapeHtml(student.programme_name)}</td>
+                            <td>${escapeHtml(student.registration_type)}</td>
+                            <td>${formatDate(student.created_at)}</td>
+                            <td>
+                                <a href="../student/profile.php?id=${student.user_id}" class="btn-icon btn-view" title="View Profile">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="../student/view_results.php?student_id=${student.user_id}" class="btn-icon btn-info" title="View Results">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </a>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                
+                tbody.innerHTML = html;
+                
+                // Update pagination
+                updatePaginationControls(data.pagination, 'loadApprovedStudents', studentType, programmeId);
+            } else {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Error: ${data.message}</td></tr>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading approved students:', error);
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Error loading data</td></tr>';
+        });
+}
+
+function exportApprovedStudents(format) {
+    const studentType = document.getElementById('student_type_filter').value;
+    const programmeId = document.getElementById('programme_filter').value;
+    
+    let url = `export_approved_students.php?format=${format}`;
+    if (studentType !== 'all') url += `&type=${studentType}`;
+    if (programmeId) url += `&programme_id=${programmeId}`;
+    
+    window.open(url, '_blank');
+}
+
+function printApprovedStudents() {
+    const studentType = document.getElementById('student_type_filter').value;
+    const programmeId = document.getElementById('programme_filter').value;
+    
+    let url = 'print_approved_students.php';
+    if (studentType !== 'all') url += `?type=${studentType}`;
+    if (programmeId) url += url.includes('?') ? `&programme_id=${programmeId}` : `?programme_id=${programmeId}`;
+    
+    window.open(url, '_blank');
+}
+
+// Update pagination controls function
+function updatePaginationControls(pagination, loadFunction, studentType, programmeId) {
+    const paginationDiv = document.getElementById('approved-pagination-controls');
+    if (!paginationDiv) return;
+    
+    if (pagination.pages.length === 0) {
+        paginationDiv.style.display = 'none';
+        return;
+    }
+    
+    paginationDiv.style.display = 'block';
+    
+    let html = '<div class="pagination">';
+    
+    // Previous button
+    if (pagination.current_page > 1) {
+        html += `<a href="#" onclick="${loadFunction}(${pagination.current_page - 1}, '${studentType}', ${programmeId ? `'${programmeId}'` : 'null'}); return false;" class="prev-page">&laquo; Previous</a>`;
+    }
+    
+    // Page numbers
+    pagination.pages.forEach(pageNum => {
+        if (pageNum === '...') {
+            html += '<span class="page-ellipsis">...</span>';
+        } else {
+            const activeClass = pageNum === pagination.current_page ? 'active' : '';
+            html += `<a href="#" onclick="${loadFunction}(${pageNum}, '${studentType}', ${programmeId ? `'${programmeId}'` : 'null'}); return false;" class="page-number ${activeClass}">${pageNum}</a>`;
+        }
+    });
+    
+    // Next button
+    if (pagination.current_page < pagination.last_page) {
+        html += `<a href="#" onclick="${loadFunction}(${pagination.current_page + 1}, '${studentType}', ${programmeId ? `'${programmeId}'` : 'null'}); return false;" class="next-page">Next &raquo;</a>`;
+    }
+    
+    html += '</div>';
+    
+    // Add entries per page selector
+    html += `
+        <div class="entries-per-page">
+            Show 
+            <select onchange="${loadFunction}(1, document.getElementById('student_type_filter').value, document.getElementById('programme_filter').value, this.value)">
+                <option value="10" ${pagination.per_page == 10 ? 'selected' : ''}>10</option>
+                <option value="25" ${pagination.per_page == 25 ? 'selected' : ''}>25</option>
+                <option value="50" ${pagination.per_page == 50 ? 'selected' : ''}>50</option>
+                <option value="100" ${pagination.per_page == 100 ? 'selected' : ''}>100</option>
+            </select>
+            entries per page
+        </div>
+    `;
+    
+    paginationDiv.innerHTML = html;
+}
+
+// Helper functions
+function escapeHtml(text) {
+    if (typeof text !== 'string') text = String(text);
+    return text.replace(/[&<"'>]/g, function(match) {
+        const escapeMap = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#x27;',
+            '/': '&#x2F;'
+        };
+        return escapeMap[match];
+    });
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+        // If the date is already in Y-m-d format
+        return dateString.split(' ')[0];
+    }
+    return date.toLocaleDateString();
+}
+
+// Load programmes for the dropdown
+fetch('get_programmes.php')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('programme_filter').innerHTML = data.options;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading programmes:', error);
+    });
+
+// Initially load the approved students
+loadApprovedStudents();
+</script>
 </body>
 </html>

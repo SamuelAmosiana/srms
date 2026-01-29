@@ -646,7 +646,7 @@ if (isset($_GET['edit_schedule'])) {
         }
     </style>
 </head>
-<body>
+<body class="admin-layout" data-theme="light">
     <!-- Navigation and Sidebar -->
     <nav class="navbar">
         <div class="nav-brand">
