@@ -119,36 +119,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$existing_registration) {
     }
 }
 
-// Fetch available courses for student's programme and intake
-// First, get all terms defined for this intake
+// Initialize variables for session-based approach
+$selected_session_id = (int)($_GET['session_id'] ?? $_POST['session_id'] ?? 0);
+$session_info = null;
 $terms = [];
 $courses_by_term = [];
 
-if ($student['intake_id']) {
-    // Get distinct terms for this intake
-    $stmt = $pdo->prepare("SELECT DISTINCT term FROM intake_courses WHERE intake_id = ? ORDER BY term");
-    $stmt->execute([$student['intake_id']]);
-    $terms = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    // For each term, get the courses defined for this intake and programme
-    foreach ($terms as $term) {
-        $stmt = $pdo->prepare("
-            SELECT c.id as course_id, c.code as course_code, c.name as course_name, c.credits
-            FROM intake_courses ic
-            JOIN course c ON ic.course_id = c.id
-            WHERE ic.intake_id = ? AND ic.term = ?
-            AND (ic.programme_id = ? OR ic.programme_id IS NULL)
-            ORDER BY c.name
-        ");
-        $stmt->execute([$student['intake_id'], $term, $student['programme_id']]);
-        $courses_by_term[$term] = $stmt->fetchAll();
-    }
-} else {
-    // Fallback to old method if no intake is set
-    $stmt = $pdo->prepare("SELECT c.id as course_id, c.code as course_code, c.name as course_name, c.credits FROM course c WHERE c.programme_id = ?");
-    $stmt->execute([$student['programme_id']]);
-    $courses_by_term['General'] = $stmt->fetchAll();
-    $terms = ['General'];
+// Get currently registered courses for the student in the current academic year
+$academic_year = date('Y');
+$registered_courses_stmt = $pdo->prepare("
+    SELECT ce.course_id
+    FROM course_enrollment ce
+    WHERE ce.student_user_id = ? AND ce.academic_year = ?
+");
+$registered_courses_stmt->execute([currentUserId(), $academic_year]);
+$registered_courses = $registered_courses_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+
+// Convert to associative array for quick lookup
+$registered_courses_map = [];
+foreach ($registered_courses as $course_id) {
+    $registered_courses_map[$course_id] = true;
 }
 
 // Get currently registered courses for the student in the current academic year
@@ -194,6 +184,34 @@ foreach ($programme_fees as $fee) {
             gap: 15px;
             margin: 20px 0;
             flex-wrap: wrap;
+        }
+        
+        /* Session and Programme Course Tags */
+        .course-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .session-tag {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .programme-tag {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .session-course {
+            border-left: 4px solid #28a745;
+        }
+        
+        .programme-course {
+            border-left: 4px solid #17a2b8;
         }
         
         .payment-method {
@@ -489,7 +507,7 @@ foreach ($programme_fees as $fee) {
     <main class="main-content">
         <div class="content-header">
             <h1><i class="fas fa-clipboard-check"></i> Register Courses</h1>
-            <p>Register for courses in the academic year: <?php echo $academic_year; ?></p>
+            <p>Select an academic session and register for courses</p>
         </div>
         
         <?php if ($message): ?>
@@ -505,141 +523,286 @@ foreach ($programme_fees as $fee) {
                 <p>Your course registration is awaiting approval from the administration.</p>
             </div>
         <?php else: ?>
-            <!-- Step 1: Make Payment -->
+            <!-- Step 1: Select Academic Session -->
             <div class="registration-step">
                 <div class="step-header">
                     <div class="step-number">1</div>
-                    <h2>Make Payment</h2>
+                    <h2>Select Academic Session</h2>
                 </div>
                 
-                <?php if ($payment_made): ?>
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle"></i> Payment has been made for this academic year. You can now proceed with course registration.
+                <div id="session-selection">
+                    <p>Please select an academic session to view available courses:</p>
+                    <div class="form-group">
+                        <label for="session_id">Academic Session *</label>
+                        <select id="session_id" name="session_id" onchange="loadSessionCourses()" required>
+                            <option value="">-- Select Session --</option>
+                        </select>
                     </div>
-                <?php else: ?>
-                    <form method="POST" enctype="multipart/form-data" class="payment-form">
-                        <input type="hidden" name="action" value="submit_payment">
-                        
-                        <div class="fee-summary">
-                            <h3>Fee Summary</h3>
-                            <?php foreach ($programme_fees as $fee): ?>
-                                <div class="fee-item">
-                                    <span><?php echo htmlspecialchars($fee['fee_name']); ?></span>
-                                    <span>K<?php echo number_format($fee['fee_amount'], 2); ?></span>
-                                </div>
-                            <?php endforeach; ?>
-                            <div class="fee-item fee-total">
-                                <span>Total</span>
-                                <span>K<?php echo number_format($total_fees, 2); ?></span>
-                            </div>
+                    <div id="session-info" style="margin-top: 15px; display: none;">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            <span id="session-details"></span>
                         </div>
-                        
-                        <div class="payment-methods">
-                            <div class="payment-method" onclick="selectPaymentMethod('bank_transfer')">
-                                <i class="fas fa-university"></i>
-                                <div>Bank Transfer</div>
-                            </div>
-                            <div class="payment-method" onclick="selectPaymentMethod('mobile_money')">
-                                <i class="fas fa-mobile-alt"></i>
-                                <div>Mobile Money</div>
-                            </div>
-                            <div class="payment-method" onclick="selectPaymentMethod('credit_card')">
-                                <i class="fas fa-credit-card"></i>
-                                <div>Credit Card</div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="payment_method">Payment Method *</label>
-                            <select id="payment_method" name="payment_method" required>
-                                <option value="">-- Select Payment Method --</option>
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="mobile_money">Mobile Money</option>
-                                <option value="credit_card">Credit Card</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="amount">Amount (K) *</label>
-                            <input type="number" id="amount" name="amount" step="0.01" min="0" value="<?php echo $total_fees; ?>" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="reference_number">Reference Number *</label>
-                            <input type="text" id="reference_number" name="reference_number" required placeholder="Enter transaction reference number">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="payment_proof">Payment Proof (Receipt/Slip)</label>
-                            <input type="file" id="payment_proof" name="payment_proof" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx">
-                        </div>
-                        
-                        <button type="submit" class="btn-submit">Submit Payment</button>
-                    </form>
-                <?php endif; ?>
-            </div>
-            
-            <!-- Step 2: Register Courses (only if payment is made) -->
-            <?php if ($payment_made): ?>
-                <div class="registration-step">
-                    <div class="step-header">
+                    </div>
+                </div>
+                
+                <div id="course-selection" style="display: none;">
+                    <div class="step-header" style="margin-top: 30px;">
                         <div class="step-number">2</div>
                         <h2>Select Courses</h2>
                     </div>
-                    
+                
                     <form method="POST" class="registration-form">
                         <input type="hidden" name="action" value="submit_registration">
+                        <input type="hidden" id="selected_session_id" name="session_id" value="<?php echo $selected_session_id; ?>">
                         
-                        <?php if (!empty($terms)): ?>
-                            <div class="term-tabs">
-                                <?php foreach ($terms as $index => $term): ?>
-                                    <div class="term-tab <?php echo $index === 0 ? 'active' : ''; ?>" onclick="showTermTab('<?php echo $term; ?>')">
-                                        <?php echo htmlspecialchars($term); ?>
+                        <div id="courses-container">
+                            <!-- Courses will be loaded here dynamically -->
+                            <p>Please select a session to view available courses.</p>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary" id="submit-registration-btn" style="display: none;">Submit Registration</button>
+                    </form>
+            </div>
+            
+                <!-- Step 3: Make Payment -->
+                <div class="registration-step" id="payment-step" style="display: none;">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <h2>Make Payment</h2>
+                    </div>
+                    
+                    <?php if ($payment_made): ?>
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> Payment has been made for this academic year.
+                        </div>
+                    <?php else: ?>
+                        <form method="POST" enctype="multipart/form-data" class="payment-form">
+                            <input type="hidden" name="action" value="submit_payment">
+                            
+                            <div class="fee-summary">
+                                <h3>Fee Summary</h3>
+                                <?php foreach ($programme_fees as $fee): ?>
+                                    <div class="fee-item">
+                                        <span><?php echo htmlspecialchars($fee['fee_name']); ?></span>
+                                        <span>K<?php echo number_format($fee['fee_amount'], 2); ?></span>
                                     </div>
                                 <?php endforeach; ?>
+                                <div class="fee-item fee-total">
+                                    <span>Total</span>
+                                    <span>K<?php echo number_format($total_fees, 2); ?></span>
+                                </div>
                             </div>
                             
-                            <?php foreach ($terms as $index => $term): ?>
-                                <div id="term-<?php echo $term; ?>" class="term-content <?php echo $index === 0 ? 'active' : ''; ?>">
-                                    <h3><?php echo htmlspecialchars($term); ?> Courses</h3>
-                                    
-                                    <?php if (empty($courses_by_term[$term])): ?>
-                                        <p>No courses defined for this term.</p>
-                                    <?php else: ?>
-                                        <div class="courses-list">
-                                            <?php foreach ($courses_by_term[$term] as $course): ?>
-                                                <div class="course-item <?php echo isset($registered_courses_map[$course['course_id']]) ? 'registered' : ''; ?>">
-                                                    <label>
-                                                        <input type="checkbox" name="courses[]" value="<?php echo $course['course_id']; ?>" <?php echo isset($registered_courses_map[$course['course_id']]) ? 'checked' : ''; ?>>
-                                                        <div class="course-details">
-                                                            <span class="course-code"><?php echo htmlspecialchars($course['course_code']); ?></span> - 
-                                                            <span class="course-name"><?php echo htmlspecialchars($course['course_name']); ?></span>
-                                                            <br>
-                                                            <span class="course-credits"><?php echo htmlspecialchars($course['credits']); ?> Credits</span>
-                                                            <?php if (isset($registered_courses_map[$course['course_id']])): ?>
-                                                                <span class="course-status"> - <strong>Registered</strong></span>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    </label>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
+                            <div class="payment-methods">
+                                <div class="payment-method" onclick="selectPaymentMethod('bank_transfer')">
+                                    <i class="fas fa-university"></i>
+                                    <div>Bank Transfer</div>
                                 </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <p>No terms defined for your intake. Please contact the administrator.</p>
-                        <?php endif; ?>
-                        
-                        <button type="submit" class="btn-submit">Submit Registration</button>
-                    </form>
+                                <div class="payment-method" onclick="selectPaymentMethod('mobile_money')">
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <div>Mobile Money</div>
+                                </div>
+                                <div class="payment-method" onclick="selectPaymentMethod('credit_card')">
+                                    <i class="fas fa-credit-card"></i>
+                                    <div>Credit Card</div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="payment_method">Payment Method *</label>
+                                <select id="payment_method" name="payment_method" required>
+                                    <option value="">-- Select Payment Method --</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="mobile_money">Mobile Money</option>
+                                    <option value="credit_card">Credit Card</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="amount">Amount (K) *</label>
+                                <input type="number" id="amount" name="amount" step="0.01" min="0" value="<?php echo $total_fees; ?>" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reference_number">Reference Number *</label>
+                                <input type="text" id="reference_number" name="reference_number" required placeholder="Enter transaction reference number">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="payment_proof">Payment Proof (Receipt/Slip)</label>
+                                <input type="file" id="payment_proof" name="payment_proof" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx">
+                            </div>
+                            
+                            <button type="submit" class="btn-submit">Submit Payment</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
-            <?php endif; ?>
         <?php endif; ?>
     </main>
 
     <script src="../assets/js/student-dashboard.js"></script>
     <script>
+        // Load programme sessions on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProgrammeSessions();
+        });
+        
+        function loadProgrammeSessions() {
+            fetch('get_programme_sessions.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const sessionSelect = document.getElementById('session_id');
+                        sessionSelect.innerHTML = '<option value="">-- Select Session --</option>';
+                        
+                        data.sessions.forEach(session => {
+                            const option = document.createElement('option');
+                            option.value = session.id;
+                            option.textContent = session.display_name;
+                            sessionSelect.appendChild(option);
+                        });
+                    } else {
+                        console.error('Error loading sessions:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+        
+        function loadSessionCourses() {
+            const sessionId = document.getElementById('session_id').value;
+            const courseSelection = document.getElementById('course-selection');
+            const sessionInfo = document.getElementById('session-info');
+            const sessionDetails = document.getElementById('session-details');
+            const paymentStep = document.getElementById('payment-step');
+            
+            if (!sessionId) {
+                courseSelection.style.display = 'none';
+                sessionInfo.style.display = 'none';
+                paymentStep.style.display = 'none';
+                return;
+            }
+            
+            // Show loading state
+            document.getElementById('courses-container').innerHTML = '<p>Loading courses...</p>';
+            courseSelection.style.display = 'block';
+            
+            fetch(`get_session_courses.php?session_id=${sessionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update session info
+                        sessionDetails.textContent = `Selected: ${data.session_info.session_name} (${data.session_info.academic_year} - ${data.session_info.term})`;
+                        sessionInfo.style.display = 'block';
+                        
+                        // Update hidden session ID field
+                        document.getElementById('selected_session_id').value = sessionId;
+                        
+                        // Display courses
+                        displayCourses(data.courses_by_term, data.registered_courses);
+                        
+                        // Show payment step
+                        paymentStep.style.display = 'block';
+                    } else {
+                        document.getElementById('courses-container').innerHTML = `<p>Error: ${data.message}</p>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('courses-container').innerHTML = '<p>Error loading courses</p>';
+                });
+        }
+        
+        function displayCourses(coursesByTerm, registeredCourses) {
+            const container = document.getElementById('courses-container');
+            let html = '';
+            
+            if (Object.keys(coursesByTerm).length === 0) {
+                html = '<p>No courses available for this session.</p>';
+            } else {
+                // Create term tabs
+                const terms = Object.keys(coursesByTerm);
+                if (terms.length > 1) {
+                    html += '<div class="term-tabs">';
+                    terms.forEach((term, index) => {
+                        const isActive = index === 0 ? 'active' : '';
+                        html += `<div class="term-tab ${isActive}" onclick="showTermTab('${term}')">${term}</div>`;
+                    });
+                    html += '</div>';
+                }
+                
+                // Create term content
+                terms.forEach((term, index) => {
+                    const isActive = index === 0 ? 'active' : '';
+                    const courses = coursesByTerm[term];
+                    
+                    html += `<div id="term-${term}" class="term-content ${isActive}">`;
+                    html += `<h3>${term} Courses</h3>`;
+                    
+                    if (courses.length === 0) {
+                        html += '<p>No courses defined for this term.</p>';
+                    } else {
+                        html += '<div class="courses-list">';
+                        courses.forEach(course => {
+                            const isChecked = registeredCourses.includes(course.course_id.toString()) ? 'checked' : '';
+                            const isRegistered = registeredCourses.includes(course.course_id.toString()) ? 'registered' : '';
+                            const isSessionCourse = course.is_session_course ? 'session-course' : 'programme-course';
+                            
+                            html += `
+                                <div class="course-item ${isRegistered} ${isSessionCourse}">
+                                    <label>
+                                        <input type="checkbox" name="courses[]" value="${course.course_id}" ${isChecked}>
+                                        <div class="course-details">
+                                            <span class="course-code">${course.course_code}</span> - 
+                                            <span class="course-name">${course.course_name}</span>
+                                            <br>
+                                            <span class="course-credits">${course.credits} Credits</span>`;
+                            
+                            if (course.is_session_course) {
+                                html += ' <span class="course-tag session-tag">Session Course</span>';
+                            } else {
+                                html += ' <span class="course-tag programme-tag">Programme Course</span>';
+                            }
+                            
+                            if (registeredCourses.includes(course.course_id.toString())) {
+                                html += ' <span class="course-status"><strong>Registered</strong></span>';
+                            }
+                            
+                            html += `
+                                        </div>
+                                    </label>
+                                </div>`;
+                        });
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                });
+            }
+            
+            container.innerHTML = html;
+            document.getElementById('submit-registration-btn').style.display = 'block';
+        }
+        
+        function showTermTab(term) {
+            // Hide all term content
+            document.querySelectorAll('.term-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.term-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected term content
+            document.getElementById(`term-${term}`).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.currentTarget.classList.add('active');
+        }
+        
         function selectPaymentMethod(method) {
             // Remove selected class from all payment methods
             document.querySelectorAll('.payment-method').forEach(el => {
