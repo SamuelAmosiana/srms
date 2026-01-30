@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 require_once '../config.php';
 require_once '../auth/auth.php';
@@ -53,7 +53,7 @@ try {
     }
     
     if ($programme_id > 0) {
-        $sql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT course_id FROM course WHERE programme_id = ?))";
+        $sql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT id FROM course WHERE programme_id = ?))";
         $params[] = $programme_id;
         $params[] = $programme_id;
     }
@@ -84,7 +84,7 @@ try {
     }
     
     if ($programme_id > 0) {
-        $countSql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT course_id FROM course WHERE programme_id = ?))";
+        $countSql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT id FROM course WHERE programme_id = ?))";
         $countParams[] = $programme_id;
         $countParams[] = $programme_id;
     }

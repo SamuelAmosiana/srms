@@ -20,7 +20,7 @@ $type = $_GET['type'] ?? 'all';
 $programme_id = (int)($_GET['programme_id'] ?? 0);
 
 try {
-    // Build query based on filters
+    // Build query based on filters (align with export logic)
     $sql = "SELECT DISTINCT 
                 sp.student_number,
                 sp.full_name,
@@ -30,13 +30,13 @@ try {
                     WHEN ps.payment_method IS NOT NULL AND ps.payment_method != '' THEN 'First Time Registration'
                     ELSE 'Regular/Returning'
                 END as registration_type,
-                cr.submitted_at
-            FROM course_registration cr
-            JOIN student_profile sp ON cr.student_id = sp.user_id
+                COALESCE(cr.submitted_at, ps.updated_at) as registration_date
+            FROM student_profile sp
             JOIN users u ON sp.user_id = u.id
             LEFT JOIN programme p ON sp.programme_id = p.id
             LEFT JOIN pending_students ps ON sp.student_number = ps.student_number
-            WHERE cr.status = 'approved'";
+            LEFT JOIN course_registration cr ON sp.user_id = cr.student_id
+            WHERE (cr.status = 'approved' OR ps.registration_status = 'approved')";
     
     $params = [];
     
@@ -49,7 +49,7 @@ try {
     }
     
     if ($programme_id > 0) {
-        $sql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT course_id FROM course WHERE programme_id = ?))";
+        $sql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT id FROM course WHERE programme_id = ?))";
         $params[] = $programme_id;
         $params[] = $programme_id;
     }
@@ -179,7 +179,7 @@ try {
                         <td><?php echo htmlspecialchars($student['email']); ?></td>
                         <td><?php echo htmlspecialchars($student['programme_name']); ?></td>
                         <td><?php echo htmlspecialchars($student['registration_type']); ?></td>
-                        <td><?php echo htmlspecialchars(date('Y-m-d', strtotime($student['submitted_at']))); ?></td>
+                        <td><?php echo htmlspecialchars(date('Y-m-d', strtotime($student['registration_date']))); ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php endif; ?>

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Export</title>
+</head>
+<body>
+    <h1>Test Export Functionality</h1>
+    
+    <button onclick="testExport('csv')">Test CSV Export</button>
+    <button onclick="testExport('pdf')">Test PDF Export</button>
+    
+    <script>
+    function testExport(format) {
+        const url = `export_approved_students.php?format=${format}`;
+        console.log('Opening URL:', url);
+        window.open(url, '_blank');
+    }
+    </script>
+</body>
+</html>

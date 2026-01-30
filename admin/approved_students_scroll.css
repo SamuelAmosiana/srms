@@ -1,0 +1,18 @@
+/* CSS for horizontal scrolling in approved students section */
+#approved-students-section .table-responsive {
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+}
+
+#approved-students-table {
+    min-width: 1400px;
+    width: auto;
+}
+
+/* Ensure the section itself doesn't get constrained by sidebar */
+#approved-students-section {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: visible;
+}

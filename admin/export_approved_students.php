@@ -18,7 +18,7 @@ if (!currentUserHasRole('Super Admin', $pdo) && !currentUserHasPermission('cours
 // Get parameters for filtering
 $type = $_GET['type'] ?? 'all';
 $programme_id = (int)($_GET['programme_id'] ?? 0);
-$format = $_GET['format'] ?? 'pdf';
+$format = strtolower(trim($_GET['format'] ?? 'pdf'));
 
 try {
     // Build query based on filters
@@ -50,12 +50,12 @@ try {
     }
     
     if ($programme_id > 0) {
-        $sql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT course_id FROM course WHERE programme_id = ?))";
+        $sql .= " AND (sp.programme_id = ? OR cr.course_id IN (SELECT id FROM course WHERE programme_id = ?))";
         $params[] = $programme_id;
         $params[] = $programme_id;
     }
     
-    $sql .= " ORDER BY cr.created_at DESC";
+    $sql .= " ORDER BY registration_date DESC";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -64,7 +64,8 @@ try {
     // Export based on format
     if ($format === 'excel' || $format === 'csv') {
         // Export to CSV
-        header('Content-Type: text/csv');
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('X-Content-Type-Options: nosniff');
         header('Content-Disposition: attachment; filename="approved_students_' . date('Y-m-d') . '.csv"');
         
         $output = fopen('php://output', 'w');
@@ -83,7 +84,7 @@ try {
                 $student['email'],
                 $student['programme_name'],
                 $student['registration_type'],
-                $student['submitted_at']
+                $student['registration_date']
             ]);
         }
         
@@ -91,7 +92,9 @@ try {
         exit;
     } elseif ($format === 'pdf') {
         // Generate PDF using FPDF
-        require_once '../../lib/fpdf/fpdf.php';
+        header('Content-Type: application/pdf');
+        header('X-Content-Type-Options: nosniff');
+        require_once '../lib/fpdf/fpdf.php';
         
         $pdf = new FPDF();
         $pdf->AddPage();
@@ -119,20 +122,20 @@ try {
             $pdf->Cell(40, 8, $student['email'], 1, 0, 'L');
             $pdf->Cell(40, 8, $student['programme_name'], 1, 0, 'L');
             $pdf->Cell(25, 8, $student['registration_type'], 1, 0, 'C');
-            $pdf->Cell(20, 8, date('Y-m-d', strtotime($student['submitted_at'])), 1, 1, 'C');
+            $pdf->Cell(20, 8, date('Y-m-d', strtotime($student['registration_date'])), 1, 1, 'C');
         }
         
         $pdf->Output('D', 'approved_students_' . date('Y-m-d') . '.pdf');
         exit;
     } else {
-        // For other formats, return JSON
+        // Unknown format
+        http_response_code(400);
         header('Content-Type: application/json');
         echo json_encode([
-            'success' => true,
-            'message' => 'Export ready',
-            'student_count' => count($students),
-            'students' => $students
+            'success' => false,
+            'message' => 'Unsupported export format'
         ]);
+        exit;
     }
     
 } catch (Exception $e) {
