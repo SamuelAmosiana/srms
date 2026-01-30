@@ -595,6 +595,92 @@ if (isset($_GET['edit_schedule'])) {
         .schedule-table {
             margin-top: 20px;
         }
+        
+        /* Session Students Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .pagination-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .pagination {
+            display: inline-flex;
+            gap: 5px;
+        }
+        
+        .pagination button {
+            padding: 8px 12px;
+            margin: 0 2px;
+            border: 1px solid #ddd;
+            background-color: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background-color: #f0f0f0;
+        }
+        
+        .pagination button:disabled {
+            background-color: #007bff;
+            color: white;
+            cursor: not-allowed;
+        }
+        
+        .pagination-ellipsis {
+            padding: 8px 12px;
+            color: #666;
+        }
 
         .form-section {
             margin-bottom: 30px;
@@ -1034,6 +1120,9 @@ if (isset($_GET['edit_schedule'])) {
                                         <?php echo htmlspecialchars($session['session_name']); ?>
                                     </div>
                                     <div class="session-actions">
+                                        <button type="button" class="btn-icon btn-view" title="View Registered Students" onclick="viewSessionStudents(<?php echo $session['id']; ?>, '<?php echo addslashes(htmlspecialchars($session['session_name'])); ?>')">
+                                            <i class="fas fa-users"></i>
+                                        </button>
                                         <a href="?edit_session=<?php echo $session['id']; ?>" class="btn-icon btn-edit" title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </a>
@@ -1546,6 +1635,145 @@ if (isset($_GET['edit_schedule'])) {
                 alerts[i].style.display = 'none';
             }
         }, 5000);
+        
+        // Session Students Modal Functions
+        function viewSessionStudents(sessionId, sessionName) {
+            // Set session info in modal
+            document.getElementById('modal_session_name').textContent = sessionName;
+            document.getElementById('session_students_modal').style.display = 'block';
+            
+            // Load students for this session
+            loadSessionStudents(sessionId, 1);
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        
+        function loadSessionStudents(sessionId, page = 1) {
+            const tbody = document.getElementById('session_students_tbody');
+            const paginationDiv = document.getElementById('session_students_pagination');
+            
+            // Show loading state
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading students...</td></tr>';
+            
+            fetch(`get_session_students.php?session_id=${sessionId}&page=${page}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let html = '';
+                        if (data.students.length === 0) {
+                            html = '<tr><td colspan="6" style="text-align: center;">No students registered for this session</td></tr>';
+                        } else {
+                            data.students.forEach(student => {
+                                html += `
+                                    <tr>
+                                        <td>${escapeHtml(student.student_number)}</td>
+                                        <td>${escapeHtml(student.full_name)}</td>
+                                        <td>${escapeHtml(student.email)}</td>
+                                        <td>${escapeHtml(student.programme_name || 'N/A')}</td>
+                                        <td>${escapeHtml(student.registration_type)}</td>
+                                        <td>${formatDate(student.registration_date)}</td>
+                                        <td>
+                                            <a href="../student/profile.php?id=${student.user_id}" class="btn-icon btn-view" title="View Profile">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="../student/view_results.php?student_id=${student.user_id}" class="btn-icon btn-info" title="View Results">
+                                                <i class="fas fa-graduation-cap"></i>
+                                            </a>
+                                        </td>
+                                    </tr>`;
+                            });
+                        }
+                        tbody.innerHTML = html;
+                        
+                        // Update pagination
+                        updateSessionPagination(data.pagination, sessionId);
+                    } else {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">Error: ${data.message}</td></tr>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading session students:', error);
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Error loading data</td></tr>';
+                });
+        }
+        
+        function updateSessionPagination(pagination, sessionId) {
+            const paginationDiv = document.getElementById('session_students_pagination');
+            
+            if (pagination.last_page <= 1) {
+                paginationDiv.innerHTML = '';
+                return;
+            }
+            
+            let html = '<div class="pagination">';
+            
+            // Previous button
+            if (pagination.current_page > 1) {
+                html += `<button onclick="loadSessionStudents(${sessionId}, ${pagination.current_page - 1})" class="btn btn-secondary">&laquo; Previous</button>`;
+            }
+            
+            // Page numbers
+            pagination.pages.forEach(page => {
+                if (page === '...') {
+                    html += '<span class="pagination-ellipsis">...</span>';
+                } else {
+                    const isActive = page === pagination.current_page;
+                    html += `<button onclick="loadSessionStudents(${sessionId}, ${page})" class="${isActive ? 'btn btn-primary' : 'btn btn-secondary'}" ${isActive ? 'disabled' : ''}>${page}</button>`;
+                }
+            });
+            
+            // Next button
+            if (pagination.current_page < pagination.last_page) {
+                html += `<button onclick="loadSessionStudents(${sessionId}, ${pagination.current_page + 1})" class="btn btn-secondary">Next &raquo;</button>`;
+            }
+            
+            html += '</div>';
+            paginationDiv.innerHTML = html;
+        }
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('session_students_modal');
+            if (event.target === modal) {
+                closeModal('session_students_modal');
+            }
+        });
     </script>
+    
+    <!-- Session Students Modal -->
+    <div id="session_students_modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 90%; width: 1200px;">
+            <div class="modal-header">
+                <h2>Registered Students for <span id="modal_session_name"></span></h2>
+                <span class="close" onclick="closeModal('session_students_modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>Student Number</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Programme</th>
+                                <th>Registration Type</th>
+                                <th>Registration Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="session_students_tbody">
+                            <tr>
+                                <td colspan="7" style="text-align: center;">Loading students...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="session_students_pagination" class="pagination-container" style="margin-top: 20px; text-align: center;"></div>
+            </div>
+        </div>
+    </div>
+    
 </body>
 </html>
