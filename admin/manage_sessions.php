@@ -681,6 +681,66 @@ if (isset($_GET['edit_schedule'])) {
             padding: 8px 12px;
             color: #666;
         }
+        
+        /* Add Students Modal Styles */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .tab-button {
+            background-color: #f1f1f1;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 10px 20px;
+            transition: 0.3s;
+            font-size: 16px;
+        }
+        
+        .tab-button:hover {
+            background-color: #ddd;
+        }
+        
+        .tab-button.active {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px 0;
+        }
+        
+        .search-results {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .search-result-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .search-result-item:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .form-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
 
         .form-section {
             margin-bottom: 30px;
@@ -1122,6 +1182,9 @@ if (isset($_GET['edit_schedule'])) {
                                     <div class="session-actions">
                                         <button type="button" class="btn-icon btn-view" title="View Registered Students" onclick="viewSessionStudents(<?php echo $session['id']; ?>, '<?php echo addslashes(htmlspecialchars($session['session_name'])); ?>')">
                                             <i class="fas fa-users"></i>
+                                        </button>
+                                        <button type="button" class="btn-icon btn-add" title="Add Students to Session" onclick="showAddStudentsModal(<?php echo $session['id']; ?>, '<?php echo addslashes(htmlspecialchars($session['session_name'])); ?>')">
+                                            <i class="fas fa-user-plus"></i>
                                         </button>
                                         <a href="?edit_session=<?php echo $session['id']; ?>" class="btn-icon btn-edit" title="Edit">
                                             <i class="fas fa-edit"></i>
@@ -1740,6 +1803,254 @@ if (isset($_GET['edit_schedule'])) {
                 closeModal('session_students_modal');
             }
         });
+        
+        // Add Students Modal Functions
+        function showAddStudentsModal(sessionId, sessionName) {
+            // Set session info in modal
+            document.getElementById('add_students_session_name').textContent = sessionName;
+            document.getElementById('assign_session_id').value = sessionId;
+            document.getElementById('upload_session_id').value = sessionId;
+            
+            // Load programmes and intakes
+            loadProgrammes('assign_programme_id');
+            loadIntakes('assign_intake_id');
+            loadIntakes('csv_intake_select');
+            
+            // Reset form
+            document.getElementById('assign_student_form').reset();
+            document.getElementById('csv_upload_form').reset();
+            
+            // Hide search results
+            document.getElementById('student_search_results').style.display = 'none';
+            
+            // Show modal
+            document.getElementById('add_students_modal').style.display = 'block';
+            
+            // Set initial tab
+            openTab(null, 'manual-assignment');
+        }
+        
+        function openTab(evt, tabName) {
+            // Hide all tab content
+            var tabcontent = document.getElementsByClassName("tab-content");
+            for (var i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+        
+            // Remove active class from all tab buttons
+            var tabbuttons = document.getElementsByClassName("tab-button");
+            for (var i = 0; i < tabbuttons.length; i++) {
+                tabbuttons[i].className = tabbuttons[i].className.replace(" active", "");
+            }
+        
+            // Show the current tab and add active class to the button
+            document.getElementById(tabName).style.display = "block";
+            if (evt) {
+                evt.currentTarget.className += " active";
+            } else {
+                // If no event, manually set the first button as active
+                document.querySelector('.tab-button[onclick*="' + tabName + '"]').className += " active";
+            }
+        }
+        
+        function toggleStudentFields() {
+            var actionType = document.getElementById('action_type').value;
+            var existingFields = document.getElementById('existing_student_fields');
+            var newFields = document.getElementById('new_student_fields');
+            
+            if (actionType === 'existing_only') {
+                existingFields.style.display = 'block';
+                newFields.style.display = 'none';
+            } else if (actionType === 'new_only') {
+                existingFields.style.display = 'none';
+                newFields.style.display = 'block';
+            } else { // new_existing
+                existingFields.style.display = 'block';
+                newFields.style.display = 'block';
+            }
+        }
+        
+        // Debounced search for students
+        var searchTimeout;
+        function searchStudents(query) {
+            clearTimeout(searchTimeout);
+            
+            if (query.length < 2) {
+                document.getElementById('student_search_results').style.display = 'none';
+                return;
+            }
+            
+            searchTimeout = setTimeout(function() {
+                fetch(`get_student_search.php?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.students) {
+                            var resultsContainer = document.getElementById('student_search_results');
+                            var html = '';
+                            
+                            if (data.students.length > 0) {
+                                data.students.forEach(student => {
+                                    html += `<div class="search-result-item" onclick="selectStudent('${student.student_number}', '${student.full_name}')">
+                                        <strong>${escapeHtml(student.student_number)}</strong> - ${escapeHtml(student.full_name)}
+                                    </div>`;
+                                });
+                                resultsContainer.innerHTML = html;
+                                resultsContainer.style.display = 'block';
+                            } else {
+                                resultsContainer.innerHTML = '<div class="search-result-item">No students found</div>';
+                                resultsContainer.style.display = 'block';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error searching students:', error);
+                    });
+            }, 300);
+        }
+        
+        function selectStudent(studentNumber, fullName) {
+            document.getElementById('selected_student_number').value = studentNumber;
+            document.getElementById('search_student').value = fullName;
+            document.getElementById('student_search_results').style.display = 'none';
+        }
+        
+        // Load programmes into select element
+        function loadProgrammes(selectId) {
+            fetch('../admin/get_programmes.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        var selectElement = document.getElementById(selectId);
+                        selectElement.innerHTML = '<option value="">-- Select Programme --</option>' + data.options;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading programmes:', error);
+                });
+        }
+        
+        // Load intakes into select element
+        function loadIntakes(selectId) {
+            fetch('../admin/get_intakes.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        var selectElement = document.getElementById(selectId);
+                        selectElement.innerHTML = '<option value="">-- Select Intake --</option>' + data.options;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading intakes:', error);
+                });
+        }
+        
+        // Set intake ID for CSV upload
+        function setUploadIntakeId() {
+            var intakeId = document.getElementById('csv_intake_select').value;
+            document.getElementById('upload_intake_id').value = intakeId;
+        }
+        
+        // Download sample CSV
+        function downloadSampleCSV() {
+            var sessionId = document.getElementById('upload_session_id').value;
+            if (!sessionId) {
+                alert('Please select a session first');
+                return;
+            }
+            window.location.href = `generate_sample_csv.php?session_id=${sessionId}`;
+        }
+        
+        // Handle form submissions
+        document.getElementById('assign_student_form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            var formData = new FormData(this);
+            
+            fetch('add_student_to_session.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Optionally reload the session students list
+                    var sessionId = document.getElementById('assign_session_id').value;
+                    if (document.getElementById('session_students_modal').style.display === 'block') {
+                        loadSessionStudents(sessionId, 1);
+                    }
+                    closeModal('add_students_modal');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while assigning student to session');
+            });
+        });
+        
+        document.getElementById('csv_upload_form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            var formData = new FormData(this);
+            
+            // Validate required fields
+            var intakeId = document.getElementById('upload_intake_id').value;
+            if (!intakeId) {
+                alert('Please select an intake for the CSV upload');
+                return;
+            }
+            
+            var fileInput = document.getElementById('csv_file');
+            if (!fileInput.files[0]) {
+                alert('Please select a CSV file to upload');
+                return;
+            }
+            
+            // Show processing message
+            alert('Uploading and processing CSV file. This may take a moment...');
+            
+            fetch('upload_session_students.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    var summary = `CSV processing completed:\n\n` +
+                                 `Total processed: ${data.summary.total_processed}\n` +
+                                 `Added new students: ${data.summary.added_new}\n` +
+                                 `Assigned existing: ${data.summary.assigned_existing}\n` +
+                                 `Errors: ${data.summary.errors}`;
+                    
+                    if (data.details && data.details.length > 0) {
+                        summary += '\n\nError details:\n' + data.details.join('\n');
+                    }
+                    
+                    alert(summary);
+                    
+                    // Optionally reload the session students list
+                    var sessionId = document.getElementById('upload_session_id').value;
+                    if (document.getElementById('session_students_modal').style.display === 'block') {
+                        loadSessionStudents(sessionId, 1);
+                    }
+                    closeModal('add_students_modal');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while uploading CSV file');
+            });
+        });
+        
+        // Listen for input on search field
+        document.getElementById('search_student').addEventListener('input', function() {
+            var query = this.value.trim();
+            searchStudents(query);
+        });
     </script>
     
     <!-- Session Students Modal -->
@@ -1771,6 +2082,124 @@ if (isset($_GET['edit_schedule'])) {
                     </table>
                 </div>
                 <div id="session_students_pagination" class="pagination-container" style="margin-top: 20px; text-align: center;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Students to Session Modal -->
+    <div id="add_students_modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 90%; width: 800px;">
+            <div class="modal-header">
+                <h2>Add Students to <span id="add_students_session_name"></span></h2>
+                <span class="close" onclick="closeModal('add_students_modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="tabs">
+                    <button class="tab-button active" onclick="openTab(event, 'manual-assignment')">Manual Assignment</button>
+                    <button class="tab-button" onclick="openTab(event, 'bulk-upload')">Bulk Upload</button>
+                </div>
+                
+                <div id="manual-assignment" class="tab-content" style="display:block;">
+                    <h3>Assign Individual Student</h3>
+                    <form id="assign_student_form">
+                        <input type="hidden" id="assign_session_id" name="session_id">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="action_type">Action Type</label>
+                                <select id="action_type" name="action_type" onchange="toggleStudentFields()">
+                                    <option value="new_existing" selected>Auto-Detect (New/Existing)</option>
+                                    <option value="existing_only">Assign Existing Student</option>
+                                    <option value="new_only">Create New Student</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="existing_student_fields">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="search_student">Search Student by Number or Name</label>
+                                    <input type="text" id="search_student" placeholder="Enter student number or name">
+                                    <div id="student_search_results" class="search-results"></div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="selected_student_number">Selected Student Number</label>
+                                    <input type="text" id="selected_student_number" name="student_number" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="new_student_fields" style="display:none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="new_full_name">Full Name *</label>
+                                    <input type="text" id="new_full_name" name="full_name" placeholder="Enter full name">
+                                </div>
+                                <div class="form-group">
+                                    <label for="new_email">Email *</label>
+                                    <input type="email" id="new_email" name="email" placeholder="Enter email">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="new_student_number">Student Number (Optional)</label>
+                                    <input type="text" id="new_student_number" name="student_number" placeholder="Leave blank to auto-generate">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="assign_programme_id">Programme *</label>
+                                <select id="assign_programme_id" name="programme_id">
+                                    <option value="">-- Select Programme --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="assign_intake_id">Intake *</label>
+                                <select id="assign_intake_id" name="intake_id">
+                                    <option value="">-- Select Intake --</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-green">Assign Student to Session</button>
+                            <button type="button" class="btn btn-orange" onclick="closeModal('add_students_modal')">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div id="bulk-upload" class="tab-content" style="display:none;">
+                    <h3>Bulk Upload via CSV</h3>
+                    <form id="csv_upload_form" enctype="multipart/form-data">
+                        <input type="hidden" id="upload_session_id" name="session_id">
+                        <input type="hidden" id="upload_intake_id" name="intake_id">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="csv_intake_select">Select Intake for Upload *</label>
+                                <select id="csv_intake_select" onchange="setUploadIntakeId()">
+                                    <option value="">-- Select Intake --</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="csv_file">Upload CSV File</label>
+                                <input type="file" id="csv_file" name="csv_file" accept=".csv">
+                                <small>Download <a href="#" id="download_sample_csv" onclick="downloadSampleCSV(); return false;">sample CSV template</a></small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-blue">Upload and Process CSV</button>
+                            <button type="button" class="btn btn-orange" onclick="closeModal('add_students_modal')">Cancel</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
