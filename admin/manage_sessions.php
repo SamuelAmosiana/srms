@@ -429,11 +429,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_session_programme_courses
     }
 
     // Fetch all courses mapped to this programme
+    // Updated to query directly from course table using programme_id
     $stmt = $pdo->prepare("
         SELECT DISTINCT c.id, c.code, c.name
-        FROM intake_courses ic
-        JOIN course c ON ic.course_id = c.id
-        WHERE ic.programme_id = ?
+        FROM course c
+        WHERE c.programme_id = ?
         ORDER BY c.name
     ");
     $stmt->execute([$programme_id]);
