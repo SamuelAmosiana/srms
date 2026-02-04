@@ -122,6 +122,10 @@ $students = $stmt->fetchAll();
                     <i class="fas fa-money-bill"></i>
                     <span>Manage Fees & Finances</span>
                 </a>
+                <a href="manage_programme_fees.php" class="nav-item">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span>Programme Fees</span>
+                </a>
                 <a href="results_access.php" class="nav-item">
                     <i class="fas fa-lock"></i>
                     <span>Manage Results Access</span>
@@ -130,13 +134,17 @@ $students = $stmt->fetchAll();
             
             <div class="nav-section">
                 <h4>Financial Operations</h4>
-                <a href="manage_programme_fees.php" class="nav-item pinned">
+                <a href="manage_programme_fees.php" class="nav-item">
                     <i class="fas fa-file-invoice-dollar"></i>
                     <span>Programme Fees</span>
                 </a>
                 <a href="income_expenses.php" class="nav-item">
                     <i class="fas fa-chart-pie"></i>
                     <span>Income & Expenses</span>
+                </a>
+                <a href="track_payment.php" class="nav-item">
+                    <i class="fas fa-credit-card"></i>
+                    <span>Track Payments</span>
                 </a>
                 <a href="finance_reports.php" class="nav-item">
                     <i class="fas fa-file-invoice"></i>

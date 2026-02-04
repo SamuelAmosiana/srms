@@ -218,6 +218,10 @@ $stats['total_expenses'] = $stmt->fetch()['total'] ?? 0;
                     <i class="fas fa-chart-pie"></i>
                     <span>Income & Expenses</span>
                 </a>
+                <a href="./track_payment.php" class="nav-item">
+                    <i class="fas fa-credit-card"></i>
+                    <span>Track Payments</span>
+                </a>
                 <a href="./finance_reports.php" class="nav-item">
                     <i class="fas fa-file-invoice"></i>
                     <span>Finance Reports</span>

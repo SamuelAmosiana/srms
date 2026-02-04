@@ -63,12 +63,12 @@ try {
             c.name as course_name,
             c.description,
             c.credits,
-            spc.term,
+            'Assigned' as term,  -- Use a fixed term name since session_programme_courses table doesn't have a term column
             1 as is_session_course  -- Flag to indicate this is a session-defined course
         FROM session_programme_courses spc
         JOIN course c ON spc.course_id = c.id
         WHERE spc.session_id = ? AND spc.programme_id = ?
-        ORDER BY spc.term, c.name
+        ORDER BY c.name
     ";
     
     $stmt = $pdo->prepare($session_courses_sql);
