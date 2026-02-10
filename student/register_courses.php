@@ -25,7 +25,7 @@ $stmt->execute([currentUserId(), $academic_year]);
 $existing_registration = $stmt->fetch();
 
 // Check if payment has been made for current academic year
-$stmt = $pdo->prepare("SELECT * FROM payments WHERE student_id = ? AND description LIKE ? AND status = 'paid' LIMIT 1");
+$stmt = $pdo->prepare("SELECT * FROM payments WHERE student_or_application_id = ? AND description LIKE ? AND status = 'paid' LIMIT 1");
 $stmt->execute([currentUserId(), "%$academic_year%"]);
 $payment_made = $stmt->fetch();
 
@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$existing_registration) {
                 } else {
                     try {
                         // Insert payment record
-                        $stmt = $pdo->prepare("INSERT INTO payments (student_id, amount, payment_date, payment_method, reference_number, status, description, created_at) VALUES (?, ?, NOW(), ?, ?, 'pending', ?, NOW())");
+                        $stmt = $pdo->prepare("INSERT INTO payments (student_or_application_id, amount, payment_date, payment_method, reference_number, status, description) VALUES (?, ?, NOW(), ?, ?, 'pending', ?)");
                         $stmt->execute([
                             currentUserId(),
                             $amount,
