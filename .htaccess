@@ -7,10 +7,6 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^([^\.]+)$ $1.php [NC,L]
 
-# Redirect URLs with .php extension to clean URLs (SEO friendly)
-RewriteCond %{THE_REQUEST} /([^.]+)\.php [NC]
-RewriteRule ^ /%1? [NC,L,R=301]
-
 # Handle specific exceptions for directories that should not be rewritten
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f

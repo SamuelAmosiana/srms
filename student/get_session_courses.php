@@ -5,14 +5,18 @@ require_once '../auth/auth.php';
 
 // Check if user is logged in and has student role
 if (!currentUserId()) {
-    header('Location: ../auth/login.php');
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'message' => 'User not authenticated'
+    ]);
     exit();
 }
 
 requireRole('Student', $pdo);
 
-// Get parameters
-$session_id = (int)($_GET['session_id'] ?? 0);
+// Simple and clean session ID handling
+$session_id = (int)($_POST['session_id'] ?? 0);
 
 if ($session_id <= 0) {
     header('Content-Type: application/json');
@@ -55,7 +59,6 @@ try {
     }
     
     // Get courses defined for this session and programme
-    // This gets the session-specific courses that have been assigned by admin
     $session_courses_sql = "
         SELECT 
             c.id as course_id,
@@ -63,8 +66,8 @@ try {
             c.name as course_name,
             c.description,
             c.credits,
-            'Assigned' as term,  -- Use a fixed term name since session_programme_courses table doesn't have a term column
-            1 as is_session_course  -- Flag to indicate this is a session-defined course
+            'Assigned' as term,
+            1 as is_session_course
         FROM session_programme_courses spc
         JOIN course c ON spc.course_id = c.id
         WHERE spc.session_id = ? AND spc.programme_id = ?
@@ -75,8 +78,7 @@ try {
     $stmt->execute([$session_id, $programme_id]);
     $session_courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get all programme courses (for hybrid approach - showing additional courses)
-    // This allows students to select from all programme courses, not just session-defined ones
+    // Get all programme courses (for hybrid approach)
     $programme_courses_sql = "
         SELECT 
             c.id as course_id,
@@ -84,8 +86,8 @@ try {
             c.name as course_name,
             c.description,
             c.credits,
-            'General' as term,  -- Default term for programme courses
-            0 as is_session_course  -- Flag to indicate this is a programme course
+            'General' as term,
+            0 as is_session_course
         FROM course c
         WHERE c.programme_id = ?
         AND c.id NOT IN (
@@ -99,19 +101,17 @@ try {
     $stmt->execute([$programme_id, $session_id, $programme_id]);
     $programme_courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // If no session-specific courses are defined, show all programme courses under a general term
+    // Combine courses
     if (count($session_courses) === 0 && count($programme_courses) > 0) {
-        // Treat all programme courses as available for the session
         foreach ($programme_courses as &$course) {
-            $course['is_session_course'] = 0;  // These are programme courses
+            $course['is_session_course'] = 0;
         }
         $all_courses = $programme_courses;
     } else {
-        // Combine session courses and programme courses
         $all_courses = array_merge($session_courses, $programme_courses);
     }
     
-    // Group courses by term for better organization
+    // Group courses by term
     $courses_by_term = [];
     foreach ($all_courses as $course) {
         $term = $course['term'];
@@ -121,7 +121,7 @@ try {
         $courses_by_term[$term][] = $course;
     }
     
-    // Get currently registered courses for this session
+    // Get currently registered courses
     $current_year = date('Y');
     $registered_courses_stmt = $pdo->prepare("
         SELECT ce.course_id

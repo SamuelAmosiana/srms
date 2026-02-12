@@ -17,11 +17,20 @@ try {
     $stmt->execute([currentUserId()]);
     $student = $stmt->fetch();
     
-    if (!$student || !$student['programme_id']) {
+    if (!$student) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'message' => 'Student profile not found or programme not assigned'
+            'message' => 'Student profile not found'
+        ]);
+        exit();
+    }
+    
+    if (!$student['programme_id']) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'No programme assigned to your profile. Please contact the administrator to assign a programme to your account.'
         ]);
         exit();
     }
@@ -71,6 +80,18 @@ try {
     }
     
     $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Check if any sessions were found
+    if (empty($sessions)) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'No active sessions found for your programme/intake. Please contact the administrator to set up sessions for your programme.',
+            'programme_id' => $programme_id,
+            'intake_id' => $intake_id
+        ]);
+        exit();
+    }
     
     // Format sessions for dropdown display
     $formatted_sessions = [];

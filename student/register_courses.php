@@ -415,6 +415,12 @@ foreach ($programme_fees as $fee) {
             color: #28a745;
             font-weight: bold;
         }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
     </style>
 </head>
 <body class="student-layout" data-theme="light">
@@ -649,36 +655,49 @@ foreach ($programme_fees as $fee) {
         });
         
         function loadProgrammeSessions() {
+            console.log('Loading programme sessions...');
             fetch('get_programme_sessions.php')
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Programme sessions response:', data);
                     if (data.success) {
                         const sessionSelect = document.getElementById('session_id');
                         sessionSelect.innerHTML = '<option value="">-- Select Session --</option>';
                         
+                        console.log('Number of sessions found:', data.sessions.length);
                         data.sessions.forEach(session => {
+                            console.log('Adding session:', session.id, session.display_name);
                             const option = document.createElement('option');
                             option.value = session.id;
                             option.textContent = session.display_name;
                             sessionSelect.appendChild(option);
                         });
+                        console.log('Session dropdown populated successfully');
                     } else {
                         console.error('Error loading sessions:', data.message);
+                        document.getElementById('courses-container').innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> ' + data.message + '</div>';
+                        document.getElementById('session-selection').innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> ' + data.message + '</div>';
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
+                    console.error('Error fetching sessions:', error);
+                    document.getElementById('courses-container').innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> Error loading sessions. Please refresh the page or contact support.</div>';
+                    document.getElementById('session-selection').innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> Error loading sessions. Please refresh the page or contact support.</div>';
                 });
         }
         
         function loadSessionCourses() {
-            const sessionId = document.getElementById('session_id').value;
+            const sessionIdRaw = document.getElementById('session_id').value;
+            const sessionId = sessionIdRaw ? parseInt(sessionIdRaw.trim(), 10) : 0;
             const courseSelection = document.getElementById('course-selection');
             const sessionInfo = document.getElementById('session-info');
             const sessionDetails = document.getElementById('session-details');
             const paymentStep = document.getElementById('payment-step');
             
-            if (!sessionId) {
+            console.log('Selected session ID:', sessionId, '(Type:', typeof sessionId, ')');
+            
+            if (!sessionId || sessionId === '') {
+                console.log('No session ID selected, hiding course selection');
                 courseSelection.style.display = 'none';
                 sessionInfo.style.display = 'none';
                 paymentStep.style.display = 'none';
@@ -689,9 +708,18 @@ foreach ($programme_fees as $fee) {
             document.getElementById('courses-container').innerHTML = '<p>Loading courses...</p>';
             courseSelection.style.display = 'block';
             
-            fetch(`get_session_courses.php?session_id=${sessionId}`)
+            console.log('Fetching courses for session ID:', sessionId);
+            // Use clean URL to avoid 301 redirects
+            fetch('./get_session_courses', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `session_id=${sessionId}`
+            })
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Received response:', data);
                     if (data.success) {
                         // Update session info
                         sessionDetails.textContent = `Selected: ${data.session_info.session_name} (${data.session_info.academic_year} - ${data.session_info.term})`;
@@ -706,12 +734,13 @@ foreach ($programme_fees as $fee) {
                         // Show payment step
                         paymentStep.style.display = 'block';
                     } else {
-                        document.getElementById('courses-container').innerHTML = `<p>Error: ${data.message}</p>`;
+                        console.error('Error from server:', data.message);
+                        document.getElementById('courses-container').innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> ${data.message}</div>`;
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    document.getElementById('courses-container').innerHTML = '<p>Error loading courses</p>';
+                    document.getElementById('courses-container').innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> Error loading courses. Please try selecting a session again.</div>';
                 });
         }
         

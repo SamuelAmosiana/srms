@@ -664,6 +664,13 @@ function requireRole($roleName, $pdo) {
     }
 }
 
+function requirePermission($permissionName, $pdo) {
+    if (!currentUserHasPermission($permissionName, $pdo)) {
+        http_response_code(403);
+        die('Forbidden - insufficient permissions to access this resource');
+    }
+}
+
 // Enhanced permission checking functions
 
 // Get all permissions for current user
@@ -718,13 +725,6 @@ function getCurrentUserPermissions($pdo) {
 function currentUserHasPermission($permissionName, $pdo) {
     $permissions = getCurrentUserPermissions($pdo);
     return in_array($permissionName, $permissions);
-}
-
-function requirePermission($permissionName, $pdo) {
-    if (!currentUserHasPermission($permissionName, $pdo)) {
-        http_response_code(403);
-        die('Forbidden - insufficient permissions to access this resource');
-    }
 }
 
 // Check if current user can manage a specific user (for part-time/intern restrictions)
