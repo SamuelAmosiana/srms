@@ -38,10 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($registration) {
                         // Update registration status to approved
-                        $stmt = $pdo->prepare("UPDATE course_registration SET status = 'approved' WHERE id = ?");
+                        $stmt = $pdo->prepare("UPDATE course_registration SET status = 'approved_academic' WHERE id = ?");
                         $stmt->execute([$registration_id]);
                         
-                        $message = "Registration approved successfully!";
+                        $message = "Registration approved by academic team successfully!";
                         $messageType = 'success';
                     } else {
                         $message = "Registration not found!";
@@ -216,7 +216,7 @@ try {
         JOIN student_profile sp ON cr.student_id = sp.user_id
         JOIN course c ON cr.course_id = c.id
         JOIN intake i ON sp.intake_id = i.id
-        WHERE cr.status = 'pending'
+        WHERE cr.status = 'pending_admin'
     ";
     $pending_count_result = $pdo->query($pending_count_query);
     $pending_total = $pending_count_result->fetch()['count'];
@@ -228,7 +228,7 @@ try {
         JOIN student_profile sp ON cr.student_id = sp.user_id
         JOIN course c ON cr.course_id = c.id
         JOIN intake i ON sp.intake_id = i.id
-        WHERE cr.status = 'pending'
+        WHERE cr.status = 'pending_admin'
         ORDER BY cr.submitted_at DESC
         LIMIT $pending_registrations_limit OFFSET $pending_registrations_offset
     ";

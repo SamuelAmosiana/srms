@@ -53,6 +53,13 @@ $stats['gpa'] = number_format($stmt->fetch()['gpa'] ?? 0, 2);
 $stats['fee_balance'] = $student['balance'] ?? 0;
 
 // Get accommodation status (no table exists yet, placeholder)
+
+// Get course registration status
+$stmt = $pdo->prepare("SELECT status, COUNT(*) as count FROM course_registration WHERE student_id = ? GROUP BY status ORDER BY FIELD(status, 'pending_admin', 'approved_academic', 'pending_finance_approval', 'fully_approved', 'rejected') LIMIT 1");
+$stmt->execute([currentUserId()]);
+$reg_status_row = $stmt->fetch();
+$stats['registration_status'] = $reg_status_row ? $reg_status_row['status'] : 'none';
+$stats['registration_count'] = $reg_status_row ? $reg_status_row['count'] : 0;
 $stats['accommodation_status'] = 'Not Applied';
 ?>
 <!DOCTYPE html>
@@ -201,6 +208,16 @@ $stats['accommodation_status'] = 'Not Applied';
                 <div class="stat-info">
                     <h3><?php echo htmlspecialchars($stats['accommodation_status']); ?></h3>
                     <p>Accommodation Status</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="stat-info">
+                    <h3><?php echo htmlspecialchars($stats['registration_status'] !== 'none' ? ucfirst(str_replace('_', ' ', $stats['registration_status'])) : 'Not Registered'); ?></h3>
+                    <p>Registration Status</p>
                 </div>
             </div>
         </div>

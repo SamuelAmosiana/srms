@@ -37,14 +37,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             LEFT JOIN programme p ON sp.programme_id = p.id
                             LEFT JOIN intake i ON sp.intake_id = i.id
                             LEFT JOIN users u ON sp.user_id = u.id
-                            WHERE cr.student_id = ? AND cr.status = 'approved' AND cr.finance_cleared = 0
+                            WHERE cr.student_id = ? AND cr.status = 'approved_academic' AND cr.finance_cleared = 0
                             LIMIT 1
                         ");
                         $stmt->execute([$student_id]);
                         $registration_details = $stmt->fetch();
                         
                         // Mark course registration as cleared for finance
-                        $stmt = $pdo->prepare("UPDATE course_registration SET finance_cleared = 1, finance_cleared_at = NOW(), finance_cleared_by = ? WHERE student_id = ? AND status = 'approved' AND finance_cleared = 0");
+                        $stmt = $pdo->prepare("UPDATE course_registration SET finance_cleared = 1, finance_cleared_at = NOW(), finance_cleared_by = ?, status = 'fully_approved' WHERE student_id = ? AND status = 'pending_finance_approval' AND finance_cleared = 0");
                         $stmt->execute([currentUserId(), $student_id]);
                         
                         if ($stmt->rowCount() > 0) {
@@ -89,14 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             LEFT JOIN users u ON ps.email = u.email
                             LEFT JOIN programme p ON ps.programme_id = p.id
                             LEFT JOIN intake i ON ps.intake_id = i.id
-                            WHERE ps.id = ? AND ps.registration_status = 'approved' AND ps.finance_cleared = 0
+                            WHERE ps.id = ? AND ps.registration_status = 'approved_academic' AND ps.finance_cleared = 0
                             LIMIT 1
                         ");
                         $stmt->execute([$student_id]);
                         $registration_details = $stmt->fetch();
                         
                         // Mark first-time registration as cleared for finance
-                        $stmt = $pdo->prepare("UPDATE pending_students SET finance_cleared = 1, finance_cleared_at = NOW(), finance_cleared_by = ? WHERE id = ? AND registration_status = 'approved' AND finance_cleared = 0");
+                        $stmt = $pdo->prepare("UPDATE pending_students SET finance_cleared = 1, finance_cleared_at = NOW(), finance_cleared_by = ?, registration_status = 'fully_approved' WHERE id = ? AND registration_status = 'approved_academic' AND finance_cleared = 0");
                         $stmt->execute([currentUserId(), $student_id]);
                         
                         if ($stmt->rowCount() > 0) {
@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     try {
                         if ($registration_type === 'course') {
                             // Suspend course registration
-                            $stmt = $pdo->prepare("UPDATE course_registration SET status = 'rejected', rejection_reason = ?, finance_cleared = -1 WHERE student_id = ? AND status = 'approved' AND finance_cleared = 0");
+                            $stmt = $pdo->prepare("UPDATE course_registration SET status = 'rejected', rejection_reason = ?, finance_cleared = -1 WHERE student_id = ? AND status = 'pending_finance_approval' AND finance_cleared = 0");
                             $stmt->execute([$reason, $student_id]);
                             
                             if ($stmt->rowCount() > 0) {
@@ -162,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         } else {
                             // Suspend first-time registration
-                            $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'rejected', rejection_reason = ?, finance_cleared = -1 WHERE id = ? AND registration_status = 'approved' AND finance_cleared = 0");
+                            $stmt = $pdo->prepare("UPDATE pending_students SET registration_status = 'rejected', rejection_reason = ?, finance_cleared = -1 WHERE id = ? AND registration_status = 'approved_academic' AND finance_cleared = 0");
                             $stmt->execute([$reason, $student_id]);
                             
                             if ($stmt->rowCount() > 0) {
@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 JOIN course c ON cr.course_id = c.id
                 JOIN intake i ON sp.intake_id = i.id
                 LEFT JOIN programme p ON sp.programme_id = p.id
-                WHERE cr.student_id = ? AND cr.status = 'approved'
+                WHERE cr.student_id = ? AND cr.status = 'approved_academic'
                 LIMIT 1
             ");
             $stmt->execute([$student_id]);

@@ -36,80 +36,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$existing_registration) {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'submit_registration':
-                $selected_courses = $_POST['courses'] ?? [];
-                if (empty($selected_courses)) {
+                $session_id = $_POST['session_id'] ?? '';
+                $courses = $_POST['courses'] ?? [];
+
+                if (empty($session_id)) {
+                    $message = 'Please select an academic session.';
+                    $messageType = 'error';
+                } elseif (empty($courses)) {
                     $message = 'Please select at least one course.';
                     $messageType = 'error';
                 } else {
                     try {
-                        // Insert enrollments for each selected course
-                        foreach ($selected_courses as $course_id) {
-                            $stmt = $pdo->prepare("INSERT INTO course_enrollment (student_user_id, course_id, academic_year, status) VALUES (?, ?, ?, 'pending')");
-                            $stmt->execute([currentUserId(), $course_id, $academic_year]);
+                        $pdo->beginTransaction();
+
+                        // Submit each selected course for registration
+                        foreach ($courses as $course_id) {
+                            // Insert into course_registration with initial status
+                            $stmt = $pdo->prepare("INSERT INTO course_registration (student_id, course_id, term, status, submitted_at) VALUES (?, ?, ?, 'pending_admin', NOW())");
+                            $stmt->execute([currentUserId(), $course_id, 'Semester 1']); // Assuming semester 1, can be modified as needed
                         }
-                        $message = 'Registration submitted successfully. Awaiting approval.';
+
+                        $pdo->commit();
+                        $message = 'Course registration submitted successfully! Awaiting admin approval.';
                         $messageType = 'success';
-                        $existing_registration = true; // Refresh status
                     } catch (Exception $e) {
+                        $pdo->rollback();
                         $message = 'Error submitting registration: ' . $e->getMessage();
                         $messageType = 'error';
                     }
                 }
                 break;
-                
+
             case 'submit_payment':
+                $transaction_ref = $_POST['transaction_ref'] ?? '';
                 $amount = $_POST['amount'] ?? 0;
-                $payment_method = $_POST['payment_method'] ?? '';
-                $reference_number = $_POST['reference_number'] ?? '';
-                
-                // Handle file upload
-                $payment_proof = null;
-                if (isset($_FILES['payment_proof']) && $_FILES['payment_proof']['error'] == 0) {
-                    $upload_dir = '../uploads/payment_proofs/';
-                    if (!is_dir($upload_dir)) {
-                        mkdir($upload_dir, 0777, true);
-                    }
-                    
-                    $file_extension = strtolower(pathinfo($_FILES['payment_proof']['name'], PATHINFO_EXTENSION));
-                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'];
-                    
-                    if (in_array($file_extension, $allowed_extensions)) {
-                        $new_filename = uniqid() . '_' . time() . '.' . $file_extension;
-                        $target_file = $upload_dir . $new_filename;
-                        
-                        if (move_uploaded_file($_FILES['payment_proof']['tmp_name'], $target_file)) {
-                            $payment_proof = $target_file;
-                        }
-                    }
-                }
-                
-                if (empty($amount) || empty($payment_method) || empty($reference_number)) {
-                    $message = 'Please fill in all payment details.';
+
+                if (empty($transaction_ref) || $amount <= 0) {
+                    $message = 'Please provide valid transaction reference and amount.';
                     $messageType = 'error';
                 } else {
                     try {
-                        // Insert payment record
-                        $stmt = $pdo->prepare("INSERT INTO payments (student_or_application_id, amount, payment_date, payment_method, reference_number, status, description) VALUES (?, ?, NOW(), ?, ?, 'pending', ?)");
-                        $stmt->execute([
-                            currentUserId(),
-                            $amount,
-                            $payment_method,
-                            $reference_number,
-                            'Payment for academic year ' . $academic_year
-                        ]);
-                        
-                        $payment_id = $pdo->lastInsertId();
-                        
-                        // Update payment with proof if uploaded
-                        if ($payment_proof) {
-                            $stmt = $pdo->prepare("UPDATE payments SET description = ? WHERE id = ?");
-                            $stmt->execute([$payment_proof, $payment_id]);
+                        $pdo->beginTransaction();
+
+                        // Update course registration status to pending finance approval
+                        $stmt = $pdo->prepare("UPDATE course_registration SET status = 'pending_finance_approval', payment_method = 'Bank Transfer', payment_amount = ?, transaction_id = ? WHERE student_id = ? AND status = 'approved_academic'");
+                        $stmt->execute([$amount, $transaction_ref, currentUserId()]);
+
+                        if ($stmt->rowCount() > 0) {
+                            // Also insert payment record
+                            $stmt = $pdo->prepare("INSERT INTO payments (transaction_reference, full_name, phone_number, amount, category, description, student_or_application_id, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, 'Tuition / School Fees', 'Course Registration Payment', ?, 'pending', 'srms', NOW(), NOW())");
+                            
+                            // Get student profile for name
+                            $student_stmt = $pdo->prepare("SELECT full_name FROM student_profile WHERE user_id = ?");
+                            $student_stmt->execute([currentUserId()]);
+                            $student = $student_stmt->fetch();
+                            
+                            $phone_number = ''; // Get from user profile if available
+                            $stmt->execute([$transaction_ref, $student['full_name'] ?? 'Student', $phone_number, $amount, currentUserId()]);
+                            
+                            $pdo->commit();
+                            $message = 'Payment submitted successfully! Awaiting finance approval.';
+                            $messageType = 'success';
+                        } else {
+                            $pdo->rollback();
+                            $message = 'No approved registrations found to submit payment for.';
+                            $messageType = 'error';
                         }
-                        
-                        $message = 'Payment submitted successfully. Awaiting verification.';
-                        $messageType = 'success';
-                        $payment_made = true; // Refresh status
                     } catch (Exception $e) {
+                        $pdo->rollback();
                         $message = 'Error submitting payment: ' . $e->getMessage();
                         $messageType = 'error';
                     }
@@ -583,7 +577,7 @@ foreach ($programme_fees as $fee) {
                             <i class="fas fa-check-circle"></i> Payment has been made for this academic year.
                         </div>
                     <?php else: ?>
-                        <form method="POST" enctype="multipart/form-data" class="payment-form">
+                        <form method="POST" class="payment-form">
                             <input type="hidden" name="action" value="submit_payment">
                             
                             <div class="fee-summary">
@@ -600,44 +594,14 @@ foreach ($programme_fees as $fee) {
                                 </div>
                             </div>
                             
-                            <div class="payment-methods">
-                                <div class="payment-method" onclick="selectPaymentMethod('bank_transfer')">
-                                    <i class="fas fa-university"></i>
-                                    <div>Bank Transfer</div>
-                                </div>
-                                <div class="payment-method" onclick="selectPaymentMethod('mobile_money')">
-                                    <i class="fas fa-mobile-alt"></i>
-                                    <div>Mobile Money</div>
-                                </div>
-                                <div class="payment-method" onclick="selectPaymentMethod('credit_card')">
-                                    <i class="fas fa-credit-card"></i>
-                                    <div>Credit Card</div>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="payment_method">Payment Method *</label>
-                                <select id="payment_method" name="payment_method" required>
-                                    <option value="">-- Select Payment Method --</option>
-                                    <option value="bank_transfer">Bank Transfer</option>
-                                    <option value="mobile_money">Mobile Money</option>
-                                    <option value="credit_card">Credit Card</option>
-                                </select>
-                            </div>
-                            
                             <div class="form-group">
                                 <label for="amount">Amount (K) *</label>
-                                <input type="number" id="amount" name="amount" step="0.01" min="0" value="<?php echo $total_fees; ?>" required>
+                                <input type="number" id="amount" name="amount" step="0.01" min="0" value="<?php echo $total_fees; ?>" required readonly>
                             </div>
                             
                             <div class="form-group">
-                                <label for="reference_number">Reference Number *</label>
-                                <input type="text" id="reference_number" name="reference_number" required placeholder="Enter transaction reference number">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="payment_proof">Payment Proof (Receipt/Slip)</label>
-                                <input type="file" id="payment_proof" name="payment_proof" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx">
+                                <label for="transaction_ref">Transaction Reference *</label>
+                                <input type="text" id="transaction_ref" name="transaction_ref" required placeholder="Enter your bank transaction reference">
                             </div>
                             
                             <button type="submit" class="btn-submit">Submit Payment</button>
@@ -748,70 +712,69 @@ foreach ($programme_fees as $fee) {
             const container = document.getElementById('courses-container');
             let html = '';
             
-            if (Object.keys(coursesByTerm).length === 0) {
-                html = '<p>No courses available for this session.</p>';
-            } else {
-                // Create term tabs
-                const terms = Object.keys(coursesByTerm);
-                if (terms.length > 1) {
-                    html += '<div class="term-tabs">';
-                    terms.forEach((term, index) => {
-                        const isActive = index === 0 ? 'active' : '';
-                        html += `<div class="term-tab ${isActive}" onclick="showTermTab('${term}')">${term}</div>`;
-                    });
-                    html += '</div>';
+            // Check if there are any courses available
+            let hasCourses = false;
+            for (const term in coursesByTerm) {
+                if (coursesByTerm[term].length > 0) {
+                    hasCourses = true;
+                    break;
                 }
+            }
+            
+            if (!hasCourses) {
+                html = '<div class="alert alert-warning"><i class="fas fa-info-circle"></i> No courses available for this session yet. Please contact the administration.</div>';
+                container.innerHTML = html;
+                document.getElementById('submit-registration-btn').style.display = 'none';
+                return;
+            }
+            
+            for (const term in coursesByTerm) {
+                html += `<h3>${term}</h3>`;
+                html += '<div class="courses-grid">';
                 
-                // Create term content
-                terms.forEach((term, index) => {
-                    const isActive = index === 0 ? 'active' : '';
-                    const courses = coursesByTerm[term];
+                coursesByTerm[term].forEach(course => {
+                    const isRegistered = registeredCourses.includes(course.course_id.toString());
+                    const isChecked = isRegistered ? 'checked disabled' : '';
+                    const isSessionCourse = course.is_session_course ? 'session-course' : 'programme-course';
                     
-                    html += `<div id="term-${term}" class="term-content ${isActive}">`;
-                    html += `<h3>${term} Courses</h3>`;
+                    html += `
+                        <div class="course-item ${isRegistered ? 'registered' : ''} ${isSessionCourse}">
+                            <label>
+                                <input type="checkbox" name="courses[]" value="${course.course_id}" ${isChecked}>
+                                <div class="course-details">
+                                    <span class="course-code">${course.course_code}</span> - 
+                                    <span class="course-name">${course.course_name}</span>
+                                    <br>
+                                    <span class="course-credits">${course.credits} Credits</span>`;
                     
-                    if (courses.length === 0) {
-                        html += '<p>No courses defined for this term.</p>';
+                    if (course.is_session_course) {
+                        html += ' <span class="course-tag session-tag">Session Course</span>';
                     } else {
-                        html += '<div class="courses-list">';
-                        courses.forEach(course => {
-                            const isChecked = registeredCourses.includes(course.course_id.toString()) ? 'checked' : '';
-                            const isRegistered = registeredCourses.includes(course.course_id.toString()) ? 'registered' : '';
-                            const isSessionCourse = course.is_session_course ? 'session-course' : 'programme-course';
-                            
-                            html += `
-                                <div class="course-item ${isRegistered} ${isSessionCourse}">
-                                    <label>
-                                        <input type="checkbox" name="courses[]" value="${course.course_id}" ${isChecked}>
-                                        <div class="course-details">
-                                            <span class="course-code">${course.course_code}</span> - 
-                                            <span class="course-name">${course.course_name}</span>
-                                            <br>
-                                            <span class="course-credits">${course.credits} Credits</span>`;
-                            
-                            if (course.is_session_course) {
-                                html += ' <span class="course-tag session-tag">Session Course</span>';
-                            } else {
-                                html += ' <span class="course-tag programme-tag">Programme Course</span>';
-                            }
-                            
-                            if (registeredCourses.includes(course.course_id.toString())) {
-                                html += ' <span class="course-status"><strong>Registered</strong></span>';
-                            }
-                            
-                            html += `
-                                        </div>
-                                    </label>
-                                </div>`;
-                        });
-                        html += '</div>';
+                        html += ' <span class="course-tag programme-tag">Programme Course</span>';
                     }
-                    html += '</div>';
+                    
+                    if (isRegistered) {
+                        html += ' <span class="course-status"><strong>Registered</strong></span>';
+                    }
+                    
+                    html += `
+                                </div>
+                            </label>
+                        </div>`;
                 });
+                
+                html += '</div>';
             }
             
             container.innerHTML = html;
-            document.getElementById('submit-registration-btn').style.display = 'block';
+            
+            // Show the submit button only if there are selectable courses
+            const selectableCourses = document.querySelectorAll('input[name="courses[]"]:not(:disabled)');
+            if (selectableCourses.length > 0) {
+                document.getElementById('submit-registration-btn').style.display = 'inline-block';
+            } else {
+                document.getElementById('submit-registration-btn').style.display = 'none';
+            }
         }
         
         function showTermTab(term) {
