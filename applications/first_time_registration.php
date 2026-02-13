@@ -412,18 +412,6 @@ try {
                             <?php endif; ?>
                             <small>Select the academic session for your registration</small>
                         </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="session_id">Select Session *</label>
-                            <select id="session_id" name="session_id" required>
-                                <option value="">-- Select Session --</option>
-                            </select>
-                            <?php if ($student_data): ?>
-                                <input type="hidden" name="session_id" id="hidden_session_id" value="">
-                            <?php endif; ?>
-                            <small>Select the academic session for your registration</small>
-                        </div>
                         
                         <!-- Programme Fee Display -->
                         <div class="form-group">
@@ -620,7 +608,7 @@ try {
                 feeDisplay.innerHTML = '<p>Loading fee information...</p>';
                 
                 // Fetch fee via AJAX
-                fetch('./fetch_programme_fee.php?programme_id=' + programmeId + '&session_id=' + sessionId)
+                fetch('./fetch_programme_fee.php?programme_id=' + programmeId)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('Network response not ok');
@@ -628,11 +616,13 @@ try {
                         return response.json();
                     })
                     .then(data => {
-                        if (data.error) {
-                            feeDisplay.innerHTML = '<p>Error loading fee: ' + data.error + '</p>';
-                        } else if (data.message) {
-                            feeDisplay.innerHTML = '<p>' + data.message + '</p>';
-                        } else if (data.amount) {
+                        if (data.success === false) {
+                            if (data.message) {
+                                feeDisplay.innerHTML = '<p>' + data.message + '</p>';
+                            } else {
+                                feeDisplay.innerHTML = '<p>Error loading fee information.</p>';
+                            }
+                        } else if (data.success === true && data.amount) {
                             let feeHtml = `
                                 <h4>Total Amount Payable: K${parseFloat(data.amount).toFixed(2)}</h4>
                             `;
@@ -645,7 +635,7 @@ try {
                             feeDisplay.appendChild(feePlaceholder);
                             feeDisplay.appendChild(feeContent);
                         } else {
-                            feeDisplay.innerHTML = '<p>No fee information available for this programme and session.</p>';
+                            feeDisplay.innerHTML = '<p>No fee information available for this programme.</p>';
                         }
                     })
                     .catch(error => {
