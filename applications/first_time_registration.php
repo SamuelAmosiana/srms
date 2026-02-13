@@ -74,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $full_name = trim($_POST['full_name']);
                 $intake_id = $_POST['intake_id'];
                 $programme_id = $_POST['programme_id'];
+                $session_id = $_POST['session_id'];
                 $payment_method = $_POST['payment_method'];
                 $payment_amount = $_POST['payment_amount'];
                 $transaction_id = $_POST['transaction_id'];
@@ -101,12 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 // Insert into pending_students table with 'pending_approval' status
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, payment_method, payment_amount, transaction_id, payment_proof, created_at, registration_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'pending_approval')");
+                    $stmt = $pdo->prepare("INSERT INTO pending_students (full_name, email, programme_id, intake_id, session_id, payment_method, payment_amount, transaction_id, payment_proof, created_at, registration_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'pending_approval')");
                     $stmt->execute([
                         $full_name,
                         $email,
                         $programme_id,
                         $intake_id,
+                        $session_id,
                         $payment_method,
                         $payment_amount,
                         $transaction_id,
@@ -400,11 +402,43 @@ try {
                             <?php endif; ?>
                         </div>
                         
+                        <div class="form-group">
+                            <label for="session_id">Select Session *</label>
+                            <select id="session_id" name="session_id" required>
+                                <option value="">-- Select Session --</option>
+                            </select>
+                            <?php if ($student_data): ?>
+                                <input type="hidden" name="session_id" id="hidden_session_id" value="">
+                            <?php endif; ?>
+                            <small>Select the academic session for your registration</small>
+                        </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="session_id">Select Session *</label>
+                            <select id="session_id" name="session_id" required>
+                                <option value="">-- Select Session --</option>
+                            </select>
+                            <?php if ($student_data): ?>
+                                <input type="hidden" name="session_id" id="hidden_session_id" value="">
+                            <?php endif; ?>
+                            <small>Select the academic session for your registration</small>
+                        </div>
+                        
+                        <!-- Programme Fee Display -->
+                        <div class="form-group">
+                            <label>Programme Fee</label>
+                            <div id="feeDisplay" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                                <p id="feePlaceholder">Select a programme and session to see the fee information</p>
+                                <div id="feeContent" style="display: none;"></div>
+                            </div>
+                        </div>
+                        
                         <!-- Programme Courses -->
                         <div class="form-group">
-                            <label>Courses for Selected Programme (Term 1)</label>
+                            <label>Courses for Selected Programme and Session (Term 1)</label>
                             <div class="course-list" id="courseList">
-                                <p id="courseListPlaceholder">Select a programme to see available courses</p>
+                                <p id="courseListPlaceholder">Select a programme and session to see available courses</p>
                                 <div id="courseListContent" style="display: none;"></div>
                             </div>
                         </div>
@@ -479,21 +513,62 @@ try {
             document.getElementById('payment_method').value = method;
         }
         
-        // Programme change handler
-        function loadCourses(programmeId) {
+        // Load available sessions
+        function loadSessions() {
+            fetch('./fetch_sessions.php')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const sessionSelect = document.getElementById('session_id');
+                    
+                    if (data.error) {
+                        console.error('Error loading sessions:', data.error);
+                        sessionSelect.innerHTML = '<option value="">Error loading sessions</option>';
+                    } else if (data.message) {
+                        sessionSelect.innerHTML = '<option value="">' + data.message + '</option>';
+                    } else if (data.sessions && data.sessions.length > 0) {
+                        sessionSelect.innerHTML = '<option value="">-- Select Session --</option>';
+                        data.sessions.forEach(session => {
+                            const option = document.createElement('option');
+                            option.value = session.id;
+                            option.textContent = session.session_name + ' (' + session.academic_year + ')';
+                            sessionSelect.appendChild(option);
+                        });
+                    } else {
+                        sessionSelect.innerHTML = '<option value="">No sessions available</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sessions:', error);
+                    const sessionSelect = document.getElementById('session_id');
+                    sessionSelect.innerHTML = '<option value="">Error loading sessions</option>';
+                });
+        }
+        
+        // Load programme courses
+        function loadCourses(programmeId, sessionId) {
             const courseList = document.getElementById('courseList');
             const courseListPlaceholder = document.getElementById('courseListPlaceholder');
             const courseListContent = document.getElementById('courseListContent');
             
-            if (programmeId) {
+            if (programmeId && sessionId) {
                 // Show loading message
                 courseListPlaceholder.style.display = 'none';
                 courseListContent.style.display = 'none';
                 courseList.innerHTML = '<p>Loading courses...</p>';
                 
                 // Fetch courses via AJAX
-                fetch('fetch_programme_courses.php?programme_id=' + programmeId + '&term=1')
-                    .then(response => response.json())
+                fetch('./fetch_programme_courses.php?programme_id=' + programmeId + '&session_id=' + sessionId + '&term=1')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response not ok');
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.error) {
                             courseList.innerHTML = '<p>Error loading courses: ' + data.error + '</p>';
@@ -506,6 +581,7 @@ try {
                                     <div class="course-item">
                                         <strong>${course.course_name}</strong>
                                         <div>${course.course_code} - ${course.credits} Credits</div>
+                                        <div>${course.description || ''}</div>
                                     </div>
                                 `;
                             });
@@ -515,10 +591,11 @@ try {
                             courseList.appendChild(courseListPlaceholder);
                             courseList.appendChild(courseListContent);
                         } else {
-                            courseList.innerHTML = '<p>No courses defined for this programme yet.</p>';
+                            courseList.innerHTML = '<p>No courses defined for this programme and session yet.</p>';
                         }
                     })
                     .catch(error => {
+                        console.error('Error loading courses:', error);
                         courseList.innerHTML = '<p>Error loading courses: ' + error.message + '</p>';
                     });
             } else {
@@ -526,12 +603,95 @@ try {
                 courseListPlaceholder.style.display = 'block';
                 courseList.innerHTML = '';
                 courseList.appendChild(courseListPlaceholder);
+                courseList.appendChild(document.createElement('div')).textContent = 'Select both programme and session to see courses.';
             }
         }
         
+        // Load programme fee
+        function loadProgrammeFee(programmeId, sessionId) {
+            const feeDisplay = document.getElementById('feeDisplay');
+            const feePlaceholder = document.getElementById('feePlaceholder');
+            const feeContent = document.getElementById('feeContent');
+            
+            if (programmeId && sessionId) {
+                // Show loading message
+                feePlaceholder.style.display = 'none';
+                feeContent.style.display = 'none';
+                feeDisplay.innerHTML = '<p>Loading fee information...</p>';
+                
+                // Fetch fee via AJAX
+                fetch('./fetch_programme_fee.php?programme_id=' + programmeId + '&session_id=' + sessionId)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) {
+                            feeDisplay.innerHTML = '<p>Error loading fee: ' + data.error + '</p>';
+                        } else if (data.message) {
+                            feeDisplay.innerHTML = '<p>' + data.message + '</p>';
+                        } else if (data.amount) {
+                            let feeHtml = `
+                                <h4>Total Amount Payable: K${parseFloat(data.amount).toFixed(2)}</h4>
+                            `;
+                            if (data.description) {
+                                feeHtml += `<p>${data.description}</p>`;
+                            }
+                            feeContent.innerHTML = feeHtml;
+                            feeContent.style.display = 'block';
+                            feeDisplay.innerHTML = '';
+                            feeDisplay.appendChild(feePlaceholder);
+                            feeDisplay.appendChild(feeContent);
+                        } else {
+                            feeDisplay.innerHTML = '<p>No fee information available for this programme and session.</p>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading fee:', error);
+                        feeDisplay.innerHTML = '<p>Error loading fee: ' + error.message + '</p>';
+                    });
+            } else {
+                feeContent.style.display = 'none';
+                feePlaceholder.style.display = 'block';
+                feeDisplay.innerHTML = '';
+                feeDisplay.appendChild(feePlaceholder);
+                feeDisplay.appendChild(document.createElement('div')).textContent = 'Select both programme and session to see fee information.';
+            }
+        }
+        
+        // Event listeners for programme and session selection
         document.getElementById('programme_id').addEventListener('change', function() {
             const programmeId = this.value;
-            loadCourses(programmeId);
+            const sessionId = document.getElementById('session_id').value;
+            
+            if (programmeId && sessionId) {
+                loadCourses(programmeId, sessionId);
+                loadProgrammeFee(programmeId, sessionId);
+            } else {
+                // Reset if either is not selected
+                const courseList = document.getElementById('courseList');
+                const feeDisplay = document.getElementById('feeDisplay');
+                courseList.innerHTML = '<p id="courseListPlaceholder">Select a programme and session to see available courses</p>';
+                feeDisplay.innerHTML = '<p id="feePlaceholder">Select a programme and session to see the fee information</p>';
+            }
+        });
+        
+        document.getElementById('session_id').addEventListener('change', function() {
+            const sessionId = this.value;
+            const programmeId = document.getElementById('programme_id').value;
+            
+            if (programmeId && sessionId) {
+                loadCourses(programmeId, sessionId);
+                loadProgrammeFee(programmeId, sessionId);
+            } else {
+                // Reset if either is not selected
+                const courseList = document.getElementById('courseList');
+                const feeDisplay = document.getElementById('feeDisplay');
+                courseList.innerHTML = '<p id="courseListPlaceholder">Select a programme and session to see available courses</p>';
+                feeDisplay.innerHTML = '<p id="feePlaceholder">Select a programme and session to see the fee information</p>';
+            }
         });
         
         // Initialize payment method if already selected
@@ -545,10 +705,15 @@ try {
                 });
             }
             
-            // If programme is already selected (pre-filled), load courses
+            // Load available sessions
+            loadSessions();
+            
+            // If programme and session are already selected (pre-filled), load courses and fee
             const programmeId = document.getElementById('programme_id').value;
-            if (programmeId) {
-                loadCourses(programmeId);
+            const sessionId = document.getElementById('session_id').value;
+            if (programmeId && sessionId) {
+                loadCourses(programmeId, sessionId);
+                loadProgrammeFee(programmeId, sessionId);
             }
         });
     </script>
