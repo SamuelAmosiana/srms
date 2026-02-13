@@ -218,6 +218,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Handle pagination parameters
+$pending_page = isset($_GET['pending_page']) ? max(1, (int)$_GET['pending_page']) : 1;
+$approved_page = isset($_GET['approved_page']) ? max(1, (int)$_GET['approved_page']) : 1;
+$rejected_page = isset($_GET['rejected_page']) ? max(1, (int)$_GET['rejected_page']) : 1;
+
+// Handle items per page limit (default to 5, min 3, max 50)
+$items_per_page = isset($_GET['items_per_page']) ? max(3, min(50, (int)$_GET['items_per_page'])) : 5;
+
+// Calculate offsets
+$pending_offset = ($pending_page - 1) * $items_per_page;
+$approved_offset = ($approved_page - 1) * $items_per_page;
+$rejected_offset = ($rejected_page - 1) * $items_per_page;
+
 // Get undergraduate applications - updated logic to match actual programme names
 $stmt = $pdo->prepare("
     SELECT a.*, a.phone, p.name as programme_name, i.name as intake_name
@@ -227,9 +240,16 @@ $stmt = $pdo->prepare("
     WHERE a.status = 'pending' 
     AND a.application_type = 'undergraduate'
     ORDER BY a.created_at DESC
+    LIMIT $items_per_page OFFSET $pending_offset
 ");
 $stmt->execute();
 $undergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get total count for pagination
+$stmt = $pdo->prepare("SELECT COUNT(*) as total FROM applications WHERE status = 'pending' AND application_type = 'undergraduate'");
+$stmt->execute();
+$pending_total = $stmt->fetch()['total'];
+$pending_pages = ceil($pending_total / $items_per_page);
 
 // Get approved undergraduate applications
 $stmt = $pdo->prepare("
@@ -240,9 +260,16 @@ $stmt = $pdo->prepare("
     WHERE a.status = 'approved' 
     AND a.application_type = 'undergraduate'
     ORDER BY a.created_at DESC
+    LIMIT $items_per_page OFFSET $approved_offset
 ");
 $stmt->execute();
 $approvedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get total count for pagination
+$stmt = $pdo->prepare("SELECT COUNT(*) as total FROM applications WHERE status = 'approved' AND application_type = 'undergraduate'");
+$stmt->execute();
+$approved_total = $stmt->fetch()['total'];
+$approved_pages = ceil($approved_total / $items_per_page);
 
 // Get rejected undergraduate applications
 $stmt = $pdo->prepare("
@@ -253,9 +280,16 @@ $stmt = $pdo->prepare("
     WHERE a.status = 'rejected' 
     AND a.application_type = 'undergraduate'
     ORDER BY a.created_at DESC
+    LIMIT $items_per_page OFFSET $rejected_offset
 ");
 $stmt->execute();
 $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get total count for pagination
+$stmt = $pdo->prepare("SELECT COUNT(*) as total FROM applications WHERE status = 'rejected' AND application_type = 'undergraduate'");
+$stmt->execute();
+$rejected_total = $stmt->fetch()['total'];
+$rejected_pages = ceil($rejected_total / $items_per_page);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -348,6 +382,71 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         #documents_section ul li a i {
+            font-size: 14px;
+        }
+        
+        /* Pagination Styles */
+        .pagination-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding: 15px 0;
+            border-top: 1px solid #eee;
+        }
+        
+        .pagination-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .pagination {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .page-link {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            color: #007bff;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .page-link:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        .page-link.active {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        
+        .page-link:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .items-per-page-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .items-per-page-selector label {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .items-per-page-selector select {
+            padding: 5px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background-color: #fff;
             font-size: 14px;
         }
     </style>
@@ -458,7 +557,18 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <!-- Undergraduate Applications -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="fas fa-graduation-cap"></i> Pending Undergraduate Applications (<?php echo count($undergraduateApplications); ?>)</h3>
+                <h3><i class="fas fa-graduation-cap"></i> Pending Undergraduate Applications (<?php echo $pending_total; ?>)</h3>
+                <div class="items-per-page-selector">
+                    <label for="items_per_page">Show:</label>
+                    <select id="items_per_page" name="items_per_page" onchange="updateItemsPerPagePreservePage()">
+                        <option value="3" <?php echo $items_per_page == 3 ? 'selected' : ''; ?>>3</option>
+                        <option value="5" <?php echo $items_per_page == 5 ? 'selected' : ''; ?>>5</option>
+                        <option value="10" <?php echo $items_per_page == 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="15" <?php echo $items_per_page == 15 ? 'selected' : ''; ?>>15</option>
+                        <option value="20" <?php echo $items_per_page == 20 ? 'selected' : ''; ?>>20</option>
+                        <option value="25" <?php echo $items_per_page == 25 ? 'selected' : ''; ?>>25</option>
+                    </select>
+                </div>
             </div>
             <div class="panel-content">
                 <?php if (empty($undergraduateApplications)): ?>
@@ -505,6 +615,30 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Pagination Controls -->
+                    <?php if ($pending_total > $items_per_page): ?>
+                    <div class="pagination-controls">
+                        <div class="pagination-info">
+                            Showing <?php echo min($pending_offset + 1, $pending_total); ?> to <?php echo min($pending_offset + $items_per_page, $pending_total); ?> of <?php echo $pending_total; ?> entries
+                        </div>
+                        <div class="pagination">
+                            <?php if ($pending_pages > 1): ?>
+                                <?php if ($pending_page > 1): ?>
+                                    <a href="?pending_page=<?php echo $pending_page - 1; ?>&approved_page=<?php echo $approved_page; ?>&rejected_page=<?php echo $rejected_page; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link">Previous</a>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $pending_pages; $i++): ?>
+                                    <a href="?pending_page=<?php echo $i; ?>&approved_page=<?php echo $approved_page; ?>&rejected_page=<?php echo $rejected_page; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link <?php echo ($i == $pending_page) ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                                <?php endfor; ?>
+                                
+                                <?php if ($pending_page < $pending_pages): ?>
+                                    <a href="?pending_page=<?php echo $pending_page + 1; ?>&approved_page=<?php echo $approved_page; ?>&rejected_page=<?php echo $rejected_page; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link">Next</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -512,7 +646,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <!-- Approved Undergraduate Applications -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="fas fa-check-circle"></i> Approved Undergraduate Applications (<?php echo count($approvedUndergraduateApplications); ?>)</h3>
+                <h3><i class="fas fa-check-circle"></i> Approved Undergraduate Applications (<?php echo $approved_total; ?>)</h3>
             </div>
             <div class="panel-content">
                 <?php if (empty($approvedUndergraduateApplications)): ?>
@@ -549,6 +683,30 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Pagination Controls -->
+                    <?php if ($approved_total > $items_per_page): ?>
+                    <div class="pagination-controls">
+                        <div class="pagination-info">
+                            Showing <?php echo min($approved_offset + 1, $approved_total); ?> to <?php echo min($approved_offset + $items_per_page, $approved_total); ?> of <?php echo $approved_total; ?> entries
+                        </div>
+                        <div class="pagination">
+                            <?php if ($approved_pages > 1): ?>
+                                <?php if ($approved_page > 1): ?>
+                                    <a href="?pending_page=<?php echo $pending_page; ?>&approved_page=<?php echo $approved_page - 1; ?>&rejected_page=<?php echo $rejected_page; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link">Previous</a>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $approved_pages; $i++): ?>
+                                    <a href="?pending_page=<?php echo $pending_page; ?>&approved_page=<?php echo $i; ?>&rejected_page=<?php echo $rejected_page; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link <?php echo ($i == $approved_page) ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                                <?php endfor; ?>
+                                
+                                <?php if ($approved_page < $approved_pages): ?>
+                                    <a href="?pending_page=<?php echo $pending_page; ?>&approved_page=<?php echo $approved_page + 1; ?>&rejected_page=<?php echo $rejected_page; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link">Next</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -556,7 +714,7 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <!-- Rejected Undergraduate Applications -->
         <div class="data-panel">
             <div class="panel-header">
-                <h3><i class="fas fa-times-circle"></i> Rejected Undergraduate Applications (<?php echo count($rejectedUndergraduateApplications); ?>)</h3>
+                <h3><i class="fas fa-times-circle"></i> Rejected Undergraduate Applications (<?php echo $rejected_total; ?>)</h3>
             </div>
             <div class="panel-content">
                 <?php if (empty($rejectedUndergraduateApplications)): ?>
@@ -595,6 +753,30 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Pagination Controls -->
+                    <?php if ($rejected_total > $items_per_page): ?>
+                    <div class="pagination-controls">
+                        <div class="pagination-info">
+                            Showing <?php echo min($rejected_offset + 1, $rejected_total); ?> to <?php echo min($rejected_offset + $items_per_page, $rejected_total); ?> of <?php echo $rejected_total; ?> entries
+                        </div>
+                        <div class="pagination">
+                            <?php if ($rejected_pages > 1): ?>
+                                <?php if ($rejected_page > 1): ?>
+                                    <a href="?pending_page=<?php echo $pending_page; ?>&approved_page=<?php echo $approved_page; ?>&rejected_page=<?php echo $rejected_page - 1; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link">Previous</a>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $rejected_pages; $i++): ?>
+                                    <a href="?pending_page=<?php echo $pending_page; ?>&approved_page=<?php echo $approved_page; ?>&rejected_page=<?php echo $i; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link <?php echo ($i == $rejected_page) ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                                <?php endfor; ?>
+                                
+                                <?php if ($rejected_page < $rejected_pages): ?>
+                                    <a href="?pending_page=<?php echo $pending_page; ?>&approved_page=<?php echo $approved_page; ?>&rejected_page=<?php echo $rejected_page + 1; ?>&items_per_page=<?php echo $items_per_page; ?>" class="page-link">Next</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -740,6 +922,26 @@ $rejectedUndergraduateApplications = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <script src="../assets/js/admin-dashboard.js"></script>
     <script>
         let currentApplicationId = null;
+        
+        function updateItemsPerPage() {
+            const itemsPerPage = document.getElementById('items_per_page').value;
+            const currentPendingPage = <?php echo $pending_page; ?>;
+            const currentApprovedPage = <?php echo $approved_page; ?>;
+            const currentRejectedPage = <?php echo $rejected_page; ?>;
+            
+            // Redirect to first page with new items per page setting
+            window.location.href = `?pending_page=1&approved_page=1&rejected_page=1&items_per_page=${itemsPerPage}`;
+        }
+        
+        // Preserve current page states when changing items per page
+        function updateItemsPerPagePreservePage() {
+            const itemsPerPage = document.getElementById('items_per_page').value;
+            const currentPendingPage = <?php echo $pending_page; ?>;
+            const currentApprovedPage = <?php echo $approved_page; ?>;
+            const currentRejectedPage = <?php echo $rejected_page; ?>;
+            
+            window.location.href = `?pending_page=${currentPendingPage}&approved_page=${currentApprovedPage}&rejected_page=${currentRejectedPage}&items_per_page=${itemsPerPage}`;
+        }
         
 
         

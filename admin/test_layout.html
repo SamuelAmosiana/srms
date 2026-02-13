@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layout Test</title>
+    <style>
+        /* Core Layout Styles */
+        .admin-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
+            background: #f8f9fa;
+        }
+        
+        .sidebar {
+            background: #343a40;
+            color: white;
+            padding: 20px;
+            height: 100vh;
+            position: fixed;
+            width: 280px;
+        }
+        
+        .main-content {
+            margin-left: 0;
+        }
+        
+        .content-area {
+            padding: 30px 40px;
+            max-width: 100%;
+            overflow-x: visible;
+        }
+
+        /* Ensure table-responsive container handles overflow properly */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+            margin-right: 15px;
+        }
+        
+        /* Make sure the table can expand beyond container width */
+        .users-table {
+            width: 100%;
+            min-width: 1400px;
+            table-layout: auto;
+            border-collapse: collapse;
+        }
+        
+        /* Ensure proper column sizing */
+        .users-table th,
+        .users-table td {
+            white-space: nowrap;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        
+        .users-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .admin-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .content-area {
+                padding: 15px 20px;
+            }
+            
+            .table-responsive {
+                margin-right: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <h3>Admin Panel</h3>
+            <nav>
+                <p>Dashboard</p>
+                <p>Manage Users</p>
+                <p>Course Registrations</p>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <div class="content-area">
+                <h1>Course Registrations</h1>
+                
+                <!-- Approved Students Section -->
+                <div class="card" id="approved-students-section" style="margin-top: 30px;">
+                    <div class="card-header">
+                        <h3>Approved Students</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-row" style="margin-bottom: 20px;">
+                            <div class="form-group">
+                                <label>Student Type:</label>
+                                <select>
+                                    <option>All Students</option>
+                                    <option>First Time Registration</option>
+                                    <option>Regular/Returning</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Programme:</label>
+                                <select>
+                                    <option>All Programmes</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="users-table" id="approved-students-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student Number</th>
+                                        <th>Full Name</th>
+                                        <th>Email</th>
+                                        <th>Programme</th>
+                                        <th>Type</th>
+                                        <th>Registration Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>STU001</td>
+                                        <td>John Doe</td>
+                                        <td>john@example.com</td>
+                                        <td>Computer Science</td>
+                                        <td>First Time</td>
+                                        <td>2024-01-15</td>
+                                        <td>
+                                            <button>View</button>
+                                            <button>Print</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>STU002</td>
+                                        <td>Jane Smith</td>
+                                        <td>jane@example.com</td>
+                                        <td>Business Administration</td>
+                                        <td>Regular</td>
+                                        <td>2024-01-20</td>
+                                        <td>
+                                            <button>View</button>
+                                            <button>Print</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

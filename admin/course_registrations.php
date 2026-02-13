@@ -612,23 +612,64 @@ try {
             min-width: 1400px;
         }
 
-        /* Prevent sidebar overlap: enforce content offset when sidebar is visible */
-        body.admin-layout .main-content {
-            margin-left: 280px !important;
+        /* Prevent sidebar overlap: enforce proper content area sizing */
+        .admin-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
         }
-        @media (max-width: 768px) {
-            body.admin-layout .main-content {
-                margin-left: 0 !important;
-            }
+        
+        .main-content {
+            margin-left: 0; /* Reset any conflicting margins */
+        }
+        
+        .content-area {
+            padding: 30px 40px;
+            max-width: 100%;
+            overflow-x: visible; /* Allow horizontal overflow for scrolling */
         }
 
-        /* Slight padding to ensure scrollbar is not flush against the sidebar edge */
+        /* Ensure table-responsive container handles overflow properly */
         #approved-students-section .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
             padding-bottom: 4px;
+            margin-right: 15px; /* Add space for scrollbar visibility */
+        }
+        
+        /* Make sure the table can expand beyond container width */
+        #approved-students-table {
+            width: 100%;
+            min-width: 1400px;
+            table-layout: auto;
+        }
+        
+        /* Ensure proper column sizing */
+        #approved-students-table th,
+        #approved-students-table td {
+            white-space: nowrap;
+            padding: 12px 15px;
+        }
+
+        @media (max-width: 768px) {
+            .admin-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .content-area {
+                padding: 15px 20px;
+            }
+            
+            #approved-students-section .table-responsive {
+                margin-right: 0;
+            }
         }
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
+    <!-- Admin Container -->
+    <div class="admin-container">
+    
     <!-- Top Navigation Bar -->
     <nav class="top-nav">
         <div class="nav-left">
@@ -1275,7 +1316,7 @@ try {
                 </div>
             </div>
             
-            <div class="table-responsive">
+            <div class="approved-table-wrapper">
                 <table class="users-table" id="approved-students-table">
                     <thead>
                         <tr>
@@ -1906,5 +1947,6 @@ fetch('get_programmes.php')
 // Initially load the approved students
 loadApprovedStudents();
 </script>
+    </div> <!-- End admin-container -->
 </body>
 </html>
