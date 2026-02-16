@@ -790,6 +790,59 @@ if (isset($_GET['edit_schedule'])) {
             font-style: italic;
             color: #666;
         }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .modal-actions .btn {
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        
+        @media print {
+            .no-print, .modal-actions, .close {
+                display: none !important;
+            }
+            
+            .modal-content {
+                box-shadow: none !important;
+                border: none !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+            
+            body {
+                background: white !important;
+            }
+            
+            .print-header {
+                text-align: center;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+            }
+            
+            .print-header img {
+                height: 60px;
+                width: auto;
+                margin-bottom: 10px;
+            }
+            
+            .print-header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: bold;
+            }
+            
+            .print-header h2 {
+                margin: 5px 0;
+                font-size: 18px;
+                color: #333;
+            }
+        }
     </style>
 </head>
 <body class="admin-layout" data-theme="light">
@@ -1718,7 +1771,7 @@ if (isset($_GET['edit_schedule'])) {
             const paginationDiv = document.getElementById('session_students_pagination');
             
             // Show loading state
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading students...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading students...</td></tr>';
             
             fetch(`get_session_students.php?session_id=${sessionId}&page=${page}`)
                 .then(response => response.json())
@@ -1726,7 +1779,7 @@ if (isset($_GET['edit_schedule'])) {
                     if (data.success) {
                         let html = '';
                         if (data.students.length === 0) {
-                            html = '<tr><td colspan="6" style="text-align: center;">No students registered for this session</td></tr>';
+                            html = '<tr><td colspan="7" style="text-align: center;">No students registered for this session</td></tr>';
                         } else {
                             data.students.forEach(student => {
                                 html += `
@@ -1753,12 +1806,12 @@ if (isset($_GET['edit_schedule'])) {
                         // Update pagination
                         updateSessionPagination(data.pagination, sessionId);
                     } else {
-                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">Error: ${data.message}</td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Error: ${data.message}</td></tr>`;
                     }
                 })
                 .catch(error => {
                     console.error('Error loading session students:', error);
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Error loading data</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Error loading data</td></tr>';
                 });
         }
         
@@ -1794,6 +1847,231 @@ if (isset($_GET['edit_schedule'])) {
             
             html += '</div>';
             paginationDiv.innerHTML = html;
+        }
+        
+        // Function to print session students
+        function printSessionStudents() {
+            // Get current session info
+            const sessionName = document.getElementById('modal_session_name').textContent;
+            const sessionId = document.getElementById('session_students_modal').dataset.sessionId;
+            
+            if (!sessionId) {
+                alert('Session ID not found. Please refresh the page and try again.');
+                return;
+            }
+            
+            // Show loading message
+            const originalContent = document.querySelector('.modal-body').innerHTML;
+            document.querySelector('.modal-body').innerHTML = '<div class="loading">Preparing print data...</div>';
+            
+            // Fetch fresh student data for printing
+            fetch(`get_session_students.php?session_id=${sessionId}&limit=1000`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.students.length > 0) {
+                        // Create table HTML for printing
+                        let tableHtml = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Student Number</th>
+                                        <th>Full Name</th>
+                                        <th>Email</th>
+                                        <th>Programme</th>
+                                        <th>Registration Type</th>
+                                        <th>Registration Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
+                        
+                        data.students.forEach(student => {
+                            tableHtml += `
+                                <tr>
+                                    <td>${escapeHtml(student.student_number)}</td>
+                                    <td>${escapeHtml(student.full_name)}</td>
+                                    <td>${escapeHtml(student.email)}</td>
+                                    <td>${escapeHtml(student.programme_name || 'N/A')}</td>
+                                    <td>${escapeHtml(student.registration_type)}</td>
+                                    <td>${formatDate(student.registration_date)}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        tableHtml += `
+                                </tbody>
+                            </table>
+                            <p style="margin-top: 20px; text-align: center; font-style: italic;">
+                                Total Students: ${data.students.length}
+                            </p>
+                        `;
+                        
+                        // Create print content
+                        const printContent = `
+                            <div class="print-header">
+                                <img src="../assets/images/lsc-logo.png" alt="LSC Logo" onerror="this.style.display='none'">
+                                <h1>LUSAKA SOUTH COLLEGE</h1>
+                                <h2>REGISTERED STUDENTS LIST</h2>
+                                <h3>Session: ${sessionName}</h3>
+                                <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                            </div>
+                            
+                            <div class="print-content">
+                                ${tableHtml}
+                            </div>
+                        `;
+                        
+                        // Create a new window for printing
+                        const printWindow = window.open('', '_blank');
+                        printWindow.document.write(`
+                            <html>
+                                <head>
+                                    <title>Registered Students - ${sessionName}</title>
+                                    <style>
+                                        body { 
+                                            font-family: Arial, sans-serif; 
+                                            margin: 20px; 
+                                            line-height: 1.4;
+                                        }
+                                        .print-header { 
+                                            text-align: center; 
+                                            margin-bottom: 30px; 
+                                            border-bottom: 2px solid #000; 
+                                            padding-bottom: 20px; 
+                                        }
+                                        .print-header img { 
+                                            height: 80px; 
+                                            width: auto; 
+                                            margin-bottom: 15px; 
+                                        }
+                                        .print-header h1 { 
+                                            margin: 10px 0; 
+                                            font-size: 24px; 
+                                            font-weight: bold; 
+                                        }
+                                        .print-header h2 { 
+                                            margin: 10px 0; 
+                                            font-size: 20px; 
+                                            color: #333; 
+                                        }
+                                        .print-header h3 { 
+                                            margin: 10px 0; 
+                                            font-size: 16px; 
+                                            color: #666; 
+                                        }
+                                        table { 
+                                            width: 100%; 
+                                            border-collapse: collapse; 
+                                            margin-top: 20px; 
+                                        }
+                                        th, td { 
+                                            border: 1px solid #000; 
+                                            padding: 8px; 
+                                            text-align: left; 
+                                        }
+                                        th { 
+                                            background-color: #f0f0f0; 
+                                            font-weight: bold; 
+                                        }
+                                        tr:nth-child(even) { 
+                                            background-color: #f9f9f9; 
+                                        }
+                                    </style>
+                                </head>
+                                <body>
+                                    ${printContent}
+                                </body>
+                            </html>
+                        `);
+                        
+                        printWindow.document.close();
+                        printWindow.focus();
+                        printWindow.print();
+                        printWindow.close();
+                    } else {
+                        alert('No student data found for this session.');
+                    }
+                    
+                    // Restore original content
+                    document.querySelector('.modal-body').innerHTML = originalContent;
+                    // Reload the student data
+                    loadSessionStudents(sessionId, 1);
+                })
+                .catch(error => {
+                    console.error('Error preparing print data:', error);
+                    alert('Error preparing print data. Please try again.');
+                    // Restore original content
+                    document.querySelector('.modal-body').innerHTML = originalContent;
+                });
+        }
+        
+        // Function to export session students
+        function exportSessionStudents(format) {
+            // Get current session ID from the modal
+            const sessionId = document.getElementById('session_students_modal').dataset.sessionId;
+            
+            if (!sessionId) {
+                alert('Session ID not found. Please refresh the page and try again.');
+                return;
+            }
+            
+            // Open export URL in new window/tab
+            const exportUrl = `export_session_students.php?session_id=${sessionId}&format=${format}`;
+            window.open(exportUrl, '_blank');
+        }
+        
+        // Store session ID in modal when loading students
+        function loadSessionStudents(sessionId, page = 1) {
+            // Store session ID in modal for export functionality
+            const modal = document.getElementById('session_students_modal');
+            modal.dataset.sessionId = sessionId;
+            
+            const tbody = document.getElementById('session_students_tbody');
+            const paginationDiv = document.getElementById('session_students_pagination');
+            
+            // Show loading state
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading students...</td></tr>';
+            
+            fetch(`get_session_students.php?session_id=${sessionId}&page=${page}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let html = '';
+                        if (data.students.length === 0) {
+                            html = '<tr><td colspan="7" style="text-align: center;">No students registered for this session</td></tr>';
+                        } else {
+                            data.students.forEach(student => {
+                                html += `
+                                    <tr>
+                                        <td>${escapeHtml(student.student_number)}</td>
+                                        <td>${escapeHtml(student.full_name)}</td>
+                                        <td>${escapeHtml(student.email)}</td>
+                                        <td>${escapeHtml(student.programme_name || 'N/A')}</td>
+                                        <td>${escapeHtml(student.registration_type)}</td>
+                                        <td>${formatDate(student.registration_date)}</td>
+                                        <td>
+                                            <a href="../student/profile.php?id=${student.user_id}" class="btn-icon btn-view" title="View Profile">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="../student/view_results.php?student_id=${student.user_id}" class="btn-icon btn-info" title="View Results">
+                                                <i class="fas fa-graduation-cap"></i>
+                                            </a>
+                                        </td>
+                                    </tr>`;
+                            });
+                        }
+                        tbody.innerHTML = html;
+                        
+                        // Update pagination
+                        updateSessionPagination(data.pagination, sessionId);
+                    } else {
+                        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Error: ${data.message}</td></tr>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading session students:', error);
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Error loading data</td></tr>';
+                });
         }
         
         // Close modal when clicking outside
@@ -2058,7 +2336,18 @@ if (isset($_GET['edit_schedule'])) {
         <div class="modal-content" style="max-width: 90%; width: 1200px;">
             <div class="modal-header">
                 <h2>Registered Students for <span id="modal_session_name"></span></h2>
-                <span class="close" onclick="closeModal('session_students_modal')">&times;</span>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="printSessionStudents()">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                    <button class="btn btn-primary" onclick="exportSessionStudents('pdf')">
+                        <i class="fas fa-file-pdf"></i> Export PDF
+                    </button>
+                    <button class="btn btn-info" onclick="exportSessionStudents('csv')">
+                        <i class="fas fa-file-csv"></i> Export CSV
+                    </button>
+                    <span class="close" onclick="closeModal('session_students_modal')">&times;</span>
+                </div>
             </div>
             <div class="modal-body">
                 <div class="table-responsive">

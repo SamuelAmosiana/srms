@@ -540,11 +540,7 @@ try {
                                     
                                     <?php if (!empty($student_details['payment_proof'])): ?>
                                         <p><strong>Payment Proof:</strong></p>
-                                        <?php if (file_exists('../' . $student_details['payment_proof'])): ?>
-                                            <img src="../<?php echo htmlspecialchars($student_details['payment_proof']); ?>" alt="Payment Proof" class="payment-proof">
-                                        <?php else: ?>
-                                            <p>Payment proof file not found.</p>
-                                        <?php endif; ?>
+                                        <img src="download_payment_proof.php?file=<?php echo urlencode($student_details['payment_proof']); ?>" alt="Payment Proof" class="payment-proof">
                                     <?php else: ?>
                                         <p>No payment proof uploaded.</p>
                                     <?php endif; ?>

@@ -489,7 +489,7 @@ function generateStudentNumber($pdo) {
                                         <td><?php echo date('Y-m-d', strtotime($reg['created_at'])); ?></td>
                                         <td>
                                             <?php if (!empty($reg['payment_proof'])): ?>
-                                                <a href="../<?php echo htmlspecialchars($reg['payment_proof']); ?>" target="_blank" class="btn btn-sm btn-info payment-proof-link">
+                                                <a href="download_payment_proof.php?file=<?php echo urlencode($reg['payment_proof']); ?>" target="_blank" class="btn btn-sm btn-info payment-proof-link">
                                                     <i class="fas fa-receipt"></i> View Proof
                                                 </a>
                                             <?php endif; ?>

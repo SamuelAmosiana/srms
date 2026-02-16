@@ -1383,8 +1383,8 @@ try {
         // Function to view payment proof
         function viewPaymentProof(studentId, proofPath) {
             if (proofPath) {
-                // Open the payment proof in a new window/tab
-                window.open('../' + proofPath, '_blank');
+                // Open the payment proof in a new window/tab using the full path
+                window.open('download_payment_proof.php?file=' + encodeURIComponent(proofPath), '_blank');
             } else {
                 alert('No payment proof available for this student.');
             }
@@ -1440,7 +1440,7 @@ try {
                             html += `
                                 <div class="detail-row">
                                     <strong>Payment Proof:</strong> 
-                                    <a href="../${data.payment_proof}" target="_blank" class="btn btn-sm btn-info">
+                                    <a href="download_payment_proof.php?file=${encodeURIComponent(data.payment_proof)}" target="_blank" class="btn btn-sm btn-info">
                                         <i class="fas fa-file-download"></i> View Document
                                     </a>
                                 </div>
