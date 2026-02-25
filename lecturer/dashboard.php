@@ -122,6 +122,10 @@ $stats['pending_results'] = $stmt->fetch()['count'];
                     <i class="fas fa-users"></i>
                     <span>View Students</span>
                 </a>
+                <a href="./elearning.php" class="nav-item">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>E-Learning (Moodle)</span>
+                </a>
             </div>
             
             <div class="nav-section">
