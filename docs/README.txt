@@ -1,4 +1,4 @@
-📘 LSC Student Records Management System (SRMS)
+📘 Lusaka South College(LSC) Student Records Management System (SRMS)
 A modern, efficient, and secure Student Records Management System built for Lusaka South College (LSC) to support admissions, enrollment, academic management, and student services.
 
 🚀 Overview
