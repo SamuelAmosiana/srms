@@ -515,6 +515,14 @@ $rejected_pages = ceil($rejected_total / $items_per_page);
             </div>
             
             <div class="nav-section">
+                <h4>Documents</h4>
+                <a href="document_access.php" class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Document Access</span>
+                </a>
+            </div>
+            
+            <div class="nav-section">
                 <h4>My Approvals</h4>
                 <a href="my_approvals.php" class="nav-item">
                     <i class="fas fa-thumbs-up"></i>
