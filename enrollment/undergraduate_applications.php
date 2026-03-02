@@ -17,7 +17,7 @@ require_once '../finance/generate_acceptance_letter_with_fees.php';
 require_once '../letters_reports/generate_acceptance_letter_dompdf.php';
 
 // Include the email functionality (contains sendAcceptanceLetterEmail function)
-require_once '../letters_reports/generate_acceptance_letter_docx.php';
+require_once '../letters_reports/generate_acceptance_letter.php';
 
 // Add a helper function to send emails with better error handling
 function sendEmailWithImprovedHandling($to, $subject, $body) {
@@ -26,7 +26,7 @@ function sendEmailWithImprovedHandling($to, $subject, $body) {
     
     if ($phpmailer_available) {
         // Include the PHPMailer functions
-        require_once '../letters_reports/generate_acceptance_letter_docx.php';
+        require_once '../letters_reports/generate_acceptance_letter.php';
         $result = sendEmailWithPHPMailer($to, $subject, $body);
         if ($result) {
             return true;
